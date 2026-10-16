@@ -14,9 +14,9 @@ the npm account.
 
 ```sh
 npm login
-scripts/npm-publish.sh 0.0.1          # creates all 7 packages
+scripts/npm-publish.sh 0.0.1          # creates the packages (win32-x64: see below)
 pkgs="cfn-idle-cost cdk-idle-cost"
-for p in darwin-arm64 darwin-x64 linux-x64 linux-arm64 win32-x64; do pkgs="$pkgs cfn-idle-cost-$p"; done
+for p in darwin-arm64 darwin-x64 linux-x64 linux-arm64; do pkgs="$pkgs cfn-idle-cost-$p"; done
 for p in $pkgs; do
   npm trust github "$p" --repo badmintoncryer/cfn-idle-cost --file release.yml --allow-publish -y
 done
@@ -33,3 +33,11 @@ git tag v0.1.0 && git push origin v0.1.0
 
 A new platform (a new `cfn-idle-cost-<os>-<cpu>` package) needs the same
 first-publish + `npm trust` step before its first release.
+
+## Windows package
+
+npm's spam check rejects the name `cfn-idle-cost-win32-x64` (E403), so the npm
+packages don't include Windows yet; the GitHub Release still has the Windows
+binary. Once npm support allows the name, add `windows/amd64:win32/x64` back to
+`TARGETS` in `scripts/npm-publish.sh`, publish it once from a laptop and run
+`npm trust` for it like the others.

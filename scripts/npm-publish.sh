@@ -7,8 +7,19 @@
 set -euo pipefail
 VERSION=${1:?version}; shift
 OUT=${NPM_OUT:-$(mktemp -d)}
-TARGETS="darwin/arm64:darwin/arm64 darwin/amd64:darwin/x64 linux/amd64:linux/x64 linux/arm64:linux/arm64 windows/amd64:win32/x64"
+# TARGETS (env) overrides the platforms, e.g. to leave one out.
+# ponytail: windows/amd64:win32/x64 is left out until npm lets the name
+# cfn-idle-cost-win32-x64 past its spam check (support request open); add it back then.
+TARGETS=${TARGETS:-"darwin/arm64:darwin/arm64 darwin/amd64:darwin/x64 linux/amd64:linux/x64 linux/arm64:linux/arm64"}
 OPT=""
+# Skip versions already on the registry, so a run that failed halfway can be re-run.
+publish() {
+  if npm view "$(node -p "require('$1/package.json').name")@$VERSION" version >/dev/null 2>&1; then
+    echo "skip $1: $VERSION is already published"
+  else
+    npm publish "$@" --access public
+  fi
+}
 for t in $TARGETS; do
   IFS=: read -r go node <<<"$t"
   goos=${go%/*} goarch=${go#*/} os=${node%/*} cpu=${node#*/}
@@ -19,7 +30,7 @@ for t in $TARGETS; do
 {"name":"$name","version":"$VERSION","description":"cfn-idle-cost binary for $os-$cpu","license":"Apache-2.0",
  "repository":{"type":"git","url":"git+https://github.com/badmintoncryer/cfn-idle-cost.git"},"os":["$os"],"cpu":["$cpu"],"files":["bin"]}
 JSON
-  npm publish "$dir" --access public "$@"
+  publish "$dir" "$@"
   OPT="$OPT\"$name\":\"$VERSION\","
 done
 for p in cfn-idle-cost cdk-idle-cost; do
@@ -31,10 +42,10 @@ cat >"$OUT/cfn-idle-cost/package.json" <<JSON
  "license":"Apache-2.0","repository":{"type":"git","url":"git+https://github.com/badmintoncryer/cfn-idle-cost.git"},"keywords":["aws","aws-cdk","cdk","cloudformation","cost","pricing","finops"],
  "bin":{"cfn-idle-cost":"bin/cfn-idle-cost.js"},"optionalDependencies":$deps}
 JSON
-npm publish "$OUT/cfn-idle-cost" --access public "$@"
+publish "$OUT/cfn-idle-cost" "$@"
 cat >"$OUT/cdk-idle-cost/package.json" <<JSON
 {"name":"cdk-idle-cost","version":"$VERSION","description":"Alias of cfn-idle-cost: monthly idle cost of an AWS CDK app",
  "license":"Apache-2.0","repository":{"type":"git","url":"git+https://github.com/badmintoncryer/cfn-idle-cost.git"},"keywords":["aws","aws-cdk","cdk","cloudformation","cost","pricing","finops"],
  "bin":{"cdk-idle-cost":"bin/cdk-idle-cost.js"},"dependencies":{"cfn-idle-cost":"$VERSION"}}
 JSON
-npm publish "$OUT/cdk-idle-cost" --access public "$@"
+publish "$OUT/cdk-idle-cost" "$@"
