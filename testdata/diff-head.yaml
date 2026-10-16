@@ -1,0 +1,7 @@
+Conditions:
+  IsProd: !Equals [a, b]
+Resources:
+  Server: { Type: AWS::EC2::Instance, Properties: { InstanceType: t3.small } }
+  Secret: { Type: AWS::SecretsManager::Secret }
+  Key: { Type: AWS::KMS::Key, Condition: IsProd }
+  Eip: { Type: AWS::EC2::EIP }

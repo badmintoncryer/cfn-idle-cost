@@ -147,7 +147,6 @@ func pad(s string, n int) string {
 }
 
 func (rep Report) WriteJSON(w io.Writer) error {
-	cents := func(v *float64) { *v = math.Round(*v*100) / 100 }
 	for i := range rep.Regions {
 		r := &rep.Regions[i]
 		cents(&r.Monthly)
@@ -159,7 +158,82 @@ func (rep Report) WriteJSON(w io.Writer) error {
 			}
 		}
 	}
+	return writeJSON(w, rep)
+}
+
+func cents(v *float64) { *v = math.Round(*v*100) / 100 }
+
+func writeJSON(w io.Writer, v any) error {
 	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
-	return enc.Encode(rep)
+	return enc.Encode(v)
+}
+
+// Total is the idle cost of all regions.
+func (rep Report) Total() float64 {
+	t := 0.0
+	for _, r := range rep.Regions {
+		t += r.Monthly
+	}
+	return t
+}
+
+func (rep Report) unknownCount() int {
+	n := 0
+	for _, r := range rep.Regions {
+		n += len(r.Unknown) + len(r.Skipped)
+	}
+	return n
+}
+
+// mdCell escapes a table cell.
+func mdCell(s string) string { return strings.ReplaceAll(s, "|", `\|`) }
+
+func (rep Report) WriteMarkdown(w io.Writer) {
+	fmt.Fprintf(w, "### Idle cost ≈ %s/mo\n\n", money(rep.Total()))
+	fmt.Fprintln(w, "| Region | Stacks | Idle cost |\n|---|---:|---:|")
+	for _, r := range rep.Regions {
+		fmt.Fprintf(w, "| %s | %d | %s/mo |\n", r.Region, r.Stacks, money(r.Monthly))
+	}
+	fmt.Fprint(w, "\n<details><summary>Breakdown by resource</summary>\n\n")
+	for _, r := range rep.Regions {
+		if len(rep.Regions) > 1 {
+			fmt.Fprintf(w, "#### %s\n\n", r.Region)
+		}
+		fmt.Fprintln(w, "| Stack | Resource | Quantity | $/mo | |\n|---|---|---:|---:|---|")
+		for _, s := range r.Billed {
+			for _, it := range s.Items {
+				fmt.Fprintf(w, "| %s | `%s` | %s | %s | %s |\n", mdCell(s.Name), mdCell(it.Path), it.Quantity, money(it.Monthly), mdCell(it.Reason))
+			}
+		}
+		fmt.Fprintln(w)
+	}
+	fmt.Fprint(w, "</details>\n\n")
+	writeMarkdownUnknown(w, rep)
+	fmt.Fprintf(w, "<sub>cfn-idle-cost · prices: %s · on-demand list prices, %d h/mo, USD, free tier ignored</sub>\n", rep.Prices, hoursPerMonth)
+}
+
+func writeMarkdownUnknown(w io.Writer, rep Report) {
+	var unknown, skipped []Item
+	for _, r := range rep.Regions {
+		unknown = append(unknown, r.Unknown...)
+		skipped = append(skipped, r.Skipped...)
+	}
+	for _, g := range []struct {
+		title string
+		items []Item
+		what  func(Item) string
+	}{
+		{"Could not estimate", unknown, func(it Item) string { return it.Reason }},
+		{"Not counted yet", skipped, func(it Item) string { return it.Type }},
+	} {
+		if len(g.items) == 0 {
+			continue
+		}
+		fmt.Fprintf(w, "**%s (%d)**\n\n", g.title, len(g.items))
+		for _, it := range g.items {
+			fmt.Fprintf(w, "- %s `%s`: %s\n", it.Stack, it.Path, g.what(it))
+		}
+		fmt.Fprintln(w)
+	}
 }

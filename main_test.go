@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"flag"
+	"io"
 	"math"
 	"os"
 	"strings"
@@ -18,6 +19,7 @@ var testPrices = &Prices{Source: "test prices", Regions: map[string]map[string]f
 		"vpc|PublicIPv4:InUseAddress":       0.005,
 		"vpc|VpcEndpoint-Hours":             0.014,
 		"ec2|t3.micro":                      0.0136,
+		"ec2|t3.small":                      0.0272,
 		"ebs|EBS:VolumeUsage.gp3":           0.096,
 		"ebs|EBS:VolumeP-IOPS.gp3":          0.006,
 		"ebs|EBS:VolumeP-Throughput.gp3":    0.048,
@@ -94,15 +96,57 @@ func TestMoreTypes(t *testing.T) {
 }
 
 func TestMissingRegion(t *testing.T) {
-	err := run([]string{"testdata/template.yaml"})
+	err := run([]string{"testdata/template.yaml"}, io.Discard)
 	if _, ok := err.(usageError); !ok {
 		t.Fatalf("want usageError, got %v", err)
 	}
 }
 
 func TestFlagsAfterInputs(t *testing.T) {
-	if err := run([]string{"testdata/template.yaml", "--region", "us-east-1", "--json"}); err != nil {
+	if err := run([]string{"testdata/template.yaml", "--region", "us-east-1", "--format", "json"}, io.Discard); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestMarkdown(t *testing.T) {
+	stacks, _ := LoadInputs([]string{"testdata/cdk.out"})
+	for _, s := range stacks {
+		if s.Region == "" {
+			s.Region = "us-east-1"
+		}
+	}
+	var b bytes.Buffer
+	NewReport(stacks, Estimate(stacks, testPrices), testPrices).WriteMarkdown(&b)
+	golden(t, "cdk.out.md", b.String())
+}
+
+// A removed NAT Gateway, a resized instance, a resource that became
+// unresolvable (Condition) and a new EIP.
+func TestDiff(t *testing.T) {
+	load := func(p string) Report {
+		stacks, err := loadStacks([]string{p}, "ap-northeast-1")
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, s := range stacks {
+			s.Name = "app" // same stack in base and head
+		}
+		return NewReport(stacks, Estimate(stacks, testPrices), testPrices)
+	}
+	d := NewDiff(load("testdata/diff-base.yaml"), load("testdata/diff-head.yaml"))
+	var text, md bytes.Buffer
+	d.WriteText(&text)
+	d.WriteMarkdown(&md)
+	golden(t, "diff.txt", text.String())
+	golden(t, "diff.md", md.String())
+	head := load("testdata/diff-head.yaml") // $24/mo, down $33 from base
+	for _, c := range []struct {
+		max, maxIncrease float64
+		fail             bool
+	}{{-1, 0, false}, {100, -1, false}, {20, -1, true}} {
+		if err := checkBudget(head, d, c.max, c.maxIncrease); (err != nil) != c.fail {
+			t.Errorf("--max %v --max-increase %v: err = %v", c.max, c.maxIncrease, err)
+		}
 	}
 }
 

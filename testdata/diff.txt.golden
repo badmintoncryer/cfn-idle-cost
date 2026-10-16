@@ -1,0 +1,8 @@
+ap-northeast-1 · idle ≈ $57 → $24/mo (-$33)
+
+  - app  Nat       $45 → $0.00    -$45  NAT Gateway hourly
+  ~ app  Server  $9.93 →   $20  +$9.93  t3.micro on-demand (Linux) → t3.small on-demand (Linux)
+  + app  Eip     $0.00 → $3.65  +$3.65  public IPv4 address
+  ~ app  Key     $1.00 →     ?       ?  customer managed key → depends on Condition IsProd
+
+prices: test prices · on-demand list prices, 730 h/mo, USD, free tier ignored

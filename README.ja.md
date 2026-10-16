@@ -57,12 +57,63 @@ npx cfn-idle-cost [flags] [cdk.out | template ...]
 
 | フラグ | 内容 |
 |---|---|
+| `--base <path>` | 別の`cdk.out`（またはテンプレート）と比べて、変わった分だけを表示します。たとえば`main`ブランチからsynthした`cdk.out`を指定します。詳しくは「[プルリクエストで使う](#プルリクエストで使う)」を見てください。 |
+| `--format <f>` | 出力形式です。`text`（既定）、`md`（プルリクエストのコメント向け）、`json`から選びます。 |
+| `--max <usd>` | アイドルコストの合計が月`usd`ドルを超えたら、終了コード`3`で終わります。 |
+| `--max-increase <usd>` | `--base`と一緒に使います。アイドルコストの増加が月`usd`ドルを超えたら、終了コード`3`で終わります。 |
 | `--region <r>` | リージョンを持たないスタック（envを指定していないCDKスタックと、素のテンプレート）に使うリージョンです。`env`を指定したスタックは、そのリージョンのまま見積もります。リージョンのないスタックがあるのにこのフラグがなければ、エラーになります。 |
 | `--live` | 同梱のスナップショットではなく、[Price List Query API](https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/using-price-list-query-api.html)から最新の価格を取得します。`pricing:GetProducts`を許可したAWSの認証情報が必要です。 |
-| `--json` | JSONで出力します（リージョン、スタック、明細の順の入れ子に、見積もれなかったリソースを加えたもの）。 |
 | `--version` | バージョンを表示します。 |
 
-終了コードは、成功が`0`、エラーが`1`、使い方の誤り（リージョンのないスタックを含みます）が`2`です。見積もれなかったリソースがあっても、成功なら`0`を返します。
+終了コードは、成功が`0`、エラーが`1`、使い方の誤り（リージョンのないスタックを含みます）が`2`、`--max`か`--max-increase`の超過が`3`です。見積もれなかったリソースがあっても、成功なら`0`を返します。予算のフラグを付けたときに見積もれなかったリソースがあると、実際のアイドルコストはもっと高いかもしれないという警告を出します。ただし、この警告だけでは失敗にしません。
+
+## プルリクエストで使う
+
+`--base`を付けると、変更によってアイドルコストがどう変わるかを表示します。
+
+```sh
+npx cfn-idle-cost --base cdk.out.main cdk.out
+```
+
+```
+ap-northeast-1 · idle ≈ $382 → $682/mo (+$300)
+
+  ~ DataStack     Db                              $42 →  $322   +$280  db.t4g.micro postgres Multi-AZ → db.t4g.large postgres Multi-AZ
+  + NetworkStack  Vpc/PublicSubnet2/NATGateway  $0.00 →   $45    +$45  NAT Gateway hourly
+  - DataStack     Stream                          $28 → $0.00    -$28  provisioned shard hourly
+  + NetworkStack  Vpc/PublicSubnet2/EIP         $0.00 → $3.65  +$3.65  public IPv4 address
+```
+
+リソースは、スタック名と論理IDで対応づけます。見積もれない状態になったリソースや、見積もれるようになったリソースでは、金額の欄が`?`です。
+
+GitHub Actionsでは、変更前後の両方をsynthし、Markdownをコメントとして投稿します。増加額が予算を超えたら、チェックを失敗にします。
+
+```yaml
+name: idle-cost
+on: pull_request
+permissions: { contents: read, pull-requests: write }
+jobs:
+  idle-cost:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { path: head }
+      - uses: actions/checkout@v4
+        with: { path: base, ref: "${{ github.base_ref }}" }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm ci && npx cdk synth -q
+        working-directory: head
+      - run: npm ci && npx cdk synth -q
+        working-directory: base
+      - id: cost
+        run: npx -y cfn-idle-cost --base base/cdk.out head/cdk.out --format md --max-increase 50 > idle-cost.md
+      - if: always()
+        run: gh pr comment ${{ github.event.pull_request.number }} --body-file idle-cost.md --edit-last --create-if-none
+        env: { GH_TOKEN: "${{ github.token }}", GH_REPO: "${{ github.repository }}" }
+```
+
+`cdk synth`は`cdk.context.json`からコンテキストを読みます。このファイルをコミットしておかないと、lookupのためにsynthでAWSの認証情報が必要になります。
 
 ## 見積もる費用
 

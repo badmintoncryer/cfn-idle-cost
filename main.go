@@ -18,46 +18,64 @@ const usage = `cfn-idle-cost — monthly idle cost of a CDK app or CloudFormatio
 
 Usage:
   cfn-idle-cost [flags] [cdk.out | template ...]
+  cfn-idle-cost --base <cdk.out | template> [flags] [cdk.out | template ...]
 
 Inputs default to ./cdk.out (run ` + "`cdk synth`" + ` first). Templates may be JSON or YAML.
+With --base, prints how the idle cost changes from the base to the inputs.
 
 Flags:
-  --region r   region for stacks without one (env-agnostic stacks, plain templates)
-  --live       fetch current prices from the AWS Price List Query API
-               (needs credentials with pricing:GetProducts) instead of the bundled snapshot
-  --json       print JSON
-  --version    print the version
+  --base path          compare against this cdk.out (or template), e.g. one synthesized from main
+  --format f           text (default), md (for a pull request comment) or json
+  --max usd            exit 3 if the total idle cost is over usd per month
+  --max-increase usd   with --base: exit 3 if the idle cost grows by more than usd per month
+  --region r           region for stacks without one (env-agnostic stacks, plain templates)
+  --live               fetch current prices from the AWS Price List Query API
+                       (needs credentials with pricing:GetProducts) instead of the bundled snapshot
+  --version            print the version
+
+Exit codes: 0 ok, 1 error, 2 usage error, 3 over --max or --max-increase.
 `
 
-// usageError makes main exit with 2.
+// usageError makes main exit with 2, overBudget with 3.
 type usageError struct{ msg string }
 
 func (e usageError) Error() string { return e.msg }
 
+type overBudget struct{ msg string }
+
+func (e overBudget) Error() string { return e.msg }
+
 func main() {
-	err := run(os.Args[1:])
+	err := run(os.Args[1:], os.Stdout)
 	var ue usageError
+	var ob overBudget
 	switch {
 	case errors.As(err, &ue):
 		fmt.Fprintln(os.Stderr, "error:", err)
 		os.Exit(2)
+	case errors.As(err, &ob):
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(3)
 	case err != nil:
 		fmt.Fprintln(os.Stderr, "error:", err)
 		os.Exit(1)
 	}
 }
 
-func run(args []string) error {
+func run(args []string, stdout io.Writer) error {
 	if len(args) > 0 && args[0] == "prices" { // maintainer: regenerate prices.json
 		return runPrices(args[1:])
 	}
 	fs := flag.NewFlagSet("cfn-idle-cost", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	region := fs.String("region", "", "")
+	base := fs.String("base", "", "")
+	format := fs.String("format", "text", "")
+	maxTotal := fs.Float64("max", -1, "")
+	maxIncrease := fs.Float64("max-increase", -1, "")
 	live := fs.Bool("live", false, "")
-	asJSON := fs.Bool("json", false, "")
 	showVersion := fs.Bool("version", false, "")
-	// Allow flags after the inputs too (npx cfn-idle-cost cdk.out --json).
+	// Allow flags after the inputs too (npx cfn-idle-cost cdk.out --format md).
 	var flags, inputs []string
 	for i := 0; i < len(args); i++ {
 		a := args[i]
@@ -67,9 +85,12 @@ func run(args []string) error {
 			i = len(args)
 		case strings.HasPrefix(a, "-"):
 			flags = append(flags, a)
-			if (a == "--region" || a == "-region") && i+1 < len(args) {
-				i++
-				flags = append(flags, args[i])
+			name := strings.TrimLeft(a, "-")
+			if f := fs.Lookup(name); f != nil && !strings.Contains(a, "=") && i+1 < len(args) {
+				if _, isBool := f.Value.(interface{ IsBoolFlag() bool }); !isBool {
+					i++
+					flags = append(flags, args[i])
+				}
 			}
 		default:
 			inputs = append(inputs, a)
@@ -77,46 +98,102 @@ func run(args []string) error {
 	}
 	if err := fs.Parse(flags); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
-			fmt.Print(usage)
+			fmt.Fprint(stdout, usage)
 			return nil
 		}
 		return usageError{err.Error() + " (see --help)"}
 	}
 	if *showVersion {
-		fmt.Println(version)
+		fmt.Fprintln(stdout, version)
 		return nil
 	}
-	stacks, err := LoadInputs(inputs)
+	if !in(*format, "text", "md", "json") {
+		return usageError{"--format must be text, md or json"}
+	}
+	if *maxIncrease >= 0 && *base == "" {
+		return usageError{"--max-increase needs --base"}
+	}
+	head, err := loadStacks(inputs, *region)
 	if err != nil {
 		return err
 	}
-	var missing []string
-	for _, s := range stacks {
-		if s.Region == "" {
-			if *region == "" {
-				missing = append(missing, s.Name)
-			}
-			s.Region = *region
+	var baseStacks []*Stack
+	if *base != "" {
+		if baseStacks, err = loadStacks([]string{*base}, *region); err != nil {
+			return err
 		}
-	}
-	if len(missing) > 0 {
-		return usageError{fmt.Sprintf("no region for %s; pass --region", strings.Join(missing, ", "))}
 	}
 	var prices *Prices
 	if *live {
-		prices, err = LivePrices(context.Background(), stacks)
+		prices, err = LivePrices(context.Background(), append(append([]*Stack{}, head...), baseStacks...))
 	} else {
 		prices, err = BundledPrices()
 	}
 	if err != nil {
 		return err
 	}
-	rep := NewReport(stacks, Estimate(stacks, prices), prices)
-	if *asJSON {
-		return rep.WriteJSON(os.Stdout)
+	headItems := Estimate(head, prices)
+	rep := NewReport(head, headItems, prices)
+	var d *Diff
+	if *base != "" {
+		d = NewDiff(NewReport(baseStacks, Estimate(baseStacks, prices), prices), rep)
 	}
-	rep.WriteText(os.Stdout)
+	switch {
+	case d != nil && *format == "json":
+		err = d.WriteJSON(stdout)
+	case d != nil && *format == "md":
+		d.WriteMarkdown(stdout)
+	case d != nil:
+		d.WriteText(stdout)
+	case *format == "json":
+		err = rep.WriteJSON(stdout)
+	case *format == "md":
+		rep.WriteMarkdown(stdout)
+	default:
+		rep.WriteText(stdout)
+	}
+	if err != nil {
+		return err
+	}
+	return checkBudget(rep, d, *maxTotal, *maxIncrease)
+}
+
+// checkBudget returns overBudget when a --max or --max-increase gate fails.
+func checkBudget(rep Report, d *Diff, maxTotal, maxIncrease float64) error {
+	if maxTotal < 0 && maxIncrease < 0 {
+		return nil
+	}
+	if n := rep.unknownCount(); n > 0 {
+		fmt.Fprintf(os.Stderr, "warning: %d resources could not be estimated or are not counted; the real idle cost may be higher\n", n)
+	}
+	if total := rep.Total(); maxTotal >= 0 && total > maxTotal {
+		return overBudget{fmt.Sprintf("over budget: idle cost %s/mo is over --max %s", money(total), money(maxTotal))}
+	}
+	if d != nil && maxIncrease >= 0 && d.After-d.Before > maxIncrease {
+		return overBudget{fmt.Sprintf("over budget: idle cost grows by %s/mo, over --max-increase %s", money(d.After-d.Before), money(maxIncrease))}
+	}
 	return nil
+}
+
+// loadStacks loads inputs and fills the region of stacks that have none.
+func loadStacks(inputs []string, region string) ([]*Stack, error) {
+	stacks, err := LoadInputs(inputs)
+	if err != nil {
+		return nil, err
+	}
+	var missing []string
+	for _, s := range stacks {
+		if s.Region == "" {
+			if region == "" {
+				missing = append(missing, s.Name)
+			}
+			s.Region = region
+		}
+	}
+	if len(missing) > 0 {
+		return nil, usageError{fmt.Sprintf("no region for %s; pass --region", strings.Join(missing, ", "))}
+	}
+	return stacks, nil
 }
 
 func runPrices(args []string) error {

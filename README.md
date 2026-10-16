@@ -64,13 +64,69 @@ nested stacks) or CloudFormation templates (JSON or YAML).
 
 | Flag | What it does |
 |---|---|
+| `--base <path>` | Compare against another `cdk.out` (or template), e.g. one synthesized from `main`, and print only what changes. See [In pull requests](#in-pull-requests). |
+| `--format <f>` | `text` (default), `md` (a pull request comment) or `json`. |
+| `--max <usd>` | Exit `3` if the total idle cost is over `usd` per month. |
+| `--max-increase <usd>` | With `--base`: exit `3` if the idle cost grows by more than `usd` per month. |
 | `--region <r>` | Region for stacks that have none: env-agnostic CDK stacks and plain templates. Stacks with an `env` keep their own region. Without it, such stacks are an error. |
 | `--live` | Fetch current prices from the [Price List Query API](https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/using-price-list-query-api.html) instead of the bundled snapshot. Needs AWS credentials with `pricing:GetProducts`. |
-| `--json` | Print JSON (regions → stacks → items, plus what could not be estimated). |
 | `--version` | Print the version. |
 
 Exit codes: `0` success (even when some resources could not be estimated), `1`
-error, `2` usage error (including a stack without a region).
+error, `2` usage error (including a stack without a region), `3` over `--max`
+or `--max-increase`. When a budget flag is set and some resources could not be
+estimated, a warning says the real idle cost may be higher; it does not fail.
+
+## In pull requests
+
+`--base` shows what a change does to the idle cost:
+
+```sh
+npx cfn-idle-cost --base cdk.out.main cdk.out
+```
+
+```
+ap-northeast-1 · idle ≈ $382 → $682/mo (+$300)
+
+  ~ DataStack     Db                              $42 →  $322   +$280  db.t4g.micro postgres Multi-AZ → db.t4g.large postgres Multi-AZ
+  + NetworkStack  Vpc/PublicSubnet2/NATGateway  $0.00 →   $45    +$45  NAT Gateway hourly
+  - DataStack     Stream                          $28 → $0.00    -$28  provisioned shard hourly
+  + NetworkStack  Vpc/PublicSubnet2/EIP         $0.00 → $3.65  +$3.65  public IPv4 address
+```
+
+Resources are matched by stack name and logical ID. A resource that becomes
+(or stops being) unresolvable shows `?`.
+
+In GitHub Actions, synthesize both sides, post the Markdown as a comment, and
+fail the check when the increase is over budget:
+
+```yaml
+name: idle-cost
+on: pull_request
+permissions: { contents: read, pull-requests: write }
+jobs:
+  idle-cost:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { path: head }
+      - uses: actions/checkout@v4
+        with: { path: base, ref: "${{ github.base_ref }}" }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm ci && npx cdk synth -q
+        working-directory: head
+      - run: npm ci && npx cdk synth -q
+        working-directory: base
+      - id: cost
+        run: npx -y cfn-idle-cost --base base/cdk.out head/cdk.out --format md --max-increase 50 > idle-cost.md
+      - if: always()
+        run: gh pr comment ${{ github.event.pull_request.number }} --body-file idle-cost.md --edit-last --create-if-none
+        env: { GH_TOKEN: "${{ github.token }}", GH_REPO: "${{ github.repository }}" }
+```
+
+`cdk synth` reads context from `cdk.context.json`; commit it, or the synth
+needs AWS credentials for lookups.
 
 ## What is counted
 
