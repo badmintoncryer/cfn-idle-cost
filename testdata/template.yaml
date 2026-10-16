@@ -18,3 +18,20 @@ Resources:
       AllocatedStorage: "20"
   Secret:
     Type: AWS::SecretsManager::Secret
+  Paused:
+    Type: AWS::RDS::DBCluster
+    Properties:
+      Engine: aurora-postgresql
+      ServerlessV2ScalingConfiguration: { MinCapacity: 0, MaxCapacity: 4, SecondsUntilAutoPause: 300 }
+  PausedWriter:
+    Type: AWS::RDS::DBInstance
+    Properties: { DBClusterIdentifier: !Ref Paused, DBInstanceClass: db.serverless }
+  Busy:
+    Type: AWS::RDS::DBCluster
+    Properties:
+      Engine: aurora-postgresql
+      StorageType: aurora-iopt1
+      ServerlessV2ScalingConfiguration: { MinCapacity: 0.5, MaxCapacity: 4 }
+  BusyWriter:
+    Type: AWS::RDS::DBInstance
+    Properties: { DBClusterIdentifier: !Ref Busy, DBInstanceClass: db.serverless }

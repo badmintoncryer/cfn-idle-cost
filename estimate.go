@@ -513,20 +513,29 @@ func rdsInstance(e *est, p map[string]any) {
 	}
 	if cluster != nil { // Aurora: storage is usage-based, only the instance counts
 		iopt := e.str(cluster, "StorageType", "aurora") == "aurora-iopt1"
+		suffix := ""
+		if iopt {
+			suffix = ", I/O-Optimized"
+		}
 		if class == "db.serverless" {
 			sc := asMap(cluster["ServerlessV2ScalingConfiguration"])
 			key := "rds|Aurora:ServerlessV2Usage|" + code
 			if iopt {
 				key = "rds|Aurora:ServerlessV2IOOptimizedUsage|" + code
 			}
-			e.hourly(e.mustNum(sc, "MinCapacity"), "ACU", key, "Serverless v2 minimum capacity")
+			min := e.mustNum(sc, "MinCapacity")
+			if min == 0 { // shown at $0 so it reads as checked, not missed
+				e.items = append(e.items, Item{Quantity: "×0 ACU", Reason: "Serverless v2 minimum capacity (auto-pause)" + suffix})
+				return
+			}
+			e.hourly(min, "ACU", key, "Serverless v2 minimum capacity"+suffix)
 			return
 		}
 		usage := "InstanceUsage"
 		if iopt {
 			usage = "InstanceUsageIOOptimized"
 		}
-		e.hourly(1, "", "rds|"+usage+":"+class+"|"+code, class+" "+engine)
+		e.hourly(1, "", "rds|"+usage+":"+class+"|"+code, class+" "+engine+suffix)
 		return
 	}
 	multi := e.flag(p, "MultiAZ")

@@ -28,7 +28,7 @@ var testPrices = &Prices{Source: "test prices", Regions: map[string]map[string]f
 		"elb|Load Balancer-Application":     0.0243,
 		"kinesis|Storage-ShardHour":         0.0195,
 	},
-	"us-east-1": {"kms|KMS-Keys": 1, "ebs|EBS:VolumeUsage.gp3": 0.08, "ebs|EBS:VolumeP-IOPS.gp3": 0.005, "secrets|AWSSecretsManager-Secrets": 0.4},
+	"us-east-1": {"rds|Aurora:ServerlessV2IOOptimizedUsage|21": 0.16, "kms|KMS-Keys": 1, "ebs|EBS:VolumeUsage.gp3": 0.08, "ebs|EBS:VolumeP-IOPS.gp3": 0.005, "secrets|AWSSecretsManager-Secrets": 0.4},
 }}
 
 func golden(t *testing.T, name, got string) {

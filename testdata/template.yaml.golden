@@ -1,9 +1,11 @@
-us-east-1 · 1 stack · idle ≈ $13/mo
+us-east-1 · 1 stack · idle ≈ $72/mo
 
-template                 $13/mo
-  Data    ×100 GB gp3  $8.00  EBS gp3 storage
-  Data    ×1000 IOPS   $5.00  gp3 IOPS above 3000
-  Secret  ×1           $0.40  secret
+template                       $72/mo
+  BusyWriter    ×0.5 ACU       $58  Serverless v2 minimum capacity, I/O-Optimized
+  Data          ×100 GB gp3  $8.00  EBS gp3 storage
+  Data          ×1000 IOPS   $5.00  gp3 IOPS above 3000
+  Secret        ×1           $0.40  secret
+  PausedWriter  ×0 ACU       $0.00  Serverless v2 minimum capacity (auto-pause)
 
 ? could not estimate: 1
   template  Db  DBInstanceClass is Parameter DbClass
