@@ -1,0 +1,30 @@
+# npm publishes through trusted publishing (OIDC): no npm token. npm trusts this
+# file only, so refresh-prices.yml starts it with workflow_dispatch (a workflow_call
+# run is checked against the caller and fails). See docs/release.md.
+name: release
+on:
+  push: { tags: ["v*"] }
+  workflow_dispatch:
+    inputs:
+      tag: { type: string, required: true }
+permissions:
+  contents: write
+  id-token: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0, ref: "${{ inputs.tag || github.ref }}" }
+      - uses: actions/setup-go@v5
+        with: { go-version-file: go.mod }
+      - uses: goreleaser/goreleaser-action@v6
+        with: { args: release --clean }
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-node@v4
+        with: { node-version: 24 }
+      - run: npm install -g npm@latest
+      - run: |
+          tag="${{ inputs.tag || github.ref_name }}"
+          scripts/npm-publish.sh "${tag#v}"

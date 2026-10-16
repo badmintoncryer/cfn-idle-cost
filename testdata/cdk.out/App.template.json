@@ -1,0 +1,32 @@
+{
+  "Parameters": {
+    "ServerType": { "Type": "String", "Default": "t3.micro" },
+    "WorkerType": { "Type": "String" },
+    "BootstrapVersion": { "Type": "AWS::SSM::Parameter::Value<String>", "Default": "/cdk-bootstrap/hnb659fds/version" }
+  },
+  "Conditions": { "IsProd": { "Fn::Equals": ["a", "b"] } },
+  "Resources": {
+    "VpcNatGateway": { "Type": "AWS::EC2::NatGateway", "Properties": { "SubnetId": { "Ref": "Subnet1" } } },
+    "VpcEIP": { "Type": "AWS::EC2::EIP" },
+    "SsmEndpoint": { "Type": "AWS::EC2::VPCEndpoint", "Properties": { "VpcEndpointType": "Interface", "SubnetIds": [{ "Ref": "Subnet1" }, { "Ref": "Subnet2" }] } },
+    "S3Endpoint": { "Type": "AWS::EC2::VPCEndpoint", "Properties": { "ServiceName": "com.amazonaws.ap-northeast-1.s3" } },
+    "Server": {
+      "Type": "AWS::EC2::Instance",
+      "Properties": {
+        "InstanceType": { "Ref": "ServerType" },
+        "BlockDeviceMappings": [{ "DeviceName": "/dev/xvda", "Ebs": { "VolumeSize": 30, "VolumeType": "gp3" } }]
+      },
+      "Metadata": { "aws:cdk:path": "App/Server/Resource" }
+    },
+    "Worker": { "Type": "AWS::EC2::Instance", "Properties": { "InstanceType": { "Ref": "WorkerType" } } },
+    "Spare": { "Type": "AWS::EC2::Instance", "Properties": { "InstanceType": { "Fn::If": ["IsProd", "m5.large", "t3.micro"] } } },
+    "ProdKey": { "Type": "AWS::KMS::Key", "Condition": "IsProd" },
+    "Table": {
+      "Type": "AWS::DynamoDB::Table",
+      "Properties": { "ProvisionedThroughput": { "ReadCapacityUnits": 10, "WriteCapacityUnits": 5 } }
+    },
+    "OnDemandTable": { "Type": "AWS::DynamoDB::Table", "Properties": { "BillingMode": "PAY_PER_REQUEST" } },
+    "Bucket": { "Type": "AWS::S3::Bucket" },
+    "Archive": { "Type": "AWS::CloudFormation::Stack", "Properties": { "TemplateURL": "https://example.com/x.json" } }
+  }
+}

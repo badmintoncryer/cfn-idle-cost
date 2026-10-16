@@ -1,0 +1,6 @@
+{
+  "Resources": {
+    "Alb": { "Type": "AWS::ElasticLoadBalancingV2::LoadBalancer", "Properties": { "Subnets": [{ "Ref": "A" }, { "Ref": "B" }] } },
+    "Stream": { "Type": "AWS::Kinesis::Stream", "Properties": { "ShardCount": 2 } }
+  }
+}

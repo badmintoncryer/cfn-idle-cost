@@ -1,0 +1,20 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Parameters:
+  DbClass:
+    Type: String
+Resources:
+  Data:
+    Type: AWS::EC2::Volume
+    Properties:
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      Size: 100
+      VolumeType: gp3
+      Iops: 4000
+  Db:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DBInstanceClass: !Ref DbClass
+      Engine: postgres
+      AllocatedStorage: "20"
+  Secret:
+    Type: AWS::SecretsManager::Secret

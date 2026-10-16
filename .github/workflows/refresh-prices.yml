@@ -1,0 +1,35 @@
+# Rebuild the bundled price snapshot from the public AWS Bulk Price List files
+# and cut a patch release when it changed.
+name: refresh-prices
+on:
+  schedule: [{ cron: "23 3 * * 1" }] # weekly, Monday
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: write
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-go@v5
+        with: { go-version-file: go.mod }
+      - run: go run . prices -o prices.json
+      - run: go test ./...
+      - id: tag
+        run: |
+          # asOf moves whenever AWS republishes any offer file; release only on price changes
+          git diff --quiet -I '"asOf"' prices.json && exit 0
+          last=$(git describe --tags --abbrev=0 2>/dev/null || echo v0.0.0)
+          IFS=. read -r maj min pat <<<"${last#v}"
+          tag="v$maj.$min.$((pat+1))"
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git commit -am "chore: refresh price snapshot"
+          git tag "$tag" && git push origin HEAD "$tag"
+          # A tag pushed with GITHUB_TOKEN starts no workflow; a dispatch does.
+          gh workflow run release.yml -f tag="$tag"
+        env:
+          GH_TOKEN: ${{ github.token }}

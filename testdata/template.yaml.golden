@@ -1,0 +1,11 @@
+us-east-1 · 1 stack · idle ≈ $13/mo
+
+template                 $13/mo
+  Data    ×100 GB gp3  $8.00  EBS gp3 storage
+  Data    ×1000 IOPS   $5.00  gp3 IOPS above 3000
+  Secret  ×1           $0.40  secret
+
+? could not estimate: 1
+  template  Db  DBInstanceClass is Parameter DbClass
+
+prices: test prices · on-demand list prices, 730 h/mo, USD, free tier ignored

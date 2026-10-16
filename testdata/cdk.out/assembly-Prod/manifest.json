@@ -1,0 +1,10 @@
+{
+  "version": "54.0.0",
+  "artifacts": {
+    "ProdEdge": {
+      "type": "aws:cloudformation:stack",
+      "environment": "aws://123456789012/ap-northeast-1",
+      "properties": { "templateFile": "ProdEdge.template.json", "stackName": "Prod-Edge" }
+    }
+  }
+}

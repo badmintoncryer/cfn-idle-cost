@@ -1,0 +1,27 @@
+{
+  "version": "54.0.0",
+  "artifacts": {
+    "App": {
+      "type": "aws:cloudformation:stack",
+      "environment": "aws://123456789012/ap-northeast-1",
+      "properties": { "templateFile": "App.template.json", "stackName": "App" },
+      "metadata": {
+        "/App/Vpc/NatGateway": [{ "type": "aws:cdk:logicalId", "data": "VpcNatGateway" }],
+        "/App/Vpc/EIP": [{ "type": "aws:cdk:logicalId", "data": "VpcEIP" }],
+        "/App/Vpc/SsmEndpoint/Resource": [{ "type": "aws:cdk:logicalId", "data": "SsmEndpoint" }],
+        "/App/Server/Resource": [{ "type": "aws:cdk:logicalId", "data": "Server" }],
+        "/App/Archive/Secret/Resource": [{ "type": "aws:cdk:logicalId", "data": "ArchiveSecret" }]
+      }
+    },
+    "Agnostic": {
+      "type": "aws:cloudformation:stack",
+      "environment": "aws://unknown-account/unknown-region",
+      "properties": { "templateFile": "Agnostic.template.json" },
+      "additionalMetadataFile": "Agnostic.metadata.json"
+    },
+    "assembly-Prod": {
+      "type": "cdk:cloud-assembly",
+      "properties": { "directoryName": "assembly-Prod" }
+    }
+  }
+}

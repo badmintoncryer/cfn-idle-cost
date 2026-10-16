@@ -1,0 +1,7 @@
+{
+  "version": "54.0.0",
+  "files": {
+    "abc": { "source": { "path": "AppArchive1234ABCD.nested.template.json", "packaging": "file" } },
+    "def": { "source": { "path": "App.template.json", "packaging": "file" } }
+  }
+}
