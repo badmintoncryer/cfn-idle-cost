@@ -1,0 +1,25 @@
+eu-west-1 · 1 stack · idle ≈ $2514/mo
+
+more                            $2514/mo
+  Broker        ×1               $661  mq.m5.large RabbitMQ Multi-AZ
+  Firewall      ×2 endpoints     $577  firewall endpoint hourly per AZ
+  Kafka         ×3 brokers       $495  kafka.m5.large broker hourly
+  Kafka         ×300 GB           $33  broker storage
+  Sftp          ×1 protocols     $219  server hourly per protocol
+  Inbound       ×2 ENIs          $182  Resolver endpoint hourly per IP address
+  Cluster       ×1                $73  EKS cluster hourly (standard support)
+  Vpn           ×1                $36  Site-to-Site VPN connection hourly
+  Vpn           ×1                $36  Transit Gateway VPN attachment hourly
+  DocsInstance  ×1                $71  db.t4g.medium instance, I/O-Optimized
+  Nodes         ×2                $67  t3.medium on-demand (Linux), DesiredSize
+  Attach        ×1                $36  Transit Gateway VPC attachment hourly
+  Live          ×2 concurrency    $18  provisioned concurrency (1024 MB)
+  Acl           ×1              $5.00  web ACL
+  Acl           ×3 rules        $3.00  rules (managed rule group fees not counted)
+  MathAlarm     ×2 metrics      $0.60  high-resolution alarm per metric
+  Alarm         ×1 metrics      $0.10  alarm per metric
+
+! not counted yet: 1 (these cost money idle; cfn-idle-cost has no rule for them)
+  more  Proxy  AWS::RDS::DBProxy
+
+prices: test prices · on-demand list prices, 730 h/mo, USD, free tier ignored

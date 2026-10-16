@@ -28,6 +28,14 @@ var testPrices = &Prices{Source: "test prices", Regions: map[string]map[string]f
 		"elb|Load Balancer-Application":     0.0243,
 		"kinesis|Storage-ShardHour":         0.0195,
 	},
+	"eu-west-1": {
+		"eks|AmazonEKS-Hours:perCluster": 0.1, "ec2|t3.medium": 0.0456, "nfw|Endpoint-Hour": 0.395,
+		"waf|WebACLV2": 5, "waf|RuleV2": 1, "cw|CW:AlarmMonitorUsage": 0.1, "cw|CW:HighResAlarmMonitorUsage": 0.3,
+		"lambda|Lambda-Provisioned-Concurrency-ARM": 0.0000033334, "tgw|TransitGatewayVPC": 0.05, "tgw|TransitGatewayVPN": 0.05,
+		"vpc|VPN-Usage-Hours:ipsec.1": 0.05, "resolver|ResolverNetworkInterface": 0.125,
+		"docdb|InstanceUsageIOOptimized:db.t4g.medium": 0.0975, "msk|Kafka.m5.large": 0.226, "msk|Kafka.Storage.GP2": 0.11,
+		"mq|RabbitMQ|Multi-AZ|m5.large": 0.906, "transfer|ProtocolHours": 0.3,
+	},
 	"us-east-1": {"rds|Aurora:ServerlessV2IOOptimizedUsage|21": 0.16, "kms|KMS-Keys": 1, "ebs|EBS:VolumeUsage.gp3": 0.08, "ebs|EBS:VolumeP-IOPS.gp3": 0.005, "secrets|AWSSecretsManager-Secrets": 0.4},
 }}
 
@@ -80,6 +88,11 @@ func TestYAMLTemplate(t *testing.T) {
 	}
 }
 
+// The rules added in 0.0.3, and a type listed as "not counted yet".
+func TestMoreTypes(t *testing.T) {
+	golden(t, "more.yaml", report(t, "eu-west-1", "testdata/more.yaml"))
+}
+
 func TestMissingRegion(t *testing.T) {
 	err := run([]string{"testdata/template.yaml"})
 	if _, ok := err.(usageError); !ok {
@@ -99,31 +112,34 @@ func TestParseOffer(t *testing.T) {
 	  "A":{"sku":"A","productFamily":"Compute Instance","attributes":{"regionCode":"ap-northeast-1","usagetype":"APN1-BoxUsage:t3.micro","operation":"RunInstances","instanceType":"t3.micro","operatingSystem":"Linux","tenancy":"Shared","preInstalledSw":"NA","capacitystatus":"Used"}},
 	  "B":{"sku":"B","productFamily":"Compute Instance","attributes":{"regionCode":"ap-northeast-1","usagetype":"APN1-BoxUsage:t3.micro","operation":"RunInstances:0002","instanceType":"t3.micro","operatingSystem":"Windows","tenancy":"Shared","preInstalledSw":"NA","capacitystatus":"Used"}},
 	  "C":{"sku":"C","productFamily":"Provisioned Throughput","attributes":{"regionCode":"ap-northeast-1","usagetype":"APN1-EBS:VolumeP-Throughput.gp3"}},
+	  "E":{"sku":"E","productFamily":"Compute Instance","attributes":{"regionCode":"ap-northeast-1-tpe-1","usagetype":"APN1-TPE1-BoxUsage:t3.micro","operation":"RunInstances","instanceType":"t3.micro","operatingSystem":"Linux","tenancy":"Shared","preInstalledSw":"NA","capacitystatus":"Used"}},
 	  "D":{"sku":"D","productFamily":"Provisioned IOPS","attributes":{"regionCode":"ap-northeast-1","usagetype":"APN1-ReadCapacityUnit-Hrs"}}
 	},
 	"terms":{"OnDemand":{
 	  "A":{"A.1":{"priceDimensions":{"A.1.1":{"unit":"Hrs","pricePerUnit":{"USD":"0.0136"}}}}},
 	  "B":{"B.1":{"priceDimensions":{"B.1.1":{"unit":"Hrs","pricePerUnit":{"USD":"0.0228"}}}}},
+	  "E":{"E.1":{"priceDimensions":{"E.1.1":{"unit":"Hrs","pricePerUnit":{"USD":"0.02"}}}}},
 	  "C":{"C.1":{"priceDimensions":{"C.1.1":{"unit":"GiBps-mo","pricePerUnit":{"USD":"49.152"}}}}},
 	  "D":{"D.1":{"priceDimensions":{"D.1.1":{"unit":"ReadCapacityUnit-Hrs","pricePerUnit":{"USD":"0"}},"D.1.2":{"unit":"ReadCapacityUnit-Hrs","pricePerUnit":{"USD":"0.0001484"}}}}}
 	},"Reserved":{"A":{}}}}`
-	out := map[string]float64{}
+	all := map[string]map[string]float64{}
 	var ec2Sels []selector
 	for _, s := range selectors {
 		if s.service == "AmazonEC2" || s.service == "AmazonDynamoDB" {
 			ec2Sels = append(ec2Sels, s)
 		}
 	}
-	pub, err := parseOffer(strings.NewReader(offer), ec2Sels, out)
+	pub, err := parseOffer(strings.NewReader(offer), ec2Sels, "ap-northeast-1", all)
+	out := all["ap-northeast-1"]
 	if err != nil {
 		t.Fatal(err)
 	}
 	want := map[string]float64{
-		"ec2|t3.micro":                   0.0136, // Linux only
+		"ec2|t3.micro":                   0.0136, // Linux only; the Local Zone SKU E is dropped
 		"ebs|EBS:VolumeP-Throughput.gp3": 0.048,  // per MiB/s
 		"ddb|ReadCapacityUnit-Hrs":       0.0001484,
 	}
-	if pub != "2026-10-15T00:00:00Z" || len(out) != len(want) {
+	if pub != "2026-10-15T00:00:00Z" || len(out) != len(want) || len(all) != 1 {
 		t.Fatalf("pub=%q out=%v", pub, out)
 	}
 	for k, v := range want {

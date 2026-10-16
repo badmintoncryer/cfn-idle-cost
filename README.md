@@ -99,18 +99,38 @@ and provisioned storage billed whether you use it or not.
 | `AWS::KMS::Key`, `AWS::KMS::ReplicaKey` | $1 per key |
 | `AWS::SecretsManager::Secret` | per secret |
 | `AWS::Route53::HostedZone` | per hosted zone |
+| `AWS::EKS::Cluster` | cluster hourly (standard support) |
+| `AWS::EKS::Nodegroup` | instance hourly × `DesiredSize` (or `MinSize`), on-demand, one instance type |
+| `AWS::NetworkFirewall::Firewall` | endpoint hourly × subnets |
+| `AWS::WAFv2::WebACL` | web ACL and its rules (managed rule group fees not counted) |
+| `AWS::CloudWatch::Alarm`, `CompositeAlarm` | per alarm metric (standard or high resolution), per composite alarm |
+| `AWS::Lambda::Alias`, `AWS::Lambda::Version` | provisioned concurrency × function memory (x86 and ARM) |
+| `AWS::EC2::TransitGatewayAttachment`, `TransitGatewayVpcAttachment`, `TransitGatewayPeeringAttachment`, `TransitGatewayConnect` | attachment hourly |
+| `AWS::EC2::VPNConnection` | connection hourly, plus the Transit Gateway VPN attachment |
+| `AWS::EC2::ClientVpnTargetNetworkAssociation` | association hourly |
+| `AWS::Route53Resolver::ResolverEndpoint` | hourly × IP addresses |
+| `AWS::GlobalAccelerator::Accelerator` | fixed hourly fee |
+| `AWS::DocDB::DBInstance`, `AWS::Neptune::DBInstance` | instance hourly (I/O-Optimized aware), or the cluster's serverless minimum capacity |
+| `AWS::MSK::Cluster` | broker hourly, broker storage, storage throughput above 250 MiB/s (Standard and Express brokers) |
+| `AWS::MSK::ServerlessCluster` | cluster hourly (partitions not counted) |
+| `AWS::Redshift::Cluster` | node hourly × nodes |
+| `AWS::DAX::Cluster` | node hourly × replication factor |
+| `AWS::AmazonMQ::Broker` | broker hourly (ActiveMQ and RabbitMQ, single or multi-AZ) |
+| `AWS::Transfer::Server` | hourly per protocol |
+| `AWS::AppRunner::Service` | memory of the minimum provisioned instances |
 
 Usage-only charges are left out on purpose: S3, Lambda, Aurora storage and
 I/O, CloudWatch Logs, data transfer, requests.
 
 ### Not counted yet
 
-CloudWatch alarms, WAF web ACLs, Lambda provisioned concurrency, Redshift,
-MSK, DocumentDB, Neptune, Transit Gateway attachments, Client VPN, RDS Proxy,
-FSx for ONTAP, provisioned DynamoDB global tables, Oracle and SQL Server on
-RDS, Multi-AZ DB clusters, Fargate Spot and Windows. Resources of these types
-are listed under "could not estimate" when they are partly supported, and are
-silently skipped otherwise.
+Resource types that cost money with zero traffic but have no rule yet, such as
+RDS Proxy, OpenSearch Serverless, SageMaker endpoints, EMR, MemoryDB,
+WorkSpaces and Directory Service, are listed under `! not counted yet`, so
+their cost is never left out silently. Partly supported types (FSx for ONTAP,
+provisioned DynamoDB global tables, Oracle and SQL Server on RDS, Multi-AZ DB
+clusters, Fargate Spot and Windows, Spot node groups) are listed under
+`? could not estimate`.
 
 ## Assumptions
 

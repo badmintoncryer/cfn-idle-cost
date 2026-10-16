@@ -1,0 +1,66 @@
+# Resource types added in 0.0.3; priced with testPrices["eu-west-1"].
+Resources:
+  Cluster:
+    Type: AWS::EKS::Cluster
+    Properties: { RoleArn: arn, ResourcesVpcConfig: { SubnetIds: [a, b] } }
+  Nodes:
+    Type: AWS::EKS::Nodegroup
+    Properties: { ClusterName: !Ref Cluster, NodeRole: arn, Subnets: [a], InstanceTypes: [t3.medium], ScalingConfig: { MinSize: 1, DesiredSize: 2, MaxSize: 4 } }
+  Firewall:
+    Type: AWS::NetworkFirewall::Firewall
+    Properties: { FirewallName: fw, FirewallPolicyArn: arn, VpcId: v, SubnetMappings: [{ SubnetId: a }, { SubnetId: b }] }
+  Acl:
+    Type: AWS::WAFv2::WebACL
+    Properties: { Scope: REGIONAL, DefaultAction: { Allow: {} }, VisibilityConfig: {}, Rules: [{ Name: a }, { Name: b }, { Name: c }] }
+  Alarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties: { MetricName: Errors, Namespace: AWS/Lambda, Period: 60, Threshold: 1, EvaluationPeriods: 1, ComparisonOperator: GreaterThanThreshold }
+  MathAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      Threshold: 1
+      EvaluationPeriods: 1
+      ComparisonOperator: GreaterThanThreshold
+      Metrics:
+        - { Id: e, Expression: "a/b" }
+        - { Id: a, MetricStat: { Metric: { MetricName: A, Namespace: N }, Period: 10, Stat: Sum }, ReturnData: false }
+        - { Id: b, MetricStat: { Metric: { MetricName: B, Namespace: N }, Period: 10, Stat: Sum }, ReturnData: false }
+  Fn:
+    Type: AWS::Lambda::Function
+    Properties: { MemorySize: 1024, Architectures: [arm64], Code: {}, Role: arn }
+  Live:
+    Type: AWS::Lambda::Alias
+    Properties: { FunctionName: !Ref Fn, FunctionVersion: "1", Name: live, ProvisionedConcurrencyConfig: { ProvisionedConcurrentExecutions: 2 } }
+  Attach:
+    Type: AWS::EC2::TransitGatewayVpcAttachment
+    Properties: { TransitGatewayId: tgw, VpcId: v, SubnetIds: [a, b] }
+  Vpn:
+    Type: AWS::EC2::VPNConnection
+    Properties: { Type: ipsec.1, CustomerGatewayId: cgw, TransitGatewayId: tgw }
+  Inbound:
+    Type: AWS::Route53Resolver::ResolverEndpoint
+    Properties: { Direction: INBOUND, SecurityGroupIds: [sg], IpAddresses: [{ SubnetId: a }, { SubnetId: b }] }
+  Docs:
+    Type: AWS::DocDB::DBCluster
+    Properties: { StorageType: iopt1 }
+  DocsInstance:
+    Type: AWS::DocDB::DBInstance
+    Properties: { DBClusterIdentifier: !Ref Docs, DBInstanceClass: db.t4g.medium }
+  Kafka:
+    Type: AWS::MSK::Cluster
+    Properties:
+      ClusterName: k
+      KafkaVersion: "3.6.0"
+      NumberOfBrokerNodes: 3
+      BrokerNodeGroupInfo:
+        InstanceType: kafka.m5.large
+        ClientSubnets: [a, b, c]
+        StorageInfo: { EBSStorageInfo: { VolumeSize: 100 } }
+  Broker:
+    Type: AWS::AmazonMQ::Broker
+    Properties: { BrokerName: b, EngineType: RABBITMQ, EngineVersion: "3.13", DeploymentMode: CLUSTER_MULTI_AZ, HostInstanceType: mq.m5.large, PubliclyAccessible: false, Users: [] }
+  Sftp:
+    Type: AWS::Transfer::Server
+  Proxy:
+    Type: AWS::RDS::DBProxy
+    Properties: { DBProxyName: p, EngineFamily: MYSQL, Auth: [], RoleArn: arn, VpcSubnetIds: [a] }

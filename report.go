@@ -21,6 +21,7 @@ type regionReport struct {
 	Monthly float64       `json:"monthly"`
 	Billed  []stackReport `json:"stacks"`
 	Unknown []Item        `json:"couldNotEstimate"`
+	Skipped []Item        `json:"notCounted"`
 }
 
 type Report struct {
@@ -35,7 +36,7 @@ func NewReport(stacks []*Stack, items []Item, prices *Prices) Report {
 	for _, s := range stacks {
 		r := byRegion[s.Region]
 		if r == nil {
-			r = &regionReport{Region: s.Region, Unknown: []Item{}}
+			r = &regionReport{Region: s.Region, Unknown: []Item{}, Skipped: []Item{}}
 			byRegion[s.Region] = r
 		}
 		if !seen[s.Region+"\x00"+s.Name] { // a nested stack belongs to its parent
@@ -47,6 +48,10 @@ func NewReport(stacks []*Stack, items []Item, prices *Prices) Report {
 		r := byRegion[it.Region]
 		if it.Unknown {
 			r.Unknown = append(r.Unknown, it)
+			continue
+		}
+		if it.NotCounted {
+			r.Skipped = append(r.Skipped, it)
 			continue
 		}
 		r.Monthly += it.Monthly
@@ -125,6 +130,12 @@ func (rep Report) WriteText(w io.Writer) {
 			fmt.Fprintf(w, "\n? could not estimate: %d\n", len(r.Unknown))
 			for _, it := range r.Unknown {
 				fmt.Fprintf(w, "  %s  %s  %s\n", it.Stack, it.Path, it.Reason)
+			}
+		}
+		if len(r.Skipped) > 0 {
+			fmt.Fprintf(w, "\n! not counted yet: %d (these cost money idle; cfn-idle-cost has no rule for them)\n", len(r.Skipped))
+			for _, it := range r.Skipped {
+				fmt.Fprintf(w, "  %s  %s  %s\n", it.Stack, it.Path, it.Type)
 			}
 		}
 	}

@@ -105,7 +105,14 @@ var selectors = []selector{
 		}},
 	{name: "vpc", service: "AmazonVPC",
 		key: func(a map[string]string, u string) string {
-			return keep(u, "PublicIPv4:InUseAddress", "VpcEndpoint-Hours", "VpcEndpoint-GWLBE-Hours")
+			return keep(u, "PublicIPv4:InUseAddress", "VpcEndpoint-Hours", "VpcEndpoint-GWLBE-Hours", "VPN-Usage-Hours:ipsec.1", "ClientVPN-EndpointHours")
+		}},
+	{name: "tgw", service: "AmazonVPC",
+		key: func(a map[string]string, u string) string {
+			if u == "TransitGateway-Hours" {
+				return a["operation"] // TransitGatewayVPC, TransitGatewayPeering, ...
+			}
+			return ""
 		}},
 	{name: "elb", service: "AWSELB",
 		key: func(a map[string]string, u string) string {
@@ -204,6 +211,70 @@ var selectors = []selector{
 		}},
 	{name: "r53", service: "AmazonRoute53", global: true, families: []string{"DNS Zone"},
 		key: func(a map[string]string, u string) string { return keep(u, "HostedZone") }},
+	// Resolver endpoints are priced per region inside the global Route 53 offer.
+	{name: "resolver", service: "AmazonRoute53", global: true, families: []string{"DNS Query"},
+		key: func(a map[string]string, u string) string { return keep(u, "ResolverNetworkInterface") }},
+	{name: "ga", service: "AWSGlobalAccelerator", global: true, families: []string{"AWS Global Accelerator"},
+		key: func(a map[string]string, u string) string { return keep(u, "Global-Accelerator-fixed-fee") }},
+	{name: "eks", service: "AmazonEKS", families: []string{"Compute"},
+		key: func(a map[string]string, u string) string { return keep(u, "AmazonEKS-Hours:perCluster") }},
+	{name: "nfw", service: "AWSNetworkFirewall", families: []string{"AWS Firewall"},
+		key: func(a map[string]string, u string) string { return keep(u, "Endpoint-Hour") }},
+	{name: "waf", service: "awswaf", families: []string{"Web Application Firewall"},
+		key: func(a map[string]string, u string) string { return keep(u, "WebACLV2", "RuleV2") }},
+	{name: "cw", service: "AmazonCloudWatch", families: []string{"Alarm"},
+		key: func(a map[string]string, u string) string {
+			return keep(u, "CW:AlarmMonitorUsage", "CW:HighResAlarmMonitorUsage", "CW:CompositeAlarmMonitorUsage")
+		}},
+	{name: "lambda", service: "AWSLambda", families: []string{"Serverless"},
+		key: func(a map[string]string, u string) string {
+			return keep(u, "Lambda-Provisioned-Concurrency", "Lambda-Provisioned-Concurrency-ARM")
+		}},
+	{name: "docdb", service: "AmazonDocDB", families: []string{"Database Instance", "Serverless"},
+		key: func(a map[string]string, u string) string { return dbInstanceKey(a, u, "DocumentDB:ServerlessUsage") }},
+	{name: "neptune", service: "AmazonNeptune", families: []string{"Database Instance", "Serverless"},
+		key: func(a map[string]string, u string) string {
+			return dbInstanceKey(a, u, "Neptune:ServerlessUsage", "Neptune:ServerlessIOOptimizedUsage")
+		}},
+	{name: "msk", service: "AmazonMSK", families: []string{"Managed Streaming for Apache Kafka (MSK)"},
+		key: func(a map[string]string, u string) string {
+			if (strings.HasPrefix(u, "Kafka.") || strings.HasPrefix(u, "Express.")) && !strings.Contains(u, "PrivateConnectivity") || u == "KafkaServerless-ClusterHours" {
+				return u
+			}
+			return ""
+		}},
+	{name: "redshift", service: "AmazonRedshift", families: []string{"Compute Instance"},
+		key: func(a map[string]string, u string) string {
+			if strings.HasPrefix(u, "Node:") {
+				return strings.TrimPrefix(u, "Node:")
+			}
+			return ""
+		}},
+	{name: "dax", service: "AmazonDAX", families: []string{"DAX"},
+		key: func(a map[string]string, u string) string {
+			if strings.HasPrefix(u, "NodeUsage:") {
+				return strings.TrimPrefix(u, "NodeUsage:")
+			}
+			return ""
+		}},
+	{name: "mq", service: "AmazonMQ", families: []string{"Broker Instances"},
+		key: func(a map[string]string, u string) string {
+			return a["brokerEngine"] + "|" + a["deploymentOption"] + "|" + a["instanceType"]
+		}},
+	{name: "transfer", service: "AWSTransfer", families: []string{"AWS Transfer Family"},
+		key: func(a map[string]string, u string) string { return keep(u, "ProtocolHours") }},
+	{name: "apprunner", service: "AWSAppRunner", families: []string{"Compute"},
+		key: func(a map[string]string, u string) string { return keep(u, "AppRunner-Provisioned-GB-hours") }},
+}
+
+// dbInstanceKey keys RDS-like instance prices by instanceType (usagetype
+// abbreviates xlarge to xl), and keeps the listed serverless usagetypes.
+func dbInstanceKey(a map[string]string, u string, serverless ...string) string {
+	base, _, _ := strings.Cut(u, ":")
+	if in(base, "InstanceUsage", "InstanceUsageIOOptimized") && a["instanceType"] != "" {
+		return base + ":" + a["instanceType"]
+	}
+	return keep(u, serverless...)
 }
 
 func keep(u string, want ...string) string {
@@ -283,11 +354,37 @@ func price(terms map[string]offerTerm) (float64, bool) {
 	return best, found
 }
 
+// productRegion is where a product's price belongs: its regionCode, or the
+// offer's region when it has none (global offers). Products of Local Zones and
+// other non-region locations are dropped (ok=false) so they never overwrite a
+// region's price under the same key.
+func productRegion(p offerProduct, offerRegion string) (string, bool) {
+	r := p.Attributes["regionCode"]
+	if r == "" {
+		return offerRegion, true
+	}
+	return r, regionCode.MatchString(r)
+}
+
+// record keeps the highest price seen for a key (several SKUs can share one).
+func record(out map[string]map[string]float64, region, key string, terms map[string]offerTerm) {
+	v, ok := price(terms)
+	if !ok {
+		return
+	}
+	if out[region] == nil {
+		out[region] = map[string]float64{}
+	}
+	if old, seen := out[region][key]; !seen || v > old {
+		out[region][key] = v
+	}
+}
+
 // parseOffer streams one bulk offer file (EC2 is ~450 MB per region) and adds
-// the selected prices to out.
-func parseOffer(r io.Reader, sels []selector, out map[string]float64) (pub string, err error) {
+// the selected prices to out (region -> key -> price).
+func parseOffer(r io.Reader, sels []selector, offerRegion string, out map[string]map[string]float64) (pub string, err error) {
 	dec := json.NewDecoder(r)
-	keys := map[string]string{} // sku -> key
+	keys := map[string][2]string{} // sku -> region, key
 	if _, err := dec.Token(); err != nil {
 		return "", err
 	}
@@ -307,9 +404,13 @@ func parseOffer(r io.Reader, sels []selector, out map[string]float64) (pub strin
 				if err := dec.Decode(&p); err != nil {
 					return err
 				}
+				reg, ok := productRegion(p, offerRegion)
+				if !ok {
+					return nil
+				}
 				for _, s := range sels {
 					if k := s.match(p); k != "" {
-						keys[sku] = k
+						keys[sku] = [2]string{reg, k}
 						break
 					}
 				}
@@ -322,7 +423,7 @@ func parseOffer(r io.Reader, sels []selector, out map[string]float64) (pub strin
 					return dec.Decode(&skip)
 				}
 				return eachEntry(dec, func(sku string) error {
-					k, ok := keys[sku]
+					rk, ok := keys[sku]
 					if !ok {
 						var skip json.RawMessage
 						return dec.Decode(&skip)
@@ -331,9 +432,7 @@ func parseOffer(r io.Reader, sels []selector, out map[string]float64) (pub strin
 					if err := dec.Decode(&terms); err != nil {
 						return err
 					}
-					if v, ok := price(terms); ok && v >= out[k] {
-						out[k] = v
-					}
+					record(out, rk[0], rk[1], terms)
 					return nil
 				})
 			})
@@ -411,8 +510,8 @@ func BuildPrices(regions []string, logf func(string, ...any)) (*Prices, error) {
 			defer wg.Done()
 			sem <- struct{}{}
 			defer func() { <-sem }()
-			out := map[string]float64{}
-			pub, err := fetchOffer(j.url, byService[j.service], out)
+			out := map[string]map[string]float64{}
+			pub, err := fetchOffer(j.url, byService[j.service], j.region, out)
 			mu.Lock()
 			defer mu.Unlock()
 			if err != nil {
@@ -421,13 +520,22 @@ func BuildPrices(regions []string, logf func(string, ...any)) (*Prices, error) {
 				}
 				return
 			}
-			logf("%-18s %-16s %5d prices", j.service, j.region, len(out))
-			if p.Regions[j.region] == nil {
-				p.Regions[j.region] = map[string]float64{}
+			n := 0
+			for r, prices := range out {
+				if r != "global" && len(regions) > 0 && !in(r, regions...) {
+					continue
+				}
+				if p.Regions[r] == nil {
+					p.Regions[r] = map[string]float64{}
+				}
+				for k, v := range prices {
+					if old, seen := p.Regions[r][k]; !seen || v > old {
+						p.Regions[r][k] = v
+					}
+					n++
+				}
 			}
-			for k, v := range out {
-				p.Regions[j.region][k] = v
-			}
+			logf("%-18s %-16s %5d prices", j.service, j.region, n)
 			if d := pub[:min(10, len(pub))]; d > p.AsOf {
 				p.AsOf = d
 			}
@@ -437,7 +545,7 @@ func BuildPrices(regions []string, logf func(string, ...any)) (*Prices, error) {
 	return p, firstErr
 }
 
-func fetchOffer(url string, sels []selector, out map[string]float64) (string, error) {
+func fetchOffer(url string, sels []selector, offerRegion string, out map[string]map[string]float64) (string, error) {
 	resp, err := http.Get(url)
 	if err != nil {
 		return "", err
@@ -446,7 +554,7 @@ func fetchOffer(url string, sels []selector, out map[string]float64) (string, er
 	if resp.StatusCode != 200 {
 		return "", fmt.Errorf("GET %s: %s", url, resp.Status)
 	}
-	return parseOffer(resp.Body, sels, out)
+	return parseOffer(resp.Body, sels, offerRegion, out)
 }
 
 func getJSON(url string, v any) error {

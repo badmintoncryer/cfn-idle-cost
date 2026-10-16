@@ -28,15 +28,12 @@ func LivePrices(ctx context.Context, stacks []*Stack) (*Prices, error) {
 	p.Source = "live Price List Query API " + p.AsOf
 	for _, region := range sortedIDs(probe.wanted) {
 		for _, s := range selectorsFor(sortedIDs(probe.wanted[region])) {
-			bucket := region
+			offerRegion := region
 			if s.global {
-				bucket = "global"
-			}
-			if p.Regions[bucket] == nil {
-				p.Regions[bucket] = map[string]float64{}
+				offerRegion = "global"
 			}
 			for _, q := range liveQueries(s, region, sortedIDs(probe.wanted[region])) {
-				if err := fetchLive(ctx, client, s, q, p.Regions[bucket]); err != nil {
+				if err := fetchLive(ctx, client, s, q, offerRegion, p.Regions); err != nil {
 					return nil, fmt.Errorf("--live: %s in %s: %w", s.service, region, err)
 				}
 			}
@@ -96,7 +93,7 @@ func liveQueries(s selector, region string, keys []string) []map[string]string {
 	return out
 }
 
-func fetchLive(ctx context.Context, client *pricing.Client, s selector, q map[string]string, out map[string]float64) error {
+func fetchLive(ctx context.Context, client *pricing.Client, s selector, q map[string]string, offerRegion string, out map[string]map[string]float64) error {
 	var filters []types.Filter
 	for _, k := range sortedIDs(q) {
 		filters = append(filters, types.Filter{Field: aws.String(k), Type: types.FilterTypeTermMatch, Value: aws.String(q[k])})
@@ -117,10 +114,9 @@ func fetchLive(ctx context.Context, client *pricing.Client, s selector, q map[st
 			if err := json.Unmarshal([]byte(raw), &item); err != nil {
 				return err
 			}
-			if k := s.match(item.Product); k != "" {
-				if v, ok := price(item.Terms.OnDemand); ok && v >= out[k] {
-					out[k] = v
-				}
+			reg, ok := productRegion(item.Product, offerRegion)
+			if k := s.match(item.Product); ok && k != "" {
+				record(out, reg, k, item.Terms.OnDemand)
 			}
 		}
 	}

@@ -21,6 +21,8 @@ type Item struct {
 	Monthly   float64 `json:"monthly"`
 	Reason    string  `json:"reason"`
 	Unknown   bool    `json:"-"`
+	// NotCounted marks a resource of a type that costs money idle but has no rule yet.
+	NotCounted bool `json:"-"`
 }
 
 // unresolved aborts the estimate of one resource; the message says why.
@@ -63,6 +65,11 @@ func estimateResource(st *Stack, prices *Prices, id string) (items []Item) {
 	}()
 	rule := rules[e.r.Type]
 	if rule == nil {
+		if in(e.r.Type, notCounted...) {
+			nc := base
+			nc.NotCounted, nc.Reason = true, "not counted yet"
+			return []Item{nc}
+		}
 		return nil
 	}
 	if e.r.Condition != "" {
@@ -730,4 +737,224 @@ func ecsService(e *est, p map[string]any) {
 	if es := e.num(asMap(tp["EphemeralStorage"]), "SizeInGiB", 20); es > 20 {
 		e.hourly(n*(es-20), "GB", "fargate|Fargate-EphemeralStorage-GB-Hours", "Fargate ephemeral storage above 20 GB")
 	}
+}
+
+// notCounted are types that cost money with zero traffic but have no rule yet.
+// They are listed in the report instead of being skipped silently.
+var notCounted = []string{
+	"AWS::RDS::DBProxy", "AWS::OpenSearchServerless::Collection", "AWS::SageMaker::Endpoint",
+	"AWS::EMR::Cluster", "AWS::DocDBElastic::Cluster", "AWS::MemoryDB::Cluster",
+	"AWS::WorkSpaces::Workspace", "AWS::DirectoryService::MicrosoftAD", "AWS::DirectoryService::SimpleAD",
+	"AWS::MWAA::Environment", "AWS::AppStream::Fleet", "AWS::Kendra::Index", "AWS::DMS::ReplicationInstance",
+	"AWS::Timestream::InfluxDBInstance", "AWS::EC2::Host", "AWS::EC2::CapacityReservation",
+	"AWS::ElasticBeanstalk::Environment", "AWS::Lightsail::Instance", "AWS::Lightsail::Database",
+	"AWS::GameLift::Fleet", "AWS::MediaLive::Channel", "AWS::KafkaConnect::Connector",
+	"AWS::Shield::Protection", "AWS::Batch::ComputeEnvironment", "AWS::EC2::VerifiedAccessEndpoint",
+}
+
+func init() {
+	more := map[string]func(e *est, p map[string]any){
+		"AWS::EKS::Cluster": func(e *est, p map[string]any) {
+			e.hourly(1, "", "eks|AmazonEKS-Hours:perCluster", "EKS cluster hourly (standard support)")
+		},
+		"AWS::EKS::Nodegroup": func(e *est, p map[string]any) {
+			if e.str(p, "CapacityType", "ON_DEMAND") != "ON_DEMAND" {
+				panic(unresolved("Spot node groups are not supported"))
+			}
+			sc := asMap(p["ScalingConfig"])
+			n, why := e.num(sc, "DesiredSize", -1), "DesiredSize"
+			if n < 0 {
+				n, why = e.mustNum(sc, "MinSize"), "MinSize"
+			}
+			var t string
+			if l, ok := p["InstanceTypes"].([]any); ok && len(l) == 1 {
+				t = e.str(map[string]any{"InstanceTypes": l[0]}, "InstanceTypes", "")
+			} else if lt, ok := p["LaunchTemplate"]; ok && p["InstanceTypes"] == nil {
+				t = e.mustStr(e.launchTemplate(asMap(lt)), "InstanceType")
+			} else {
+				panic(unresolved("InstanceTypes must name exactly one type"))
+			}
+			e.hourly(n, "", "ec2|"+t, fmt.Sprintf("%s on-demand (Linux), %s", t, why))
+		},
+		"AWS::NetworkFirewall::Firewall": func(e *est, p map[string]any) {
+			n := e.length(p, "SubnetMappings")
+			if n < 0 {
+				n = e.length(p, "AvailabilityZoneMappings")
+			}
+			if n < 0 {
+				panic(unresolved("SubnetMappings is not set"))
+			}
+			e.hourly(float64(n), "endpoints", "nfw|Endpoint-Hour", "firewall endpoint hourly per AZ")
+		},
+		"AWS::WAFv2::WebACL": func(e *est, p map[string]any) {
+			e.monthly(1, "", "waf|WebACLV2", "web ACL")
+			e.monthly(float64(max(0, e.length(p, "Rules"))), "rules", "waf|RuleV2", "rules (managed rule group fees not counted)")
+		},
+		"AWS::CloudWatch::Alarm": func(e *est, p map[string]any) {
+			n, high := 1.0, e.num(p, "Period", 60) < 60
+			if l, ok := p["Metrics"].([]any); ok {
+				n = 0
+				for _, m := range l {
+					mm := asMap(m)
+					if strings.Contains(fmt.Sprint(mm["Expression"]), "ANOMALY_DETECTION_BAND") {
+						panic(unresolved("anomaly detection alarms are not supported yet"))
+					}
+					if ms := asMap(mm["MetricStat"]); ms != nil {
+						n++
+						high = high || e.num(ms, "Period", 60) < 60
+					}
+				}
+			} else if p["Metrics"] != nil {
+				e.length(p, "Metrics") // panics with the reason
+			}
+			if high {
+				e.monthly(n, "metrics", "cw|CW:HighResAlarmMonitorUsage", "high-resolution alarm per metric")
+				return
+			}
+			e.monthly(n, "metrics", "cw|CW:AlarmMonitorUsage", "alarm per metric")
+		},
+		"AWS::CloudWatch::CompositeAlarm": func(e *est, p map[string]any) {
+			e.monthly(1, "", "cw|CW:CompositeAlarmMonitorUsage", "composite alarm")
+		},
+		"AWS::Lambda::Version": lambdaProvisioned,
+		"AWS::Lambda::Alias":   lambdaProvisioned,
+		"AWS::GlobalAccelerator::Accelerator": func(e *est, p map[string]any) {
+			if e.str(p, "Enabled", "true") != "false" {
+				e.hourly(1, "", "ga|Global-Accelerator-fixed-fee", "accelerator fixed fee")
+			}
+		},
+		"AWS::EC2::TransitGatewayAttachment": func(e *est, p map[string]any) {
+			e.hourly(1, "", "tgw|TransitGatewayVPC", "Transit Gateway VPC attachment hourly")
+		},
+		"AWS::EC2::TransitGatewayVpcAttachment": func(e *est, p map[string]any) {
+			e.hourly(1, "", "tgw|TransitGatewayVPC", "Transit Gateway VPC attachment hourly")
+		},
+		"AWS::EC2::TransitGatewayPeeringAttachment": func(e *est, p map[string]any) {
+			e.hourly(1, "", "tgw|TransitGatewayPeering", "Transit Gateway peering attachment hourly")
+		},
+		"AWS::EC2::TransitGatewayConnect": func(e *est, p map[string]any) {
+			e.hourly(1, "", "tgw|TransitGatewayConnect", "Transit Gateway Connect attachment hourly")
+		},
+		"AWS::EC2::VPNConnection": func(e *est, p map[string]any) {
+			e.hourly(1, "", "vpc|VPN-Usage-Hours:ipsec.1", "Site-to-Site VPN connection hourly")
+			if _, ok := p["TransitGatewayId"]; ok {
+				e.hourly(1, "", "tgw|TransitGatewayVPN", "Transit Gateway VPN attachment hourly")
+			}
+		},
+		"AWS::EC2::ClientVpnTargetNetworkAssociation": func(e *est, p map[string]any) {
+			e.hourly(1, "", "vpc|ClientVPN-EndpointHours", "Client VPN endpoint association hourly")
+		},
+		"AWS::Route53Resolver::ResolverEndpoint": func(e *est, p map[string]any) {
+			n := e.length(p, "IpAddresses")
+			if n < 0 {
+				panic(unresolved("IpAddresses is not set"))
+			}
+			e.hourly(float64(n), "ENIs", "resolver|ResolverNetworkInterface", "Resolver endpoint hourly per IP address")
+		},
+		"AWS::DocDB::DBInstance": func(e *est, p map[string]any) {
+			e.clusterInstance(p, "docdb", "iopt1", "ServerlessV2ScalingConfiguration", "DocumentDB:ServerlessUsage", "DocumentDB:ServerlessUsage", "DCU")
+		},
+		"AWS::Neptune::DBInstance": func(e *est, p map[string]any) {
+			e.clusterInstance(p, "neptune", "iopt1", "ServerlessScalingConfiguration", "Neptune:ServerlessUsage", "Neptune:ServerlessIOOptimizedUsage", "NCU")
+		},
+		"AWS::MSK::Cluster": func(e *est, p map[string]any) {
+			b := asMap(p["BrokerNodeGroupInfo"])
+			t := e.mustStr(b, "InstanceType") // kafka.m5.large, express.m7g.large
+			n := e.mustNum(p, "NumberOfBrokerNodes")
+			e.hourly(n, "brokers", "msk|"+strings.ToUpper(t[:1])+t[1:], t+" broker hourly")
+			if strings.HasPrefix(t, "express.") {
+				return // Express storage is pay-per-use
+			}
+			ebs := asMap(asMap(b["StorageInfo"])["EBSStorageInfo"])
+			e.monthly(n*e.mustNum(ebs, "VolumeSize"), "GB", "msk|Kafka.Storage.GP2", "broker storage")
+			if pt := asMap(ebs["ProvisionedThroughput"]); e.flag(pt, "Enabled") {
+				e.monthly(n*math.Max(0, e.mustNum(pt, "VolumeThroughput")-250), "MiB/s", "msk|Kafka.Throughput", "storage throughput above 250 MiB/s")
+			}
+		},
+		"AWS::MSK::ServerlessCluster": func(e *est, p map[string]any) {
+			e.hourly(1, "", "msk|KafkaServerless-ClusterHours", "serverless cluster hourly (partitions not counted)")
+		},
+		"AWS::Redshift::Cluster": func(e *est, p map[string]any) {
+			n := 1.0
+			if e.mustStr(p, "ClusterType") == "multi-node" {
+				n = e.mustNum(p, "NumberOfNodes")
+			}
+			t := e.mustStr(p, "NodeType")
+			e.hourly(n, "nodes", "redshift|"+t, t+" node hourly")
+		},
+		"AWS::DAX::Cluster": func(e *est, p map[string]any) {
+			t := e.mustStr(p, "NodeType")
+			e.hourly(e.mustNum(p, "ReplicationFactor"), "nodes", "dax|"+t, t+" node hourly")
+		},
+		"AWS::AmazonMQ::Broker": func(e *est, p map[string]any) {
+			engine := map[string]string{"ACTIVEMQ": "ActiveMQ", "RABBITMQ": "RabbitMQ"}[strings.ToUpper(e.mustStr(p, "EngineType"))]
+			deploy := map[string]string{"SINGLE_INSTANCE": "Single-AZ", "ACTIVE_STANDBY_MULTI_AZ": "Multi-AZ", "CLUSTER_MULTI_AZ": "Multi-AZ"}[e.mustStr(p, "DeploymentMode")]
+			if engine == "" || deploy == "" {
+				panic(unresolved("EngineType or DeploymentMode is not supported"))
+			}
+			t := e.mustStr(p, "HostInstanceType")
+			e.hourly(1, "", "mq|"+engine+"|"+deploy+"|"+strings.TrimPrefix(t, "mq."), t+" "+engine+" "+deploy)
+		},
+		"AWS::Transfer::Server": func(e *est, p map[string]any) {
+			n := e.length(p, "Protocols")
+			if n < 0 {
+				n = 1 // SFTP
+			}
+			e.hourly(float64(n), "protocols", "transfer|ProtocolHours", "server hourly per protocol")
+		},
+		"AWS::AppRunner::Service": func(e *est, p map[string]any) {
+			mem := e.str(asMap(p["InstanceConfiguration"]), "Memory", "2 GB")
+			gb, err := strconv.ParseFloat(strings.TrimSpace(strings.TrimSuffix(mem, "GB")), 64)
+			if err != nil {
+				panic(unresolved(fmt.Sprintf("Memory is %q", mem)))
+			}
+			if !strings.HasSuffix(mem, "GB") {
+				gb /= 1024 // MB
+			}
+			min := 1.0 // the default auto scaling configuration
+			if _, ok := p["AutoScalingConfigurationArn"]; ok {
+				_, as := e.ref(p, "AutoScalingConfigurationArn")
+				min = e.num(as.Properties, "MinSize", 1)
+			}
+			e.hourly(min*gb, "GB", "apprunner|AppRunner-Provisioned-GB-hours", fmt.Sprintf("provisioned instance memory (%g instances)", min))
+		},
+	}
+	for k, v := range more {
+		rules[k] = v
+	}
+}
+
+func lambdaProvisioned(e *est, p map[string]any) {
+	pc := e.num(asMap(p["ProvisionedConcurrencyConfig"]), "ProvisionedConcurrentExecutions", 0)
+	if pc == 0 {
+		return
+	}
+	_, fn := e.ref(p, "FunctionName")
+	mb := e.num(fn.Properties, "MemorySize", 128)
+	key := "lambda|Lambda-Provisioned-Concurrency"
+	if l, _ := fn.Properties["Architectures"].([]any); len(l) == 1 && l[0] == "arm64" {
+		key += "-ARM"
+	}
+	e.add(pc, "concurrency", pc*mb/1024*hoursPerMonth*3600*e.price(key), fmt.Sprintf("provisioned concurrency (%g MB)", mb))
+}
+
+// clusterInstance prices a DocumentDB or Neptune instance: its class, or the
+// serverless minimum capacity of its cluster.
+func (e *est) clusterInstance(p map[string]any, svc, ioptType, scalingProp, serverlessKey, serverlessIOKey, unit string) {
+	class := e.mustStr(p, "DBInstanceClass")
+	_, c := e.ref(p, "DBClusterIdentifier")
+	iopt := e.str(c.Properties, "StorageType", "standard") == ioptType
+	if class == "db.serverless" {
+		key := serverlessKey
+		if iopt {
+			key = serverlessIOKey
+		}
+		e.hourly(e.mustNum(asMap(c.Properties[scalingProp]), "MinCapacity"), unit, svc+"|"+key, "serverless minimum capacity")
+		return
+	}
+	usage, sfx := "InstanceUsage", ""
+	if iopt {
+		usage, sfx = "InstanceUsageIOOptimized", ", I/O-Optimized"
+	}
+	e.hourly(1, "", svc+"|"+usage+":"+class, class+" instance"+sfx)
 }

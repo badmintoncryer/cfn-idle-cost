@@ -90,12 +90,31 @@ npx cfn-idle-cost [flags] [cdk.out | template ...]
 | `AWS::KMS::Key`、`AWS::KMS::ReplicaKey` | キー1つにつき$1 |
 | `AWS::SecretsManager::Secret` | シークレットごとの料金 |
 | `AWS::Route53::HostedZone` | ホストゾーンごとの料金 |
+| `AWS::EKS::Cluster` | クラスターの時間料金（標準サポート） |
+| `AWS::EKS::Nodegroup` | インスタンスの時間料金×`DesiredSize`（なければ`MinSize`）。オンデマンドで、インスタンスタイプが1つの場合 |
+| `AWS::NetworkFirewall::Firewall` | エンドポイントの時間料金×サブネット数 |
+| `AWS::WAFv2::WebACL` | Web ACLとルール（マネージドルールグループの追加料金は含みません） |
+| `AWS::CloudWatch::Alarm`、`CompositeAlarm` | アラームのメトリクスごとの料金（標準解像度・高解像度）、複合アラームごとの料金 |
+| `AWS::Lambda::Alias`、`AWS::Lambda::Version` | プロビジョニング済み同時実行数×関数のメモリ（x86とARM） |
+| `AWS::EC2::TransitGatewayAttachment`、`TransitGatewayVpcAttachment`、`TransitGatewayPeeringAttachment`、`TransitGatewayConnect` | アタッチメントの時間料金 |
+| `AWS::EC2::VPNConnection` | 接続の時間料金。Transit Gatewayにつなぐ場合は、VPNアタッチメントの時間料金も加えます |
+| `AWS::EC2::ClientVpnTargetNetworkAssociation` | 関連付けの時間料金 |
+| `AWS::Route53Resolver::ResolverEndpoint` | 時間料金×IPアドレス数 |
+| `AWS::GlobalAccelerator::Accelerator` | 固定の時間料金 |
+| `AWS::DocDB::DBInstance`、`AWS::Neptune::DBInstance` | インスタンスの時間料金（I/O-Optimizedにも対応）、またはクラスターのサーバーレス最小容量 |
+| `AWS::MSK::Cluster` | ブローカーの時間料金、ブローカーのストレージ、250 MiB/sを超えるストレージスループット（StandardとExpressのブローカー） |
+| `AWS::MSK::ServerlessCluster` | クラスターの時間料金（パーティションの料金は含みません） |
+| `AWS::Redshift::Cluster` | ノードの時間料金×ノード数 |
+| `AWS::DAX::Cluster` | ノードの時間料金×レプリケーション係数 |
+| `AWS::AmazonMQ::Broker` | ブローカーの時間料金（ActiveMQとRabbitMQ、シングル・マルチAZ） |
+| `AWS::Transfer::Server` | プロトコルごとの時間料金 |
+| `AWS::AppRunner::Service` | 最小数のプロビジョニング済みインスタンスのメモリ |
 
 使った分だけかかる費用は、意図して対象から外しています。S3、Lambda、AuroraのストレージとI/O、CloudWatch Logs、データ転送、リクエスト料金がこれに当たります。
 
 ### まだ見積もらないもの
 
-CloudWatchアラーム、WAFのWeb ACL、Lambdaのプロビジョニング済み同時実行、Redshift、MSK、DocumentDB、Neptune、Transit Gatewayのアタッチメント、Client VPN、RDS Proxy、FSx for ONTAP、プロビジョンドモードのDynamoDBグローバルテーブル、RDSのOracleとSQL Server、マルチAZ DBクラスター、Fargate SpotとWindowsのFargateです。このうち一部に対応しているリソースタイプは「could not estimate」に載り、それ以外は表示されません。
+アクセスがゼロでも費用がかかるのに、まだルールのないリソースタイプ（RDS Proxy、OpenSearch Serverless、SageMakerのエンドポイント、EMR、MemoryDB、WorkSpaces、Directory Serviceなど）は、`! not counted yet`に載せます。そのため、こうした費用が黙って抜け落ちることはありません。一部だけ対応しているリソース（FSx for ONTAP、プロビジョンドモードのDynamoDBグローバルテーブル、RDSのOracleとSQL Server、マルチAZ DBクラスター、Fargate SpotとWindowsのFargate、Spotのノードグループ）は、`? could not estimate`に載ります。
 
 ## 前提
 
