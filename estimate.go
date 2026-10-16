@@ -582,11 +582,11 @@ func (e *est) searchDomain(cc map[string]any, ccName string, p map[string]any) {
 		return t
 	}
 	t := norm(e.mustStr(cc, "InstanceType"))
-	n := e.num(cc, "InstanceCount", 1)
+	n := e.mustNum(cc, "InstanceCount")
 	e.hourly(n, "", "es|"+t, t+" data nodes")
 	if e.flag(cc, "DedicatedMasterEnabled") {
 		m := norm(e.mustStr(cc, "DedicatedMasterType"))
-		e.hourly(e.num(cc, "DedicatedMasterCount", 3), "", "es|"+m, m+" dedicated master nodes")
+		e.hourly(e.mustNum(cc, "DedicatedMasterCount"), "", "es|"+m, m+" dedicated master nodes")
 	}
 	if e.flag(cc, "WarmEnabled") {
 		w := norm(e.mustStr(cc, "WarmType"))
