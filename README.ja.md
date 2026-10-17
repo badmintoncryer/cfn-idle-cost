@@ -97,11 +97,11 @@ jobs:
   idle-cost:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with: { path: head }
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with: { path: base, ref: "${{ github.base_ref }}" }
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with: { node-version: 22 }
       - run: npm ci && npx cdk synth -q
         working-directory: head
