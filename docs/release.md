@@ -4,8 +4,8 @@ Releases run in GitHub Actions on a `vX.Y.Z` tag (and from the weekly `refresh-p
 workflow, which starts `release.yml` with `workflow_dispatch` so that npm sees
 `release.yml` as the publisher). They publish GitHub Release binaries with goreleaser and the npm
 packages with trusted publishing (OIDC). There are no long-lived tokens or repo
-secrets. The last step moves the major tag (`v0`) to the release, so
-`uses: badmintoncryer/cfn-idle-cost@v0` in a workflow picks it up.
+secrets. The last step moves the major tag (`v1`) to the release, so
+`uses: badmintoncryer/cfn-idle-cost@v1` in a workflow picks it up.
 
 ## One-time setup (npm)
 

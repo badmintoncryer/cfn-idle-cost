@@ -45,7 +45,7 @@ runs:
         GH_REPO: ${{ github.repository }}
       run: |
         set -f # inputs are split on spaces, never globbed
-        # @v1.2.3 runs that npm version; @v0, @main or a SHA run the latest.
+        # @v1.2.3 runs that npm version; @v1, @main or a SHA run the latest.
         version=latest
         [[ "$ACTION_REF" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] && version="${ACTION_REF#v}"
         flags=(--format md)
