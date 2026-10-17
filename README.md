@@ -150,7 +150,7 @@ and provisioned storage billed whether you use it or not.
 | `AWS::EC2::NatGateway` | hourly |
 | `AWS::EC2::EIP` | public IPv4 address |
 | `AWS::EC2::VPCEndpoint` | Interface: hourly × subnets (AZs). Gateway Load Balancer: hourly. Gateway: free |
-| `AWS::ElasticLoadBalancingV2::LoadBalancer` | ALB / NLB / GWLB hourly, plus one public IPv4 per subnet when internet-facing |
+| `AWS::ElasticLoadBalancingV2::LoadBalancer` | ALB / NLB / GWLB hourly, plus one public IPv4 per subnet when internet-facing (none for `dualstack-without-public-ipv4`) |
 | `AWS::ElasticLoadBalancing::LoadBalancer` | Classic Load Balancer hourly |
 | `AWS::EC2::Instance` | instance hourly (Linux), EBS volumes in `BlockDeviceMappings`, the public IPv4 it gets at launch |
 | `AWS::AutoScaling::AutoScalingGroup` | instance hourly × `DesiredCapacity` (or `MinSize`), EBS volumes and public IPv4 at launch, from its launch template or launch configuration |

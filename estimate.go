@@ -392,7 +392,7 @@ func init() {
 				panic(unresolved("Type " + t + " is not supported"))
 			}
 			e.hourly(1, "", "elb|Load Balancer-"+f, f+" Load Balancer")
-			if t == "gateway" || e.str(p, "Scheme", "internet-facing") != "internet-facing" {
+			if t == "gateway" || e.str(p, "Scheme", "internet-facing") != "internet-facing" || e.str(p, "IpAddressType", "ipv4") == "dualstack-without-public-ipv4" {
 				return
 			}
 			n := e.length(p, "Subnets")

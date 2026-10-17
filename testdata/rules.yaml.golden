@@ -1,6 +1,6 @@
-us-east-1 · 1 stack · idle ≈ $6138/mo
+us-east-1 · 1 stack · idle ≈ $6155/mo
 
-rules                           $6138/mo
+rules                           $6155/mo
   OntapScaleOut   ×3072 MB/s    $4915  throughput capacity
   OntapScaleOut   ×2048 GB SSD   $256  SSD storage (capacity pool is pay-per-use)
   OntapScaleOut   ×3856 IOPS      $66  SSD IOPS above 3 per GB
@@ -15,6 +15,7 @@ rules                           $6138/mo
   Web             ×1 GB         $3.24  Fargate memory (2 tasks)
   Fleet           ×2              $15  t3.micro on-demand (Linux), DesiredCapacity
   Fleet           ×2 IPv4       $7.30  public IPv4 assigned at launch, DesiredCapacity
+  Ipv6Alb         ×1              $16  Application Load Balancer
   Prod            ×1              $15  0.5 GB cache cluster
   PublicBox       ×1            $7.59  t3.micro on-demand (Linux)
   PublicBox       ×1 IPv4       $3.65  public IPv4 assigned at launch
