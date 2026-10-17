@@ -156,13 +156,14 @@ and provisioned storage billed whether you use it or not.
 | `AWS::AutoScaling::AutoScalingGroup` | instance hourly × `DesiredCapacity` (or `MinSize`), EBS volumes and public IPv4 at launch, from its launch template or launch configuration |
 | `AWS::EC2::Volume` | size, gp3 IOPS / throughput above 3000 / 125 MiB/s, io1 / io2 IOPS |
 | `AWS::RDS::DBInstance` | instance hourly (Single-AZ / Multi-AZ), allocated storage, provisioned IOPS and throughput above the gp3 baseline. Aurora: provisioned instances, or Serverless v2 minimum ACU (I/O-Optimized aware) |
+| `AWS::RDS::DBCluster` (Multi-AZ DB cluster) | cluster hourly (writer and two readable standbys), allocated storage and provisioned IOPS (gp3 IOPS and throughput not supported yet) |
 | `AWS::OpenSearchService::Domain`, `AWS::Elasticsearch::Domain` | data, dedicated master and UltraWarm nodes, EBS storage / IOPS / throughput |
 | `AWS::ElastiCache::CacheCluster`, `ReplicationGroup` | node hourly × nodes |
 | `AWS::ElastiCache::ServerlessCache` | minimum data storage (1 GB, 100 MB for Valkey, or your `CacheUsageLimits` minimum) |
 | `AWS::DynamoDB::Table` | provisioned RCU / WCU, including GSIs (Standard and Standard-IA) |
 | `AWS::DynamoDB::GlobalTable` | provisioned RCU and the auto scaling minimum WCU of the replica in the stack's region, including GSIs (replicated WCU with two or more replicas). Replicas in other regions are counted in the line, not priced |
 | `AWS::Kinesis::Stream` | provisioned shard hours, or the on-demand stream hour |
-| `AWS::ECS::Service` (Fargate) | vCPU, memory, ephemeral storage above 20 GB and public IPv4 (`AssignPublicIp: ENABLED`) × `DesiredCount` (x86 and ARM) |
+| `AWS::ECS::Service` (Fargate) | vCPU, memory, ephemeral storage above 20 GB and public IPv4 (`AssignPublicIp: ENABLED`) × `DesiredCount` (x86 and ARM Linux, and Windows with its OS license per vCPU) |
 | `AWS::EFS::FileSystem` | provisioned throughput |
 | `AWS::FSx::FileSystem` | storage and throughput capacity for Windows, Lustre, OpenZFS and ONTAP, SSD IOPS above the included 3 per GB (the ONTAP capacity pool is pay-per-use) |
 | `AWS::KMS::Key`, `AWS::KMS::ReplicaKey` | $1 per key |
@@ -195,6 +196,24 @@ and provisioned storage billed whether you use it or not.
 | `AWS::ApiGateway::Stage` | cache cluster hourly by `CacheClusterSize` when `CacheClusterEnabled` |
 | `AWS::DirectoryService::MicrosoftAD` | 2 domain controllers hourly (Standard or Enterprise). Controllers added later are not in the template |
 | `AWS::DirectoryService::SimpleAD` | directory hourly (Small or Large) |
+| `AWS::ACMPCA::CertificateAuthority` | monthly per CA (general-purpose or short-lived certificate mode) |
+| `AWS::DMS::ReplicationInstance` | instance hourly (Single-AZ / Multi-AZ). Storage above the amount included with the class is not counted |
+| `AWS::SageMaker::NotebookInstance` | instance hourly and its storage |
+| `AWS::OSIS::Pipeline` | `MinUnits` Ingestion OCUs |
+| `AWS::EC2::CapacityReservation` | instance hourly × `InstanceCount` (Linux, shared tenancy) |
+| `AWS::Synthetics::Canary` | runs per month from a `rate()` schedule, when it starts after creation |
+| `AWS::Kinesis::StreamConsumer` | enhanced fan-out per shard of a provisioned stream |
+| `AWS::KafkaConnect::Connector` | MCUs × workers (provisioned, or the auto scaling minimum) |
+| `AWS::MSK::Replicator` | replicator hourly (data replicated not counted) |
+| `AWS::SSM::Parameter` | per advanced parameter |
+| `AWS::Cassandra::Table` | provisioned RCU / WCU |
+| `AWS::MWAA::Environment` | environment class hourly, plus workers, schedulers and web servers above the included ones |
+| `AWS::AppSync::ApiCache` | cache hourly by `Type` |
+| `AWS::HealthLake::FHIRDatastore` | data store hourly |
+| `AWS::Route53RecoveryControl::Cluster`, `AWS::Route53RecoveryReadiness::ReadinessCheck` | cluster hourly, readiness check hourly |
+| `AWS::VpcLattice::Service` | service hourly (requests and data not counted) |
+| `AWS::DocDBElastic::Cluster` | shard vCPUs × shards × instances per shard |
+| `AWS::Timestream::InfluxDBInstance` | instance hourly (Single-AZ / Multi-AZ) and allocated storage |
 
 Usage-only charges are left out on purpose: S3, Lambda, Aurora storage and
 I/O, CloudWatch Logs, data transfer, requests.
@@ -202,10 +221,10 @@ I/O, CloudWatch Logs, data transfer, requests.
 ### Not counted yet
 
 Resource types that cost money with zero traffic but have no rule yet, such as
-EMR, WorkSpaces, DMS and CloudWatch dashboards, are listed under `! not counted yet`, so
+EMR, WorkSpaces, Kendra and CloudWatch dashboards, are listed under `! not counted yet`, so
 their cost is never left out silently. Partly supported types (Oracle and SQL
-Server on RDS, Multi-AZ DB clusters, Fargate Spot and Windows, Spot node
-groups, instances in Local Zones) are listed under
+Server on RDS, Fargate Spot, Spot node groups, instances in Local Zones,
+canaries on a cron schedule) are listed under
 `? could not estimate`.
 
 ## Assumptions

@@ -47,7 +47,18 @@ var testPrices = &Prices{Source: "test prices", Regions: map[string]map[string]f
 		"fsx|ONTAP|ThroughputCapacity.SAZ_2N2": 1.6, "fsx|ONTAP|ProvisionedSSDIOPS.SAZ_2N2": 0.017,
 		"ddb|ReadCapacityUnit-Hrs": 0.00013, "ddb|ReplWriteCapacityUnit-Hrs": 0.00065, "ddb|IA-ReadCapacityUnit-Hrs": 0.00016, "ddb|IA-WriteCapacityUnit-Hrs": 0.00081,
 		"apigw|cache:0.5": 0.02, "apigw|cache:6.1": 0.2, "ds|Std-MicrosoftAD-DC-Usage": 0.06, "ds|MicrosoftAD-DC-Usage": 0.2, "ds|Small-SimpleAD-Usage": 0.05,
-		"elb|Load Balancer-Application": 0.0225},
+		"elb|Load Balancer-Application": 0.0225,
+		"pca|PaidPrivateCA":             400, "pca|ShortLivedCertificatePrivateCA": 50, "dms|Multi-AZUsg:dms.t3.medium": 0.149,
+		"notebook|ml.t3.medium": 0.05, "notebook|VolumeUsage.gp2": 0.14, "osis|IngestionOCU": 0.24, "cw|CW:Canary-runs": 0.0012,
+		"kinesis|Storage-ShardHour": 0.015, "kinesis|EnhancedFanoutHour": 0.015, "msk|Kafka.mcu.general": 0.11,
+		"msk|KafkaReplication-ReplicatorHours": 0.3, "ssm|PS-Advanced-Param-Tier1": 0.00007,
+		"mcs|ReadCapacityUnit-Hrs": 0.00013, "mcs|WriteCapacityUnit-Hrs": 0.00065,
+		"mwaa|SmallEnvironment": 0.49, "mwaa|SmallWorker": 0.055, "healthlake|FHIRDataStore": 0.27, "appsync|cache:1.55": 0.044,
+		"vpc|VPCLattice-Service-Hourly": 0.025, "docdb|ElasticCPUUsage": 0.132,
+		"influx|MultiAZUsage-Db.influx.medium": 0.24, "influx|MultiAZ-InfluxDBStorage-InfluxIOIncludedT1": 0.2,
+		"rds|Multi-AZClusterUsage:db.m5d.large|14": 0.585, "rds|RDS:Multi-AZCluster-PIOPS-Storage|14": 0.375, "rds|RDS:Multi-AZCluster-PIOPS|14": 0.3,
+		"fargate|Fargate-Windows-vCPU-Hours:perCPU": 0.046552, "fargate|Fargate-Windows-OS-Hours:perCPU": 0.046, "fargate|Fargate-Windows-GB-Hours": 0.00511175},
+	"global": {"arc|Global-Cluster-Hours": 2.5, "arc|Global-ReadinessCheck-Hours": 0.045},
 }}
 
 func golden(t *testing.T, name, got string) {
@@ -108,6 +119,14 @@ func TestMoreTypes(t *testing.T) {
 // Gateway caches and Directory Service.
 func TestRules(t *testing.T) {
 	golden(t, "rules.yaml", report(t, "us-east-1", "testdata/rules.yaml"))
+}
+
+// The second batch: private CAs, DMS, notebooks, ingestion pipelines, capacity
+// reservations, canaries, stream consumers, MSK Connect and Replicator, SSM
+// advanced parameters, Keyspaces, MWAA, HealthLake, ARC, VPC Lattice, DocumentDB
+// elastic clusters, Timestream for InfluxDB, Multi-AZ DB clusters and Windows on Fargate.
+func TestRules2(t *testing.T) {
+	golden(t, "rules2.yaml", report(t, "us-east-1", "testdata/rules2.yaml"))
 }
 
 // --parameter turns the Condition on: ProdKey is created and Spare is an m5.large.

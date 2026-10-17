@@ -141,13 +141,14 @@ jobs:
 | `AWS::AutoScaling::AutoScalingGroup` | インスタンスの時間料金×`DesiredCapacity`（なければ`MinSize`）、EBSボリューム、起動時に割り当てられるパブリックIPv4。起動テンプレートか起動設定から読みます |
 | `AWS::EC2::Volume` | 容量、gp3の3000 IOPS・125 MiB/sを超える分、io1・io2のIOPS |
 | `AWS::RDS::DBInstance` | インスタンスの時間料金（シングルAZ・マルチAZ）、割り当てたストレージ、プロビジョンドIOPS、gp3の基準値を超えるIOPSとスループット。Auroraは、プロビジョンドのインスタンスか、Serverless v2の最小ACU（I/O-Optimizedにも対応） |
+| `AWS::RDS::DBCluster`（マルチAZ DBクラスター） | クラスターの時間料金（ライター1台と読み取り可能なスタンバイ2台）、割り当てたストレージ、プロビジョンドIOPS（gp3のIOPSとスループットにはまだ対応していません） |
 | `AWS::OpenSearchService::Domain`、`AWS::Elasticsearch::Domain` | データノード、専用マスターノード、UltraWarmノード、EBSの容量・IOPS・スループット |
 | `AWS::ElastiCache::CacheCluster`、`ReplicationGroup` | ノードの時間料金×ノード数 |
 | `AWS::ElastiCache::ServerlessCache` | データストレージの最小量（1 GB。Valkeyは100 MB。`CacheUsageLimits`で最小量を指定していればその値） |
 | `AWS::DynamoDB::Table` | プロビジョニングしたRCU・WCU（GSIを含みます。StandardとStandard-IAに対応） |
 | `AWS::DynamoDB::GlobalTable` | スタックと同じリージョンにあるレプリカの、プロビジョニングしたRCUとAuto Scalingの最小WCU（GSIを含みます。レプリカが2つ以上なら、書き込みにはレプリケートされたWCUの料金を使います）。ほかのリージョンのレプリカは、数を行に書くだけで、料金には含めません |
 | `AWS::Kinesis::Stream` | プロビジョンドのシャード時間、またはオンデマンドのストリーム時間 |
-| `AWS::ECS::Service`（Fargate） | vCPU、メモリ、20 GBを超えるエフェメラルストレージ、パブリックIPv4（`AssignPublicIp: ENABLED`のとき）×`DesiredCount`（x86とARM） |
+| `AWS::ECS::Service`（Fargate） | vCPU、メモリ、20 GBを超えるエフェメラルストレージ、パブリックIPv4（`AssignPublicIp: ENABLED`のとき）×`DesiredCount`（x86とARMのLinux、Windows。WindowsはvCPUごとのOSライセンス料金も含みます） |
 | `AWS::EFS::FileSystem` | プロビジョンドスループット |
 | `AWS::FSx::FileSystem` | Windows、Lustre、OpenZFS、ONTAPのストレージ容量とスループット容量。容量1 GBあたり3 IOPSを超えるSSD IOPS（ONTAPの容量プールは使った分だけかかるので含みません） |
 | `AWS::KMS::Key`、`AWS::KMS::ReplicaKey` | キー1つにつき$1 |
@@ -180,12 +181,30 @@ jobs:
 | `AWS::ApiGateway::Stage` | `CacheClusterEnabled`のとき、`CacheClusterSize`に応じたキャッシュクラスターの時間料金 |
 | `AWS::DirectoryService::MicrosoftAD` | ドメインコントローラー2台の時間料金（StandardとEnterprise）。あとから追加したドメインコントローラーはテンプレートに現れないため含みません |
 | `AWS::DirectoryService::SimpleAD` | ディレクトリの時間料金（SmallとLarge） |
+| `AWS::ACMPCA::CertificateAuthority` | CAごとの月額料金（汎用モードと短期証明書モード） |
+| `AWS::DMS::ReplicationInstance` | インスタンスの時間料金（シングルAZ・マルチAZ）。インスタンスクラスに含まれる量を超えたストレージは含みません |
+| `AWS::SageMaker::NotebookInstance` | インスタンスの時間料金とストレージ |
+| `AWS::OSIS::Pipeline` | `MinUnits`のIngestion OCU |
+| `AWS::EC2::CapacityReservation` | インスタンスの時間料金×`InstanceCount`（Linux、共有テナンシー） |
+| `AWS::Synthetics::Canary` | 作成後に開始するカナリアの、`rate()`のスケジュールから求めた月の実行回数 |
+| `AWS::Kinesis::StreamConsumer` | プロビジョンドのストリームのシャードごとの拡張ファンアウト料金 |
+| `AWS::KafkaConnect::Connector` | MCU×ワーカー数（プロビジョンド、または自動スケーリングの最小値） |
+| `AWS::MSK::Replicator` | レプリケーターの時間料金（レプリケートしたデータの料金は含みません） |
+| `AWS::SSM::Parameter` | アドバンストパラメータごとの料金 |
+| `AWS::Cassandra::Table` | プロビジョンドのRCUとWCU |
+| `AWS::MWAA::Environment` | 環境クラスの時間料金と、環境に含まれる数を超えたワーカー、スケジューラー、ウェブサーバー |
+| `AWS::AppSync::ApiCache` | `Type`に応じたキャッシュの時間料金 |
+| `AWS::HealthLake::FHIRDatastore` | データストアの時間料金 |
+| `AWS::Route53RecoveryControl::Cluster`、`AWS::Route53RecoveryReadiness::ReadinessCheck` | クラスターの時間料金、準備状況チェックの時間料金 |
+| `AWS::VpcLattice::Service` | サービスの時間料金（リクエストとデータの料金は含みません） |
+| `AWS::DocDBElastic::Cluster` | シャードのvCPU×シャード数×シャードごとのインスタンス数 |
+| `AWS::Timestream::InfluxDBInstance` | インスタンスの時間料金（シングルAZ・マルチAZ）と割り当てたストレージ |
 
 使った分だけかかる費用は、意図して対象から外しています。S3、Lambda、AuroraのストレージとI/O、CloudWatch Logs、データ転送、リクエスト料金がこれに当たります。
 
 ### まだ見積もらないもの
 
-アクセスがゼロでも費用がかかるのに、まだルールのないリソースタイプ（EMR、WorkSpaces、DMS、CloudWatchダッシュボードなど）は、`! not counted yet`に載せます。そのため、こうした費用が黙って抜け落ちることはありません。一部だけ対応しているリソース（RDSのOracleとSQL Server、マルチAZ DBクラスター、Fargate SpotとWindowsのFargate、Spotのノードグループ、Local Zonesのインスタンス）は、`? could not estimate`に載ります。
+アクセスがゼロでも費用がかかるのに、まだルールのないリソースタイプ（EMR、WorkSpaces、Kendra、CloudWatchダッシュボードなど）は、`! not counted yet`に載せます。そのため、こうした費用が黙って抜け落ちることはありません。一部だけ対応しているリソース（RDSのOracleとSQL Server、Fargate Spot、Spotのノードグループ、Local Zonesのインスタンス、cronのスケジュールで動くカナリア）は、`? could not estimate`に載ります。
 
 ## 前提
 

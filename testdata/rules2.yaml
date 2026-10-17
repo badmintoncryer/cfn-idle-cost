@@ -1,0 +1,100 @@
+# Second batch of resource types; priced with testPrices["us-east-1"].
+# Stopped is created stopped and Advanced=Standard, OnDemandKs and Once add no line.
+Resources:
+  Ca:
+    Type: AWS::ACMPCA::CertificateAuthority
+    Properties: { Type: ROOT, KeyAlgorithm: RSA_2048, SigningAlgorithm: SHA256WITHRSA, Subject: { CommonName: example } }
+  ShortCa:
+    Type: AWS::ACMPCA::CertificateAuthority
+    Properties: { Type: ROOT, KeyAlgorithm: RSA_2048, SigningAlgorithm: SHA256WITHRSA, Subject: { CommonName: example }, UsageMode: SHORT_LIVED_CERTIFICATE }
+  Dms:
+    Type: AWS::DMS::ReplicationInstance
+    Properties: { ReplicationInstanceClass: dms.t3.medium, MultiAZ: true, AllocatedStorage: 100 }
+  Notebook:
+    Type: AWS::SageMaker::NotebookInstance
+    Properties: { InstanceType: ml.t3.medium, RoleArn: arn:aws:iam::123456789012:role/x }
+  Ingest:
+    Type: AWS::OSIS::Pipeline
+    Properties: { MinUnits: 1, MaxUnits: 4, PipelineName: p, PipelineConfigurationBody: "version: 2" }
+  Reserved:
+    Type: AWS::EC2::CapacityReservation
+    Properties: { InstanceType: t3.micro, InstanceCount: 2, InstancePlatform: Linux/UNIX, AvailabilityZone: us-east-1a }
+  WinReserved:
+    Type: AWS::EC2::CapacityReservation
+    Properties: { InstanceType: t3.micro, InstanceCount: 1, InstancePlatform: Windows, AvailabilityZone: us-east-1a }
+  Canary:
+    Type: AWS::Synthetics::Canary
+    Properties: { Name: c, RuntimeVersion: syn-nodejs-puppeteer-9.1, StartCanaryAfterCreation: true, Schedule: { Expression: rate(5 minutes) } }
+  Hourly:
+    Type: AWS::Synthetics::Canary
+    Properties: { Name: h, RuntimeVersion: syn-nodejs-puppeteer-9.1, StartCanaryAfterCreation: true, Schedule: { Expression: rate(1 hour) } }
+  Stopped:
+    Type: AWS::Synthetics::Canary
+    Properties: { Name: s, RuntimeVersion: syn-nodejs-puppeteer-9.1, StartCanaryAfterCreation: false, Schedule: { Expression: rate(1 minute) } }
+  Once:
+    Type: AWS::Synthetics::Canary
+    Properties: { Name: o, RuntimeVersion: syn-nodejs-puppeteer-9.1, StartCanaryAfterCreation: true, Schedule: { Expression: rate(0 minute) } }
+  Cron:
+    Type: AWS::Synthetics::Canary
+    Properties: { Name: r, RuntimeVersion: syn-nodejs-puppeteer-9.1, StartCanaryAfterCreation: true, Schedule: { Expression: "cron(0 8 * * ? *)" } }
+  Stream:
+    Type: AWS::Kinesis::Stream
+    Properties: { ShardCount: 2 }
+  Consumer:
+    Type: AWS::Kinesis::StreamConsumer
+    Properties: { ConsumerName: c, StreamARN: !GetAtt Stream.Arn }
+  Connector:
+    Type: AWS::KafkaConnect::Connector
+    Properties:
+      Capacity: { AutoScaling: { McuCount: 2, MinWorkerCount: 1, MaxWorkerCount: 4, ScaleInPolicy: { CpuUtilizationPercentage: 20 }, ScaleOutPolicy: { CpuUtilizationPercentage: 80 } } }
+  Replicator:
+    Type: AWS::MSK::Replicator
+    Properties: { ReplicatorName: r }
+  Advanced:
+    Type: AWS::SSM::Parameter
+    Properties: { Type: String, Value: x, Tier: Advanced }
+  Standard:
+    Type: AWS::SSM::Parameter
+    Properties: { Type: String, Value: x }
+  Ks:
+    Type: AWS::Cassandra::Table
+    Properties:
+      KeyspaceName: k
+      PartitionKeyColumns: [{ ColumnName: id, ColumnType: text }]
+      BillingMode: { Mode: PROVISIONED, ProvisionedThroughput: { ReadCapacityUnits: 10, WriteCapacityUnits: 5 } }
+  OnDemandKs:
+    Type: AWS::Cassandra::Table
+    Properties: { KeyspaceName: k, PartitionKeyColumns: [{ ColumnName: id, ColumnType: text }] }
+  Airflow:
+    Type: AWS::MWAA::Environment
+    Properties: { Name: a, EnvironmentClass: mw1.small, MinWorkers: 3, Schedulers: 2 }
+  GraphqlCache:
+    Type: AWS::AppSync::ApiCache
+    Properties: { ApiId: a, Type: SMALL, ApiCachingBehavior: FULL_REQUEST_CACHING, Ttl: 300 }
+  Fhir:
+    Type: AWS::HealthLake::FHIRDatastore
+    Properties: { DatastoreTypeVersion: R4 }
+  ArcCluster:
+    Type: AWS::Route53RecoveryControl::Cluster
+    Properties: { Name: c }
+  Readiness:
+    Type: AWS::Route53RecoveryReadiness::ReadinessCheck
+    Properties: { ResourceSetName: r }
+  Lattice:
+    Type: AWS::VpcLattice::Service
+    Properties: { Name: s }
+  Elastic:
+    Type: AWS::DocDBElastic::Cluster
+    Properties: { ClusterName: e, AdminUserName: a, AuthType: SECRET_ARN, ShardCapacity: 2, ShardCount: 1, ShardInstanceCount: 2 }
+  Influx:
+    Type: AWS::Timestream::InfluxDBInstance
+    Properties: { DbInstanceType: db.influx.medium, AllocatedStorage: 20, DeploymentType: WITH_MULTIAZ_STANDBY }
+  MazCluster:
+    Type: AWS::RDS::DBCluster
+    Properties: { Engine: postgres, DBClusterInstanceClass: db.m5d.large, AllocatedStorage: 100, StorageType: io1, Iops: 1000 }
+  WinTask:
+    Type: AWS::ECS::TaskDefinition
+    Properties: { Cpu: "1024", Memory: "2048", RequiresCompatibilities: [FARGATE], RuntimePlatform: { OperatingSystemFamily: WINDOWS_SERVER_2022_CORE } }
+  WinService:
+    Type: AWS::ECS::Service
+    Properties: { LaunchType: FARGATE, DesiredCount: 1, TaskDefinition: !Ref WinTask }
