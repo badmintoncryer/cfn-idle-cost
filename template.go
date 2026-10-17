@@ -22,6 +22,8 @@ type Stack struct {
 	Resources  map[string]Resource
 	paths      map[string]string // logical ID -> construct path, from the cloud assembly
 	cdkPath    string            // construct path of the stack (Stage/Stack), stripped from resource paths
+	parent     *Stack            // of a nested stack: the stack whose AWS::CloudFormation::Stack creates it
+	parentID   string            // the logical ID of that resource
 }
 
 type Param struct {
@@ -120,6 +122,7 @@ func LoadInputs(paths []string) ([]*Stack, error) {
 		paths = []string{"cdk.out"}
 	}
 	var out []*Stack
+	files := map[string]string{} // stack name -> template file
 	for _, p := range paths {
 		fi, err := os.Stat(p)
 		if err != nil {
@@ -138,6 +141,10 @@ func LoadInputs(paths []string) ([]*Stack, error) {
 			return nil, err
 		}
 		s.Name = strings.TrimSuffix(filepath.Base(p), filepath.Ext(p))
+		if prev, dup := files[s.Name]; dup { // they would be reported, and diffed, as one stack
+			return nil, fmt.Errorf("%s and %s are both stack %s; rename one", prev, p, s.Name)
+		}
+		files[s.Name] = p
 		out = append(out, s)
 	}
 	return out, nil
@@ -243,16 +250,18 @@ func loadAssembly(dir string) ([]*Stack, error) {
 		if err := json.Unmarshal(raw, &am); err != nil {
 			return nil, fmt.Errorf("%s.assets.json: %w", id, err)
 		}
+		group := []*Stack{roots[i]}
 		for _, h := range sortedIDs(am.Files) {
 			f := am.Files[h].Source.Path
 			if s := nested[f]; s != nil {
 				// ponytail: nested stacks share the root's path map; a logical ID used in
 				// both shows the root's path. Key by template if that ever happens.
 				s.Name, s.Region, s.paths, s.cdkPath = roots[i].Name, roots[i].Region, roots[i].paths, roots[i].cdkPath
-				out = append(out, s)
+				out, group = append(out, s), append(group, s)
 				delete(nested, f)
 			}
 		}
+		linkParents(group)
 	}
 	for _, f := range sortedIDs(nested) {
 		s := nested[f]
@@ -260,6 +269,22 @@ func loadAssembly(dir string) ([]*Stack, error) {
 		out = append(out, s)
 	}
 	return out, nil
+}
+
+// linkParents points each nested stack of a root's group at the
+// AWS::CloudFormation::Stack resource that creates it, found by the
+// aws:asset:path metadata the CDK CLI adds, so its Condition applies.
+func linkParents(group []*Stack) {
+	for _, s := range group[1:] {
+		f := filepath.Base(s.Path)
+		for _, p := range group {
+			for id, r := range p.Resources {
+				if r.Type == "AWS::CloudFormation::Stack" && r.Metadata["aws:asset:path"] == f {
+					s.parent, s.parentID = p, id
+				}
+			}
+		}
+	}
 }
 
 func sortedIDs[V any](m map[string]V) []string {

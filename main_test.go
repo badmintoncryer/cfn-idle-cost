@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"flag"
+	"fmt"
 	"io"
 	"math"
 	"os"
@@ -57,9 +58,11 @@ var testPrices = &Prices{Source: "test prices", Regions: map[string]map[string]f
 		"vpc|VPCLattice-Service-Hourly": 0.025, "docdb|ElasticCPUUsage": 0.132,
 		"influx|MultiAZUsage-Db.influx.medium": 0.24, "influx|MultiAZ-InfluxDBStorage-InfluxIOIncludedT1": 0.2,
 		"rds|Multi-AZClusterUsage:db.m5d.large|14": 0.585, "rds|RDS:Multi-AZCluster-PIOPS-Storage|14": 0.375, "rds|RDS:Multi-AZCluster-PIOPS|14": 0.3,
-		"fargate|Fargate-Windows-vCPU-Hours:perCPU": 0.046552, "fargate|Fargate-Windows-OS-Hours:perCPU": 0.046, "fargate|Fargate-Windows-GB-Hours": 0.00511175},
+		"fargate|Fargate-Windows-vCPU-Hours:perCPU": 0.046552, "fargate|Fargate-Windows-OS-Hours:perCPU": 0.046, "fargate|Fargate-Windows-GB-Hours": 0.00511175,
+		"kinesis|Extended-ShardHour": 0.02, "vpc|VpcEndpoint-Hours": 0.01, "rds|InstanceUsage:db.t4g.micro|14": 0.016, "rds|RDS:GP3-Storage|14": 0.115,
+		"es|r6g.large.search": 0.167, "es|ES:GP3-Storage": 0.122, "es|ES:GP3-Provisioned-ThroughPut": 0.064, "docdb|DocumentDB:ServerlessIOOptimizedUsage": 0.0905},
 	"ap-southeast-1": {"rds|InstanceUsage:db.t3.small|10": 0.044, "rds|MirrorUsage:db.m5.large|12": 1.954, "rds|RDS:Mirror-GP3-Storage|12": 0.23,
-		"rds|InstanceUsage:db.m5.large|20": 0.438, "rds|RDS:GP2-Storage|20": 0.115, "rds|RDS:GP2-Storage|10": 0.115,
+		"rds|InstanceUsage:db.m5.large|20": 0.438, "rds|RDS:GP3-Storage|20": 0.115, "rds|RDS:GP3-Storage|10": 0.115,
 		"ec2|m5.xlarge": 0.192, "emr|m5.xlarge": 0.048, "ebs|EBS:VolumeUsage.gp2": 0.1},
 	"global": {"arc|Global-Cluster-Hours": 2.5, "arc|Global-ReadinessCheck-Hours": 0.045},
 }}
@@ -137,6 +140,64 @@ func TestRules3(t *testing.T) {
 	golden(t, "rules3.yaml", report(t, "ap-southeast-1", "testdata/rules3.yaml"))
 }
 
+// Fixes from the 2026-10-17 review (see the comments in the template).
+func TestReview(t *testing.T) {
+	golden(t, "review.yaml", report(t, "us-east-1", "testdata/review.yaml"))
+}
+
+// A nested stack whose AWS::CloudFormation::Stack is not created has no cost.
+func TestNestedStackCondition(t *testing.T) {
+	parse := func(name, src string) *Stack {
+		s, err := ParseTemplate(name, []byte(src))
+		if err != nil {
+			t.Fatal(err)
+		}
+		s.Name, s.Region = "App", "us-east-1"
+		return s
+	}
+	root := parse("App.template.json", `{"Parameters": {"Env": {"Type": "String", "Default": "dev"}},
+		"Conditions": {"IsProd": {"Fn::Equals": [{"Ref": "Env"}, "prod"]}},
+		"Resources": {"Archive": {"Type": "AWS::CloudFormation::Stack", "Condition": "IsProd",
+			"Metadata": {"aws:asset:path": "AppArchive.nested.template.json"}}}}`)
+	nested := parse("cdk.out/AppArchive.nested.template.json", `{"Resources": {"Key": {"Type": "AWS::KMS::Key"}}}`)
+	linkParents([]*Stack{root, nested})
+	if items := Estimate([]*Stack{root, nested}, testPrices); len(items) != 0 {
+		t.Errorf("Env=dev: got %v", items)
+	}
+	root.Parameters["Env"] = Param{Value: "prod", Given: true}
+	if items := Estimate([]*Stack{root, nested}, testPrices); len(items) != 1 || items[0].Monthly != 1 {
+		t.Errorf("Env=prod: got %v", items)
+	}
+}
+
+func TestDuplicateTemplateNames(t *testing.T) {
+	dir := t.TempDir()
+	for _, d := range []string{"a", "b"} {
+		os.Mkdir(dir+"/"+d, 0o755)
+		os.WriteFile(dir+"/"+d+"/template.yaml", []byte("Resources: {}\n"), 0o644)
+	}
+	if _, err := LoadInputs([]string{dir + "/a/template.yaml", dir + "/b/template.yaml"}); err == nil {
+		t.Error("two templates named template were loaded as one stack")
+	}
+}
+
+// --format json rounds the totals to cents; --max must still see $10.004.
+func TestBudgetBeforeRounding(t *testing.T) {
+	p, err := BundledPrices()
+	if err != nil {
+		t.Fatal(err)
+	}
+	gb, _ := p.Get("us-east-1", "ebs|EBS:VolumeUsage.gp3")
+	path := t.TempDir() + "/vol.yaml"
+	os.WriteFile(path, []byte(fmt.Sprintf("Resources: {Vol: {Type: AWS::EC2::Volume, Properties: {VolumeType: gp3, Size: %v}}}\n", 10.004/gb)), 0o644)
+	for _, f := range []string{"text", "json"} {
+		err := run([]string{path, "--region", "us-east-1", "--max", "10", "--format", f}, io.Discard)
+		if _, ok := err.(overBudget); !ok {
+			t.Errorf("--format %s: err = %v, want over budget", f, err)
+		}
+	}
+}
+
 // --parameter turns the Condition on: ProdKey is created and Spare is an m5.large.
 func TestParameter(t *testing.T) {
 	var b bytes.Buffer
@@ -197,11 +258,11 @@ func TestDiff(t *testing.T) {
 	d.WriteMarkdown(&md)
 	golden(t, "diff.txt", text.String())
 	golden(t, "diff.md", md.String())
-	head := load("testdata/diff-head.yaml") // $24/mo, down $33 from base
+	head := load("testdata/diff-head.yaml") // $24/mo, down $32 from base without the Key
 	for _, c := range []struct {
 		max, maxIncrease float64
 		fail             bool
-	}{{-1, 0, false}, {100, -1, false}, {20, -1, true}} {
+	}{{-1, 0, true}, {-1, -1, false}, {100, -1, false}, {20, -1, true}} { // Key became "?": --max-increase can't pass
 		if err := checkBudget(head, d, c.max, c.maxIncrease); (err != nil) != c.fail {
 			t.Errorf("--max %v --max-increase %v: err = %v", c.max, c.maxIncrease, err)
 		}

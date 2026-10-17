@@ -65,6 +65,11 @@ func estimateResource(st *Stack, prices *Prices, id string) (items []Item) {
 		}
 	}()
 	rule := rules[e.r.Type]
+	if on, ok, c := stackCondition(st); ok && !on {
+		return nil // its nested stack is not created
+	} else if !ok && (rule != nil || in(e.r.Type, notCounted...)) {
+		panic(unresolved("its nested stack depends on Condition " + c))
+	}
 	if c := e.r.Condition; c != "" {
 		on, ok := e.tryCondition(c)
 		if ok && !on {
@@ -92,6 +97,22 @@ func estimateResource(st *Stack, prices *Prices, id string) (items []Item) {
 		items = append(items, b)
 	}
 	return items
+}
+
+// stackCondition evaluates the Conditions of the AWS::CloudFormation::Stack
+// resources that create a nested stack, up to its root.
+func stackCondition(st *Stack) (on, ok bool, name string) {
+	for s := st; s.parent != nil; s = s.parent {
+		c := s.parent.Resources[s.parentID].Condition
+		if c == "" {
+			continue
+		}
+		e := &est{st: s.parent}
+		if on, ok := e.tryCondition(c); !ok || !on {
+			return on, ok, c
+		}
+	}
+	return true, true, ""
 }
 
 // ---- value resolution
@@ -300,6 +321,11 @@ func (e *est) length(m map[string]any, key string) int {
 	if !ok {
 		e.resolve(key, v) // panics with the reason
 		panic(unresolved(key + " is not a list"))
+	}
+	for _, x := range l { // props already chose the Fn::Ifs that resolve
+		if _, ok := asMap(x)["Fn::If"]; ok {
+			panic(unresolved(key + " has an item that uses Fn::If"))
+		}
 	}
 	return len(l)
 }
@@ -548,7 +574,11 @@ func init() {
 				e.hourly(1, "", "kinesis|OnDemand-StreamHour", "on-demand stream")
 				return
 			}
-			e.hourly(e.mustNum(p, "ShardCount"), "shards", "kinesis|Storage-ShardHour", "provisioned shards")
+			n := e.mustNum(p, "ShardCount")
+			e.hourly(n, "shards", "kinesis|Storage-ShardHour", "provisioned shards")
+			if e.num(p, "RetentionPeriodHours", 24) > 24 { // billed per shard hour, stored data or not
+				e.hourly(n, "shards", "kinesis|Extended-ShardHour", "extended retention (over 24 hours)")
+			}
 		},
 		"AWS::KMS::Key": func(e *est, p map[string]any) {
 			e.monthly(1, "", "kms|KMS-Keys", "customer managed key")
@@ -557,7 +587,11 @@ func init() {
 			e.monthly(1, "", "kms|KMS-Keys", "customer managed key (replica)")
 		},
 		"AWS::SecretsManager::Secret": func(e *est, p map[string]any) {
-			e.monthly(1, "", "secrets|AWSSecretsManager-Secrets", "secret")
+			n, why := 1+float64(max(0, e.length(p, "ReplicaRegions"))), "secret"
+			if n > 1 { // each replica is billed as a secret
+				why = "secret and its replicas"
+			}
+			e.monthly(n, "", "secrets|AWSSecretsManager-Secrets", why)
 		},
 		"AWS::Route53::HostedZone": func(e *est, p map[string]any) {
 			e.monthly(1, "", "r53|HostedZone", "hosted zone")
@@ -766,7 +800,7 @@ func rdsInstance(e *est, p map[string]any) {
 	e.hourly(1, "", "rds|"+usage+":"+class+"|"+code, class+" "+engine+" "+az)
 	size := e.mustNum(p, "AllocatedStorage")
 	iops, tput := e.num(p, "Iops", 0), e.num(p, "StorageThroughput", 0)
-	def := "gp2"
+	def := "gp3" // CloudFormation's default
 	if iops > 0 {
 		def = "io1"
 	}
@@ -777,8 +811,16 @@ func rdsInstance(e *est, p map[string]any) {
 		e.monthly(size, "GB gp2", k("GP2-Storage"), "storage")
 	case "gp3":
 		e.monthly(size, "GB gp3", k("GP3-Storage"), "storage")
-		bi, bt := 3000.0, 125.0
-		if size >= 400 {
+		// Striped volumes from 400 GiB (200 GiB on Oracle) get a higher baseline;
+		// SQL Server is never striped.
+		bi, bt, stripe := 3000.0, 125.0, 400.0
+		switch le := strings.ToLower(engine); {
+		case strings.HasPrefix(le, "oracle"):
+			stripe = 200
+		case strings.HasPrefix(le, "sqlserver"):
+			stripe = math.Inf(1)
+		}
+		if size >= stripe {
 			bi, bt = 12000, 500
 		}
 		e.monthly(math.Max(0, iops-bi), "IOPS", k("GP3-PIOPS"), fmt.Sprintf("gp3 IOPS above %.0f", bi))
@@ -825,6 +867,9 @@ func rdsCluster(e *est, p map[string]any) {
 	// Aurora clusters bill through their instances and usage-based storage.
 	engine := strings.ToLower(e.str(p, "Engine", "aurora"))
 	if strings.HasPrefix(engine, "aurora") {
+		if e.str(p, "EngineMode", "provisioned") == "serverless" {
+			panic(unresolved("Aurora Serverless v1 is not supported")) // billed per ACU on the cluster, not its instances
+		}
 		return
 	}
 	// A Multi-AZ DB cluster: one writer and two readable standbys, priced per cluster.
@@ -882,8 +927,14 @@ func (e *est) searchDomain(cc map[string]any, ccName string, p map[string]any) {
 		e.monthly(size*n, "GB gp2", "es|ES:GP2-Storage", "EBS storage")
 	case "gp3":
 		e.monthly(size*n, "GB gp3", "es|ES:GP3-Storage", "EBS storage")
-		e.monthly(math.Max(0, e.num(ebs, "Iops", 0)-3000)*n, "IOPS", "es|ES:GP3-PIOPS", "gp3 IOPS above 3000")
-		e.monthly(math.Max(0, e.num(ebs, "Throughput", 0)-125)*n, "MiB/s", "es|ES:GP3-Provisioned-ThroughPut", "gp3 throughput above 125 MiB/s")
+		// OpenSearch includes 3000 IOPS (3 per GiB above 1024 GiB) and 125 MiB/s (250 above 170 GiB).
+		// ponytail: the extra 250 MiB/s per 3 TiB of very large volumes is not included.
+		bi, bt := math.Max(3000, 3*size), 125.0
+		if size > 170 {
+			bt = 250
+		}
+		e.monthly(math.Max(0, e.num(ebs, "Iops", 0)-bi)*n, "IOPS", "es|ES:GP3-PIOPS", fmt.Sprintf("gp3 IOPS above %.0f", bi))
+		e.monthly(math.Max(0, e.num(ebs, "Throughput", 0)-bt)*n, "MiB/s", "es|ES:GP3-Provisioned-ThroughPut", fmt.Sprintf("gp3 throughput above %.0f MiB/s", bt))
 	case "io1":
 		e.monthly(size*n, "GB io1", "es|ES:PIOPS-Storage", "EBS storage")
 		e.monthly(e.num(ebs, "Iops", 0)*n, "IOPS", "es|ES:PIOPS", "provisioned IOPS")
@@ -1040,10 +1091,17 @@ func globalTable(e *est, p map[string]any) {
 func ecsService(e *est, p map[string]any) {
 	lt := e.str(p, "LaunchType", "")
 	if lt == "" {
+		// Only an all-FARGATE strategy is priced: splitting tasks by base and
+		// weight across Spot or other providers is not supported.
 		cps, _ := p["CapacityProviderStrategy"].([]any)
 		for _, c := range cps {
-			if cp := e.str(asMap(c), "CapacityProvider", ""); cp == "FARGATE" || cp == "FARGATE_SPOT" {
+			switch cp := e.str(asMap(c), "CapacityProvider", ""); cp {
+			case "FARGATE":
 				lt = cp
+			case "FARGATE_SPOT":
+				panic(unresolved("Fargate Spot is not supported"))
+			default:
+				panic(unresolved("capacity provider " + cp + " is not supported"))
 			}
 		}
 		if lt == "" {
@@ -1094,6 +1152,8 @@ var notCounted = []string{
 	"AWS::ElasticBeanstalk::Environment", "AWS::Lightsail::Instance", "AWS::Lightsail::Database",
 	"AWS::GameLift::Fleet", "AWS::MediaLive::Channel",
 	"AWS::Shield::Protection", "AWS::Batch::ComputeEnvironment", "AWS::EC2::VerifiedAccessEndpoint",
+	"AWS::KinesisAnalyticsV2::Application", "AWS::KinesisAnalytics::Application", "AWS::NetworkManager::CoreNetwork",
+	"AWS::EC2::EC2Fleet", "AWS::EC2::SpotFleet", "AWS::Route53::HealthCheck",
 	"AWS::CloudWatch::Dashboard", "AWS::Connect::PhoneNumber", // not in the Price List
 }
 
@@ -1105,6 +1165,9 @@ func init() {
 		"AWS::EKS::Nodegroup": func(e *est, p map[string]any) {
 			if e.str(p, "CapacityType", "ON_DEMAND") != "ON_DEMAND" {
 				panic(unresolved("Spot node groups are not supported"))
+			}
+			if at := e.str(p, "AmiType", ""); strings.HasPrefix(at, "WINDOWS_") {
+				panic(unresolved("Windows node groups (" + at + ") are not supported yet"))
 			}
 			sc := asMap(p["ScalingConfig"])
 			n, why := e.num(sc, "DesiredSize", -1), "DesiredSize"
@@ -1212,7 +1275,7 @@ func init() {
 			e.hourly(float64(n), "ENIs", "resolver|ResolverNetworkInterface", "Resolver endpoint")
 		},
 		"AWS::DocDB::DBInstance": func(e *est, p map[string]any) {
-			e.clusterInstance(p, "docdb", "iopt1", "ServerlessV2ScalingConfiguration", "DocumentDB:ServerlessUsage", "DocumentDB:ServerlessUsage", "DCU")
+			e.clusterInstance(p, "docdb", "iopt1", "ServerlessV2ScalingConfiguration", "DocumentDB:ServerlessUsage", "DocumentDB:ServerlessIOOptimizedUsage", "DCU")
 		},
 		"AWS::Neptune::DBInstance": func(e *est, p map[string]any) {
 			e.clusterInstance(p, "neptune", "iopt1", "ServerlessScalingConfiguration", "Neptune:ServerlessUsage", "Neptune:ServerlessIOOptimizedUsage", "NCU")
@@ -1433,6 +1496,9 @@ func rdsProxy(e *est, p map[string]any) {
 // ponytail: naming rule, not data; metal and odd legacy classes are unresolved.
 func dbVCPU(class string) float64 {
 	size := class[strings.LastIndex(class, ".")+1:]
+	if strings.HasPrefix(class, "db.t2.") && (size == "micro" || size == "small") {
+		return 1
+	}
 	switch size {
 	case "micro", "small", "medium", "large":
 		return 2

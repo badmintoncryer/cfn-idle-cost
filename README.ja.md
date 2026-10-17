@@ -66,7 +66,7 @@ npx cfn-idle-cost [flags] [cdk.out | template ...]
 | `--live` | 同梱のスナップショットではなく、[Price List Query API](https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/using-price-list-query-api.html)から最新の価格を取得します。`pricing:GetProducts`を許可したAWSの認証情報が必要です。 |
 | `--version` | バージョンを表示します。 |
 
-終了コードは、成功が`0`、エラーが`1`、使い方の誤り（リージョンのないスタックを含みます）が`2`、`--max`か`--max-increase`の超過が`3`です。見積もれなかったリソースがあっても、成功なら`0`を返します。予算のフラグを付けたときに見積もれなかったリソースがあると、実際のアイドルコストはもっと高いかもしれないという警告を出します。ただし、この警告だけでは失敗にしません。
+終了コードは、成功が`0`、エラーが`1`、使い方の誤り（リージョンのないスタックを含みます）が`2`、`--max`か`--max-increase`の超過が`3`です。見積もれなかったリソースがあっても、成功なら`0`を返します。予算のフラグを付けたときに見積もれなかったリソースがあると、実際のアイドルコストはもっと高いかもしれないという警告を出します。`--max`はこの場合も失敗にしません。一方、`--max-increase`は、見積もれないリソースが追加されたときや、見積もれていたリソースが見積もれなくなったときに失敗します。増加額を確かめられないためです。
 
 ## プルリクエストで使う
 
@@ -85,7 +85,7 @@ ap-northeast-1 · idle ≈ $382 → $682/mo (+$300)
   + NetworkStack  Vpc/PublicSubnet2/EIP         $0.00 → $3.65  +$3.65  public IPv4 address
 ```
 
-リソースは、スタック名と論理IDで対応づけます。見積もれない状態になったリソースや、見積もれるようになったリソースでは、金額の欄が`?`です。
+リソースは、スタック名と論理IDで対応づけます。見積もれない状態になったリソースや、見積もれるようになったリソースでは、金額の欄が`?`です。こうしたリソースは変更前と変更後の両方の合計から外すので、節約したように見えることはありません。そのときは、見積もれなかった変更の数を見出しに書きます。
 
 GitHub Actionsでは、変更前後の両方をsynthし、Markdownをコメントとして投稿します。増加額が予算を超えたら、チェックを失敗にします。
 
@@ -111,7 +111,7 @@ jobs:
         with: { base: base/cdk.out, path: head/cdk.out, max-increase: 50 }
 ```
 
-このActionはプルリクエストにコメントを1件投稿し、プッシュのたびにそのコメントを更新します。同じMarkdownをジョブのサマリーにも書き出し、予算を超えたときはジョブを失敗させます。
+このActionはプルリクエストにコメントを1件投稿し、プッシュのたびにそのコメントを更新します。同じMarkdownをジョブのサマリーにも書き出し、予算を超えたときはジョブを失敗させます。フォークやDependabotからのプルリクエストではトークンが読み取り専用なので、コメントできなかったことを警告するだけにします。実行にはLinuxかmacOSのランナーが必要です。npmのパッケージには、まだWindows用のバイナリがありません。
 
 | 入力 | 内容 |
 |---|---|
@@ -122,7 +122,7 @@ jobs:
 | `comment` | `false`にするとコメントを投稿しません。デフォルトは`true`です。 |
 | `github-token` | コメントに使うトークン。デフォルトは`github.token`です。 |
 
-`@v1`は最新のリリースを使います。`@v1.0.0`のように書くと、そのバージョンに固定できます。
+`@v1`は1.xの最新のリリースを使います。`@v1.0.0`のように書くと、そのバージョンに固定できます。
 
 `cdk synth`は`cdk.context.json`からコンテキストを読みます。このファイルをコミットしておかないと、lookupのためにsynthでAWSの認証情報が必要になります。
 
@@ -147,12 +147,12 @@ jobs:
 | `AWS::ElastiCache::ServerlessCache` | データストレージの最小量（1 GB。Valkeyは100 MB。`CacheUsageLimits`で最小量を指定していればその値） |
 | `AWS::DynamoDB::Table` | プロビジョニングしたRCU・WCU（GSIを含みます。StandardとStandard-IAに対応） |
 | `AWS::DynamoDB::GlobalTable` | スタックと同じリージョンにあるレプリカの、プロビジョニングしたRCUとAuto Scalingの最小WCU（GSIを含みます。レプリカが2つ以上なら、書き込みにはレプリケートされたWCUの料金を使います）。ほかのリージョンのレプリカは、数を行に書くだけで、料金には含めません |
-| `AWS::Kinesis::Stream` | プロビジョンドのシャード時間、またはオンデマンドのストリーム時間 |
+| `AWS::Kinesis::Stream` | プロビジョンドのシャード時間（24時間を超える延長保持を含む）、またはオンデマンドのストリーム時間 |
 | `AWS::ECS::Service`（Fargate） | vCPU、メモリ、20 GBを超えるエフェメラルストレージ、パブリックIPv4（`AssignPublicIp: ENABLED`のとき）×`DesiredCount`（x86とARMのLinux、Windows。WindowsはvCPUごとのOSライセンス料金も含みます） |
 | `AWS::EFS::FileSystem` | プロビジョンドスループット |
 | `AWS::FSx::FileSystem` | Windows、Lustre、OpenZFS、ONTAPのストレージ容量とスループット容量。容量1 GBあたり3 IOPSを超えるSSD IOPS（ONTAPの容量プールは使った分だけかかるので含みません） |
 | `AWS::KMS::Key`、`AWS::KMS::ReplicaKey` | キー1つにつき$1 |
-| `AWS::SecretsManager::Secret` | シークレットごとの料金 |
+| `AWS::SecretsManager::Secret` | シークレットとレプリカごとの料金 |
 | `AWS::Route53::HostedZone` | ホストゾーンごとの料金 |
 | `AWS::EKS::Cluster` | クラスターの時間料金（標準サポート） |
 | `AWS::EKS::Nodegroup` | インスタンスの時間料金×`DesiredSize`（なければ`MinSize`）。オンデマンドで、インスタンスタイプが1つの場合 |
@@ -174,7 +174,7 @@ jobs:
 | `AWS::Transfer::Server` | プロトコルごとの時間料金 |
 | `AWS::AppRunner::Service` | 最小数のプロビジョニング済みインスタンスのメモリ |
 | `AWS::RDS::DBProxy` | ターゲットのインスタンスのvCPUごとの料金。Serverless v2のターゲットは最小ACUごとの料金（ターゲットが同じテンプレートにある場合だけ） |
-| `AWS::OpenSearchServerless::Collection` | インデックス作成と検索の最小OCU（スタンバイレプリカありで1 + 1、なしで0.5 + 0.5）。コレクションはOCUを共有するので、スタック内でコレクションのタイプごとに1回だけ数えます。コレクショングループに属するコレクションは見積もりません |
+| `AWS::OpenSearchServerless::Collection` | インデックス作成と検索の最小OCU（スタンバイレプリカありで1 + 1、なしで0.5 + 0.5）。コレクションはOCUを共有するので、スタック内でコレクションのタイプごとに1回だけ数えます（同じKMSキーを使う前提です）。コレクショングループに属するコレクションは見積もりません |
 | `AWS::MemoryDB::Cluster` | ノードの時間単価 × シャード数 ×（1 + レプリカ数）（RedisとValkey） |
 | `AWS::SageMaker::Endpoint` | プロダクションバリアントごとに、インスタンスの時間単価 × `InitialInstanceCount`（サーバーレスのバリアントはアイドル時$0） |
 | `AWS::CodePipeline::Pipeline` | アクティブなV1パイプラインごとの料金（V2は実行時間の分だけかかるので、アイドル時は$0） |
@@ -205,7 +205,7 @@ jobs:
 
 ### まだ見積もらないもの
 
-アクセスがゼロでも費用がかかるのに、まだルールのないリソースタイプ（WorkSpaces、Kendra、Lightsail、CloudWatchダッシュボードなど）は、`! not counted yet`に載せます。そのため、こうした費用が黙って抜け落ちることはありません。一部だけ対応しているリソース（Fargate Spot、Spotのノードグループ、EMRのインスタンスフリート、Local Zonesのインスタンス、cronのスケジュールで動くカナリア）は、`? could not estimate`に載ります。
+アクセスがゼロでも費用がかかるのに、まだルールのないリソースタイプのうち、よく使われるもの（WorkSpaces、Kendra、Kinesis Data Analytics、Lightsail、CloudWatchダッシュボードなど）は、`! not counted yet`に載せます。この一覧にないタイプは行を出さずに飛ばすので、見つかりしだい一覧に足していきます。一部だけ対応しているリソース（Fargate Spotとほかのキャパシティプロバイダ、SpotとWindowsのノードグループ、EMRのインスタンスフリート、Aurora Serverless v1、Local Zonesのインスタンス、cronのスケジュールで動くカナリア）は、`? could not estimate`に載ります。
 
 ## 前提
 
@@ -224,7 +224,7 @@ npm install -D cfn-idle-cost   # または npx cfn-idle-cost
 go install github.com/badmintoncryer/cfn-idle-cost@latest
 ```
 
-`cdk-idle-cost`は、同じツールの別名です。
+`cdk-idle-cost`は、同じツールの別名です。npmのパッケージはLinuxとmacOS（x64とarm64）に対応しています。Windowsでは、`go install`か、GitHub Releaseのバイナリを使ってください。
 
 ## ライセンス
 

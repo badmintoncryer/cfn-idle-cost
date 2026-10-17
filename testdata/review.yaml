@@ -1,0 +1,42 @@
+# Fixes from the 2026-10-17 review.
+Conditions:
+  ThirdAz: !Equals [!Ref "AWS::AccountId", "123456789012"]
+Resources:
+  # Extended retention is billed per shard hour on provisioned streams.
+  Stream: { Type: AWS::Kinesis::Stream, Properties: { ShardCount: 2, RetentionPeriodHours: 168 } }
+  # Each replica is billed as a secret.
+  Secret: { Type: AWS::SecretsManager::Secret, Properties: { ReplicaRegions: [{ Region: eu-west-1 }, { Region: ap-northeast-1 }] } }
+  # Windows node groups are not priced as Linux.
+  WinNodes:
+    Type: AWS::EKS::Nodegroup
+    Properties: { ClusterName: c, NodeRole: r, Subnets: [a], AmiType: WINDOWS_CORE_2022_x86_64, InstanceTypes: [m5.large], ScalingConfig: { DesiredSize: 2 } }
+  # Only an all-FARGATE capacity provider strategy is priced, whatever the order.
+  Td: { Type: AWS::ECS::TaskDefinition, Properties: { Cpu: "1024", Memory: "2048" } }
+  SpotLast:
+    Type: AWS::ECS::Service
+    Properties: { TaskDefinition: !Ref Td, DesiredCount: 4, CapacityProviderStrategy: [{ CapacityProvider: FARGATE, Base: 1 }, { CapacityProvider: FARGATE_SPOT, Weight: 3 }] }
+  SpotFirst:
+    Type: AWS::ECS::Service
+    Properties: { TaskDefinition: !Ref Td, DesiredCount: 4, CapacityProviderStrategy: [{ CapacityProvider: FARGATE_SPOT, Weight: 3 }, { CapacityProvider: FARGATE, Base: 1 }] }
+  FargateOnly:
+    Type: AWS::ECS::Service
+    Properties: { TaskDefinition: !Ref Td, DesiredCount: 1, CapacityProviderStrategy: [{ CapacityProvider: FARGATE }] }
+  # A list item whose Fn::If doesn't resolve is not counted as present.
+  Endpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties: { VpcEndpointType: Interface, ServiceName: s, VpcId: v, SubnetIds: [a, b, !If [ThirdAz, c, !Ref "AWS::NoValue"]] }
+  # CloudFormation's default StorageType is gp3.
+  Db: { Type: AWS::RDS::DBInstance, Properties: { Engine: postgres, DBInstanceClass: db.t4g.micro, AllocatedStorage: 20 } }
+  # Aurora Serverless v1 bills on the cluster.
+  V1: { Type: AWS::RDS::DBCluster, Properties: { Engine: aurora-mysql, EngineMode: serverless } }
+  # OpenSearch gp3 includes 250 MiB/s above 170 GiB: only 50 of the 300 are billed.
+  Search:
+    Type: AWS::OpenSearchService::Domain
+    Properties:
+      ClusterConfig: { InstanceType: r6g.large.search, InstanceCount: 1 }
+      EBSOptions: { EBSEnabled: true, VolumeType: gp3, VolumeSize: 500, Throughput: 300 }
+  # DocumentDB Serverless on I/O-Optimized storage.
+  Docs: { Type: AWS::DocDB::DBCluster, Properties: { StorageType: iopt1, ServerlessV2ScalingConfiguration: { MinCapacity: 1, MaxCapacity: 4 } } }
+  DocsWriter: { Type: AWS::DocDB::DBInstance, Properties: { DBClusterIdentifier: !Ref Docs, DBInstanceClass: db.serverless } }
+  # Listed instead of left out.
+  Flink: { Type: AWS::KinesisAnalyticsV2::Application, Properties: { RuntimeEnvironment: FLINK-1_18, ServiceExecutionRole: arn } }

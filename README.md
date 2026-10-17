@@ -76,7 +76,10 @@ nested stacks) or CloudFormation templates (JSON or YAML).
 Exit codes: `0` success (even when some resources could not be estimated), `1`
 error, `2` usage error (including a stack without a region), `3` over `--max`
 or `--max-increase`. When a budget flag is set and some resources could not be
-estimated, a warning says the real idle cost may be higher; it does not fail.
+estimated, a warning says the real idle cost may be higher. `--max` does not
+fail on them, but `--max-increase` does when the pull request adds a resource
+that can't be estimated or makes one unresolvable, since its increase can't be
+checked.
 
 ## In pull requests
 
@@ -96,7 +99,9 @@ ap-northeast-1 · idle ≈ $382 → $682/mo (+$300)
 ```
 
 Resources are matched by stack name and logical ID. A resource that becomes
-(or stops being) unresolvable shows `?`.
+(or stops being) unresolvable shows `?`, and is left out of both totals, so it
+never reads as a saving; the heading then says how many changes could not be
+estimated.
 
 In GitHub Actions, synthesize both sides, post the Markdown as a comment, and
 fail the check when the increase is over budget:
@@ -124,7 +129,10 @@ jobs:
 ```
 
 The action posts one comment and updates it on every push, writes the same
-Markdown to the job summary, and fails the job when a budget is exceeded.
+Markdown to the job summary, and fails the job when a budget is exceeded. On
+pull requests from forks and Dependabot the token is read-only, so it only
+warns that it could not comment. It needs a Linux or macOS runner: the npm
+packages have no Windows binary yet.
 
 | Input | What it does |
 |---|---|
@@ -135,7 +143,7 @@ Markdown to the job summary, and fails the job when a budget is exceeded.
 | `comment` | `false` to skip the comment. Default `true`. |
 | `github-token` | Token used to comment. Default `github.token`. |
 
-`@v1` runs the latest release; `@v1.0.0` pins that version.
+`@v1` runs the latest 1.x release; `@v1.0.0` pins that version.
 
 `cdk synth` reads context from `cdk.context.json`; commit it, or the synth
 needs AWS credentials for lookups.
@@ -162,12 +170,12 @@ and provisioned storage billed whether you use it or not.
 | `AWS::ElastiCache::ServerlessCache` | minimum data storage (1 GB, 100 MB for Valkey, or your `CacheUsageLimits` minimum) |
 | `AWS::DynamoDB::Table` | provisioned RCU / WCU, including GSIs (Standard and Standard-IA) |
 | `AWS::DynamoDB::GlobalTable` | provisioned RCU and the auto scaling minimum WCU of the replica in the stack's region, including GSIs (replicated WCU with two or more replicas). Replicas in other regions are counted in the line, not priced |
-| `AWS::Kinesis::Stream` | provisioned shard hours, or the on-demand stream hour |
+| `AWS::Kinesis::Stream` | provisioned shard hours (and extended retention over 24 hours), or the on-demand stream hour |
 | `AWS::ECS::Service` (Fargate) | vCPU, memory, ephemeral storage above 20 GB and public IPv4 (`AssignPublicIp: ENABLED`) × `DesiredCount` (x86 and ARM Linux, and Windows with its OS license per vCPU) |
 | `AWS::EFS::FileSystem` | provisioned throughput |
 | `AWS::FSx::FileSystem` | storage and throughput capacity for Windows, Lustre, OpenZFS and ONTAP, SSD IOPS above the included 3 per GB (the ONTAP capacity pool is pay-per-use) |
 | `AWS::KMS::Key`, `AWS::KMS::ReplicaKey` | $1 per key |
-| `AWS::SecretsManager::Secret` | per secret |
+| `AWS::SecretsManager::Secret` | per secret and per replica |
 | `AWS::Route53::HostedZone` | per hosted zone |
 | `AWS::EKS::Cluster` | cluster hourly (standard support) |
 | `AWS::EKS::Nodegroup` | instance hourly × `DesiredSize` (or `MinSize`), on-demand, one instance type |
@@ -189,7 +197,7 @@ and provisioned storage billed whether you use it or not.
 | `AWS::Transfer::Server` | hourly per protocol |
 | `AWS::AppRunner::Service` | memory of the minimum provisioned instances |
 | `AWS::RDS::DBProxy` | per vCPU of the target instances, or per ACU of Serverless v2 targets at their minimum (targets must be in the same template) |
-| `AWS::OpenSearchServerless::Collection` | minimum indexing and search OCUs (1 + 1 with standby replicas, 0.5 + 0.5 without), once per collection type in a stack, since collections share OCUs. Collections in a collection group are not estimated |
+| `AWS::OpenSearchServerless::Collection` | minimum indexing and search OCUs (1 + 1 with standby replicas, 0.5 + 0.5 without), once per collection type in a stack, since collections share OCUs (assuming they use the same KMS key). Collections in a collection group are not estimated |
 | `AWS::MemoryDB::Cluster` | node hourly × shards × (1 + replicas) (Redis and Valkey) |
 | `AWS::SageMaker::Endpoint` | instance hourly × `InitialInstanceCount` per production variant (serverless variants: $0 idle) |
 | `AWS::CodePipeline::Pipeline` | per active V1 pipeline (V2 pipelines bill per minute: $0 idle) |
@@ -221,12 +229,13 @@ I/O, CloudWatch Logs, data transfer, requests.
 
 ### Not counted yet
 
-Resource types that cost money with zero traffic but have no rule yet, such as
-WorkSpaces, Kendra, Lightsail and CloudWatch dashboards, are listed under `! not counted yet`, so
-their cost is never left out silently. Partly supported types (Fargate Spot, Spot node
-groups and EMR instance fleets, instances in Local Zones, canaries on a cron
-schedule) are listed under
-`? could not estimate`.
+Common resource types that cost money with zero traffic but have no rule yet,
+such as WorkSpaces, Kendra, Kinesis Data Analytics, Lightsail and CloudWatch
+dashboards, are listed under `! not counted yet`. Types missing from that list
+are skipped without a line, so the list grows as they are found. Partly
+supported types (Fargate Spot and other capacity providers, Spot and Windows
+node groups, EMR instance fleets, Aurora Serverless v1, instances in Local
+Zones, canaries on a cron schedule) are listed under `? could not estimate`.
 
 ## Assumptions
 
@@ -264,7 +273,9 @@ npm install -D cfn-idle-cost   # or: npx cfn-idle-cost
 go install github.com/badmintoncryer/cfn-idle-cost@latest
 ```
 
-`cdk-idle-cost` is the same tool under another name.
+`cdk-idle-cost` is the same tool under another name. The npm packages cover
+Linux and macOS (x64 and arm64); on Windows, use `go install` or the binary from
+the GitHub Release.
 
 ## License
 

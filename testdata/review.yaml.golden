@@ -1,0 +1,26 @@
+us-east-1 · 1 stack · idle ≈ $354/mo
+
+review                       $354/mo
+  Search       ×1            $122  r6g.large.search data nodes
+  Search       ×500 GB gp3    $61  EBS storage
+  Search       ×50 MiB/s    $3.20  gp3 throughput above 250 MiB/s
+  DocsWriter   ×1 DCU         $66  serverless minimum capacity
+  Stream       ×2 shards      $29  extended retention (over 24 hours)
+  Stream       ×2 shards      $22  provisioned shards
+  FargateOnly  ×1 vCPU        $30  Fargate vCPU (1 tasks)
+  FargateOnly  ×2 GB        $6.49  Fargate memory (1 tasks)
+  Db           ×1             $12  db.t4g.micro postgres Single-AZ
+  Db           ×20 GB gp3   $2.30  storage
+  Secret       ×3           $1.20  secret and its replicas
+
+? could not estimate: 5
+  review  Endpoint  SubnetIds has an item that uses Fn::If
+  review  SpotFirst  Fargate Spot is not supported
+  review  SpotLast  Fargate Spot is not supported
+  review  V1  Aurora Serverless v1 is not supported
+  review  WinNodes  Windows node groups (WINDOWS_CORE_2022_x86_64) are not supported yet
+
+! not counted yet: 1 (these cost money idle; cfn-idle-cost has no rule for them)
+  review  Flink  AWS::KinesisAnalyticsV2::Application
+
+prices: test prices · on-demand list prices, 730 h/mo, USD, free tier ignored
