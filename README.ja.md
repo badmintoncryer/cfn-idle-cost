@@ -140,7 +140,7 @@ jobs:
 | `AWS::EC2::Instance` | インスタンスの時間料金（Linux）、`BlockDeviceMappings`のEBSボリューム、起動時に割り当てられるパブリックIPv4 |
 | `AWS::AutoScaling::AutoScalingGroup` | インスタンスの時間料金×`DesiredCapacity`（なければ`MinSize`）、EBSボリューム、起動時に割り当てられるパブリックIPv4。起動テンプレートか起動設定から読みます |
 | `AWS::EC2::Volume` | 容量、gp3の3000 IOPS・125 MiB/sを超える分、io1・io2のIOPS |
-| `AWS::RDS::DBInstance` | インスタンスの時間料金（シングルAZ・マルチAZ）、割り当てたストレージ、プロビジョンドIOPS、gp3の基準値を超えるIOPSとスループット。Auroraは、プロビジョンドのインスタンスか、Serverless v2の最小ACU（I/O-Optimizedにも対応） |
+| `AWS::RDS::DBInstance` | インスタンスの時間料金（シングルAZ・マルチAZ。MySQL、PostgreSQL、MariaDBと、ライセンスモデルごとのOracleとSQL Server）、割り当てたストレージ、プロビジョンドIOPS、gp3の基準値を超えるIOPSとスループット。Auroraは、プロビジョンドのインスタンスか、Serverless v2の最小ACU（I/O-Optimizedにも対応） |
 | `AWS::RDS::DBCluster`（マルチAZ DBクラスター） | クラスターの時間料金（ライター1台と読み取り可能なスタンバイ2台）、割り当てたストレージ、プロビジョンドIOPS（gp3のIOPSとスループットにはまだ対応していません） |
 | `AWS::OpenSearchService::Domain`、`AWS::Elasticsearch::Domain` | データノード、専用マスターノード、UltraWarmノード、EBSの容量・IOPS・スループット |
 | `AWS::ElastiCache::CacheCluster`、`ReplicationGroup` | ノードの時間料金×ノード数 |
@@ -199,12 +199,13 @@ jobs:
 | `AWS::VpcLattice::Service` | サービスの時間料金（リクエストとデータの料金は含みません） |
 | `AWS::DocDBElastic::Cluster` | シャードのvCPU×シャード数×シャードごとのインスタンス数 |
 | `AWS::Timestream::InfluxDBInstance` | インスタンスの時間料金（シングルAZ・マルチAZ）と割り当てたストレージ |
+| `AWS::EMR::Cluster`、`AWS::EMR::InstanceGroupConfig` | オンデマンドのインスタンスグループの、EC2の時間料金（Linux）、EMRの料金、EBSボリューム。自動で終了するクラスターと、ステップが終わると終了するクラスターはアイドル時$0 |
 
 使った分だけかかる費用は、意図して対象から外しています。S3、Lambda、AuroraのストレージとI/O、CloudWatch Logs、データ転送、リクエスト料金がこれに当たります。
 
 ### まだ見積もらないもの
 
-アクセスがゼロでも費用がかかるのに、まだルールのないリソースタイプ（EMR、WorkSpaces、Kendra、CloudWatchダッシュボードなど）は、`! not counted yet`に載せます。そのため、こうした費用が黙って抜け落ちることはありません。一部だけ対応しているリソース（RDSのOracleとSQL Server、Fargate Spot、Spotのノードグループ、Local Zonesのインスタンス、cronのスケジュールで動くカナリア）は、`? could not estimate`に載ります。
+アクセスがゼロでも費用がかかるのに、まだルールのないリソースタイプ（WorkSpaces、Kendra、Lightsail、CloudWatchダッシュボードなど）は、`! not counted yet`に載せます。そのため、こうした費用が黙って抜け落ちることはありません。一部だけ対応しているリソース（Fargate Spot、Spotのノードグループ、EMRのインスタンスフリート、Local Zonesのインスタンス、cronのスケジュールで動くカナリア）は、`? could not estimate`に載ります。
 
 ## 前提
 

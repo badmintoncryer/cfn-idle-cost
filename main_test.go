@@ -58,6 +58,9 @@ var testPrices = &Prices{Source: "test prices", Regions: map[string]map[string]f
 		"influx|MultiAZUsage-Db.influx.medium": 0.24, "influx|MultiAZ-InfluxDBStorage-InfluxIOIncludedT1": 0.2,
 		"rds|Multi-AZClusterUsage:db.m5d.large|14": 0.585, "rds|RDS:Multi-AZCluster-PIOPS-Storage|14": 0.375, "rds|RDS:Multi-AZCluster-PIOPS|14": 0.3,
 		"fargate|Fargate-Windows-vCPU-Hours:perCPU": 0.046552, "fargate|Fargate-Windows-OS-Hours:perCPU": 0.046, "fargate|Fargate-Windows-GB-Hours": 0.00511175},
+	"ap-southeast-1": {"rds|InstanceUsage:db.t3.small|10": 0.044, "rds|MirrorUsage:db.m5.large|12": 1.954, "rds|RDS:Mirror-GP3-Storage|12": 0.23,
+		"rds|InstanceUsage:db.m5.large|20": 0.438, "rds|RDS:GP2-Storage|20": 0.115, "rds|RDS:GP2-Storage|10": 0.115,
+		"ec2|m5.xlarge": 0.192, "emr|m5.xlarge": 0.048, "ebs|EBS:VolumeUsage.gp2": 0.1},
 	"global": {"arc|Global-Cluster-Hours": 2.5, "arc|Global-ReadinessCheck-Hours": 0.045},
 }}
 
@@ -127,6 +130,11 @@ func TestRules(t *testing.T) {
 // elastic clusters, Timestream for InfluxDB, Multi-AZ DB clusters and Windows on Fargate.
 func TestRules2(t *testing.T) {
 	golden(t, "rules2.yaml", report(t, "us-east-1", "testdata/rules2.yaml"))
+}
+
+// The third batch: Oracle and SQL Server on RDS, and EMR clusters.
+func TestRules3(t *testing.T) {
+	golden(t, "rules3.yaml", report(t, "ap-southeast-1", "testdata/rules3.yaml"))
 }
 
 // --parameter turns the Condition on: ProdKey is created and Spare is an m5.large.

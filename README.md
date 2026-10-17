@@ -155,7 +155,7 @@ and provisioned storage billed whether you use it or not.
 | `AWS::EC2::Instance` | instance hourly (Linux), EBS volumes in `BlockDeviceMappings`, the public IPv4 it gets at launch |
 | `AWS::AutoScaling::AutoScalingGroup` | instance hourly × `DesiredCapacity` (or `MinSize`), EBS volumes and public IPv4 at launch, from its launch template or launch configuration |
 | `AWS::EC2::Volume` | size, gp3 IOPS / throughput above 3000 / 125 MiB/s, io1 / io2 IOPS |
-| `AWS::RDS::DBInstance` | instance hourly (Single-AZ / Multi-AZ), allocated storage, provisioned IOPS and throughput above the gp3 baseline. Aurora: provisioned instances, or Serverless v2 minimum ACU (I/O-Optimized aware) |
+| `AWS::RDS::DBInstance` | instance hourly (Single-AZ / Multi-AZ; MySQL, PostgreSQL, MariaDB, Oracle and SQL Server by license model), allocated storage, provisioned IOPS and throughput above the gp3 baseline. Aurora: provisioned instances, or Serverless v2 minimum ACU (I/O-Optimized aware) |
 | `AWS::RDS::DBCluster` (Multi-AZ DB cluster) | cluster hourly (writer and two readable standbys), allocated storage and provisioned IOPS (gp3 IOPS and throughput not supported yet) |
 | `AWS::OpenSearchService::Domain`, `AWS::Elasticsearch::Domain` | data, dedicated master and UltraWarm nodes, EBS storage / IOPS / throughput |
 | `AWS::ElastiCache::CacheCluster`, `ReplicationGroup` | node hourly × nodes |
@@ -214,6 +214,7 @@ and provisioned storage billed whether you use it or not.
 | `AWS::VpcLattice::Service` | service hourly (requests and data not counted) |
 | `AWS::DocDBElastic::Cluster` | shard vCPUs × shards × instances per shard |
 | `AWS::Timestream::InfluxDBInstance` | instance hourly (Single-AZ / Multi-AZ) and allocated storage |
+| `AWS::EMR::Cluster`, `AWS::EMR::InstanceGroupConfig` | EC2 hourly (Linux), EMR fee and EBS volumes of on-demand instance groups. Clusters that auto-terminate or end with their steps: $0 idle |
 
 Usage-only charges are left out on purpose: S3, Lambda, Aurora storage and
 I/O, CloudWatch Logs, data transfer, requests.
@@ -221,10 +222,10 @@ I/O, CloudWatch Logs, data transfer, requests.
 ### Not counted yet
 
 Resource types that cost money with zero traffic but have no rule yet, such as
-EMR, WorkSpaces, Kendra and CloudWatch dashboards, are listed under `! not counted yet`, so
-their cost is never left out silently. Partly supported types (Oracle and SQL
-Server on RDS, Fargate Spot, Spot node groups, instances in Local Zones,
-canaries on a cron schedule) are listed under
+WorkSpaces, Kendra, Lightsail and CloudWatch dashboards, are listed under `! not counted yet`, so
+their cost is never left out silently. Partly supported types (Fargate Spot, Spot node
+groups and EMR instance fleets, instances in Local Zones, canaries on a cron
+schedule) are listed under
 `? could not estimate`.
 
 ## Assumptions

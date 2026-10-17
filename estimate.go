@@ -723,6 +723,9 @@ func rdsInstance(e *est, p map[string]any) {
 	}
 	code, ok := rdsEngineCode[strings.ToLower(engine)]
 	if !ok {
+		code, ok = e.licensedEngineCode(strings.ToLower(engine), p)
+	}
+	if !ok {
 		panic(unresolved("engine " + engine + " is not supported yet"))
 	}
 	if cluster != nil { // Aurora: storage is usage-based, only the instance counts
@@ -756,6 +759,9 @@ func rdsInstance(e *est, p map[string]any) {
 	usage, maz, az := "InstanceUsage", "", "Single-AZ"
 	if multi {
 		usage, maz, az = "Multi-AZUsage", "Multi-AZ-", "Multi-AZ"
+		if strings.HasPrefix(strings.ToLower(engine), "sqlserver") { // SQL Server Multi-AZ is priced as mirroring
+			usage, maz = "MirrorUsage", "Mirror-"
+		}
 	}
 	e.hourly(1, "", "rds|"+usage+":"+class+"|"+code, class+" "+engine+" "+az)
 	size := e.mustNum(p, "AllocatedStorage")
@@ -787,6 +793,31 @@ func rdsInstance(e *est, p map[string]any) {
 		e.monthly(size, "GB magnetic", k("StorageUsage"), "storage")
 	default:
 		panic(unresolved("StorageType " + t + " is not supported"))
+	}
+}
+
+// licensedEngineCode returns the Price List engineCode of Oracle and SQL
+// Server, which the license model decides along with the edition.
+func (e *est) licensedEngineCode(engine string, p map[string]any) (string, bool) {
+	engine = strings.TrimSuffix(engine, "-cdb") // the CDB architecture is priced the same
+	byo := map[string]string{"oracle-se2": "19", "oracle-ee": "5", "sqlserver-se": "52", "sqlserver-ee": "53", "sqlserver-dev-ee": "51"}
+	li := map[string]string{"oracle-se2": "20", "sqlserver-ex": "10", "sqlserver-web": "11", "sqlserver-se": "12", "sqlserver-ee": "15"}
+	def := "license-included"
+	if strings.HasPrefix(engine, "oracle") {
+		def = "bring-your-own-license"
+		if engine == "oracle-se2" {
+			def = e.mustStr(p, "LicenseModel") // either is possible, and there is no default to rely on
+		}
+	}
+	switch lm := e.str(p, "LicenseModel", def); lm {
+	case "license-included":
+		code, ok := li[engine]
+		return code, ok
+	case "bring-your-own-license", "bring-your-own-media":
+		code, ok := byo[engine]
+		return code, ok
+	default:
+		panic(unresolved("LicenseModel " + lm + " is not supported"))
 	}
 }
 
@@ -1059,7 +1090,7 @@ func ecsService(e *est, p map[string]any) {
 // notCounted are types that cost money with zero traffic but have no rule yet.
 // They are listed in the report instead of being skipped silently.
 var notCounted = []string{
-	"AWS::EMR::Cluster", "AWS::WorkSpaces::Workspace", "AWS::AppStream::Fleet", "AWS::Kendra::Index", "AWS::EC2::Host",
+	"AWS::WorkSpaces::Workspace", "AWS::AppStream::Fleet", "AWS::Kendra::Index", "AWS::EC2::Host",
 	"AWS::ElasticBeanstalk::Environment", "AWS::Lightsail::Instance", "AWS::Lightsail::Database",
 	"AWS::GameLift::Fleet", "AWS::MediaLive::Channel",
 	"AWS::Shield::Protection", "AWS::Batch::ComputeEnvironment", "AWS::EC2::VerifiedAccessEndpoint",
@@ -1597,4 +1628,58 @@ func mwaa(e *est, p map[string]any) {
 var appsyncCacheGB = map[string]string{
 	"SMALL": "1.55", "MEDIUM": "3.22", "LARGE": "12.3", "XLARGE": "25.05", "LARGE_2X": "50.47", "LARGE_4X": "101.38", "LARGE_8X": "203.26", "LARGE_12X": "317.77",
 	"T2_SMALL": "1.55", "T2_MEDIUM": "3.22", "R4_LARGE": "12.3", "R4_XLARGE": "25.05", "R4_2XLARGE": "50.47", "R4_4XLARGE": "101.38", "R4_8XLARGE": "203.26",
+}
+
+func init() {
+	rules["AWS::EMR::Cluster"] = func(e *est, p map[string]any) {
+		if why := e.emrTransient(p); why != "" {
+			e.items = append(e.items, Item{Quantity: "×0", Reason: why})
+			return
+		}
+		in := asMap(p["Instances"])
+		if in["MasterInstanceFleet"] != nil || in["CoreInstanceFleet"] != nil {
+			panic(unresolved("instance fleets are not supported yet"))
+		}
+		e.emrGroup(asMap(in["MasterInstanceGroup"]), "primary")
+		if g := asMap(in["CoreInstanceGroup"]); g != nil {
+			e.emrGroup(g, "core")
+		}
+	}
+	rules["AWS::EMR::InstanceGroupConfig"] = func(e *est, p map[string]any) {
+		if id, ok := asMap(p["JobFlowId"])["Ref"].(string); ok {
+			if c, ok := e.st.Resources[id]; ok && e.emrTransient(e.props(c)) != "" {
+				return // shown on the cluster
+			}
+		}
+		e.emrGroup(p, strings.ToLower(e.mustStr(p, "InstanceRole")))
+	}
+}
+
+// emrTransient says why a cluster does not stay up while idle, or "".
+func (e *est) emrTransient(p map[string]any) string {
+	if p["AutoTerminationPolicy"] != nil {
+		return "terminates after its AutoTerminationPolicy idle timeout"
+	}
+	if in := asMap(p["Instances"]); in["KeepJobFlowAliveWhenNoSteps"] != nil && !e.flag(in, "KeepJobFlowAliveWhenNoSteps") {
+		return "terminates when its steps finish (KeepJobFlowAliveWhenNoSteps: false)"
+	}
+	return ""
+}
+
+// emrGroup prices the instances of an EMR instance group: EC2 (Linux), the EMR
+// fee, and the EBS volumes attached to each. The root volume is not counted.
+func (e *est) emrGroup(g map[string]any, role string) {
+	if e.str(g, "Market", "ON_DEMAND") != "ON_DEMAND" {
+		panic(unresolved("Spot instance groups are not supported"))
+	}
+	t := e.mustStr(g, "InstanceType")
+	n := e.mustNum(g, "InstanceCount")
+	e.hourly(n, "", "ec2|"+t, t+" "+role+" instances (Linux)")
+	e.hourly(n, "", "emr|"+t, "EMR fee, "+role)
+	l, _ := asMap(g["EbsConfiguration"])["EbsBlockDeviceConfigs"].([]any)
+	for _, c := range l {
+		c := asMap(c)
+		vs := asMap(c["VolumeSpecification"])
+		e.ebs(e.mustStr(vs, "VolumeType"), e.mustNum(vs, "SizeInGB"), e.num(vs, "Iops", 0), e.num(vs, "Throughput", 0), n*e.num(c, "VolumesPerInstance", 1))
+	}
 }

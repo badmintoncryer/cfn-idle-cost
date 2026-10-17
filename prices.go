@@ -82,7 +82,9 @@ func in(s string, set ...string) bool {
 	return false
 }
 
-var rdsEngines = []string{"2", "14", "16", "18", "21"} // mysql, postgres, aurora-mysql, mariadb, aurora-postgresql
+var rdsEngines = []string{"2", "14", "16", "18", "21", // mysql, postgres, aurora-mysql, mariadb, aurora-postgresql
+	"5", "19", "20", // oracle-ee BYOL, oracle-se2 BYOL, oracle-se2 license included
+	"10", "11", "12", "15", "51", "52", "53"} // sqlserver ex, web, se, ee (license included); dev-ee, se, ee (bring your own media)
 
 var selectors = []selector{
 	{name: "ec2", service: "AmazonEC2", families: []string{"Compute Instance"},
@@ -128,7 +130,7 @@ var selectors = []selector{
 			}
 			if a["productFamily"] == "Database Instance" {
 				base, _, _ := strings.Cut(u, ":")
-				if !in(base, "InstanceUsage", "Multi-AZUsage", "InstanceUsageIOOptimized", "Multi-AZClusterUsage") {
+				if !in(base, "InstanceUsage", "Multi-AZUsage", "InstanceUsageIOOptimized", "Multi-AZClusterUsage", "MirrorUsage") {
 					return ""
 				}
 				// usagetype abbreviates xlarge to xl, so key on instanceType instead
@@ -347,6 +349,14 @@ var selectors = []selector{
 			}
 			return ""
 		}},
+	{name: "emr", service: "ElasticMapReduce", families: []string{"Elastic Map Reduce Instance"}, filters: map[string]string{"softwareType": "EMR"},
+		key: func(a map[string]string, u string) string {
+			if strings.HasPrefix(u, "BoxUsage:") {
+				return a["instanceType"]
+			}
+			return ""
+		},
+		liveFilter: byInstanceType},
 	{name: "healthlake", service: "AmazonHealthLake", families: []string{"Machine Learning"},
 		key: func(a map[string]string, u string) string { return keep(u, "FHIRDataStore") }},
 	// Application Recovery Controller has one offer, for the "aws-other" location.
