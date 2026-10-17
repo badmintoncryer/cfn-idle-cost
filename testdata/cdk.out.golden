@@ -1,8 +1,8 @@
 ap-northeast-1 · 2 stacks · idle ≈ $150/mo
 
 App                              $96/mo
-  Vpc/NatGateway   ×1            $45  NAT Gateway hourly
-  Vpc/SsmEndpoint  ×2 AZ         $20  interface endpoint hourly per AZ
+  Vpc/NatGateway   ×1            $45  NAT Gateway
+  Vpc/SsmEndpoint  ×2 AZ         $20  interface endpoint
   Server           ×1          $9.93  t3.micro on-demand (Linux) (default of ServerType)
   Server           ×30 GB gp3  $2.88  EBS gp3 storage (default of ServerType)
   Spare            ×1          $9.93  t3.micro on-demand (Linux) (default of Env)
@@ -12,8 +12,8 @@ App                              $96/mo
   Archive/Secret   ×1          $0.40  secret
 
 Prod-Edge                        $54/mo
-  Stream           ×2 shards     $28  provisioned shard hourly
-  LoadBalancer     ×1            $18  Application Load Balancer hourly
+  Stream           ×2 shards     $28  provisioned shards
+  LoadBalancer     ×1            $18  Application Load Balancer
   LoadBalancer     ×2 IPv4     $7.30  public IPv4 per AZ (internet-facing)
 
 ? could not estimate: 1

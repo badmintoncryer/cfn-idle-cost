@@ -35,8 +35,8 @@ DataStack                                    $196/mo
   ...
 
 NetworkStack                                  $69/mo
-  Vpc/PublicSubnet1/NATGateway  ×1            $45  NAT Gateway hourly
-  Vpc/SsmEndpoint               ×2 AZ         $20  interface endpoint hourly per AZ
+  Vpc/PublicSubnet1/NATGateway  ×1            $45  NAT Gateway
+  Vpc/SsmEndpoint               ×2 AZ         $20  interface endpoint
   Vpc/PublicSubnet1/EIP         ×1          $3.65  public IPv4 address
 
 ? could not estimate: 1
@@ -80,8 +80,8 @@ npx cfn-idle-cost --base cdk.out.main cdk.out
 ap-northeast-1 · idle ≈ $382 → $682/mo (+$300)
 
   ~ DataStack     Db                              $42 →  $322   +$280  db.t4g.micro postgres Multi-AZ → db.t4g.large postgres Multi-AZ
-  + NetworkStack  Vpc/PublicSubnet2/NATGateway  $0.00 →   $45    +$45  NAT Gateway hourly
-  - DataStack     Stream                          $28 → $0.00    -$28  provisioned shard hourly
+  + NetworkStack  Vpc/PublicSubnet2/NATGateway  $0.00 →   $45    +$45  NAT Gateway
+  - DataStack     Stream                          $28 → $0.00    -$28  provisioned shards
   + NetworkStack  Vpc/PublicSubnet2/EIP         $0.00 → $3.65  +$3.65  public IPv4 address
 ```
 

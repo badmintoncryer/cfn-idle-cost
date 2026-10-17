@@ -11,8 +11,8 @@
 
 | Stack | Resource | Quantity | $/mo | |
 |---|---|---:|---:|---|
-| App | `Vpc/NatGateway` | ×1 | $45 | NAT Gateway hourly |
-| App | `Vpc/SsmEndpoint` | ×2 AZ | $20 | interface endpoint hourly per AZ |
+| App | `Vpc/NatGateway` | ×1 | $45 | NAT Gateway |
+| App | `Vpc/SsmEndpoint` | ×2 AZ | $20 | interface endpoint |
 | App | `Server` | ×1 | $9.93 | t3.micro on-demand (Linux) (default of ServerType) |
 | App | `Server` | ×30 GB gp3 | $2.88 | EBS gp3 storage (default of ServerType) |
 | App | `Spare` | ×1 | $9.93 | t3.micro on-demand (Linux) (default of Env) |
@@ -20,8 +20,8 @@
 | App | `Table` | ×10 RCU | $1.08 | provisioned read capacity |
 | App | `Vpc/EIP` | ×1 | $3.65 | public IPv4 address |
 | App | `Archive/Secret` | ×1 | $0.40 | secret |
-| Prod-Edge | `Stream` | ×2 shards | $28 | provisioned shard hourly |
-| Prod-Edge | `LoadBalancer` | ×1 | $18 | Application Load Balancer hourly |
+| Prod-Edge | `Stream` | ×2 shards | $28 | provisioned shards |
+| Prod-Edge | `LoadBalancer` | ×1 | $18 | Application Load Balancer |
 | Prod-Edge | `LoadBalancer` | ×2 IPv4 | $7.30 | public IPv4 per AZ (internet-facing) |
 
 #### us-east-1
