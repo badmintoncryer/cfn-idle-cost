@@ -1,4 +1,5 @@
 # Resource types added after 1.0.0; priced with testPrices["us-east-1"].
+# Ipv6Alb uses no public IPv4, so only its hourly line shows.
 Resources:
   # Public IPv4 assigned at launch: by subnet, by AssociatePublicIpAddress, and
   # the cases that add no line (private, outside this template, opted out, EIP).
@@ -63,6 +64,9 @@ Resources:
       DesiredCount: 2
       TaskDefinition: !Ref Task
       NetworkConfiguration: { AwsvpcConfiguration: { AssignPublicIp: ENABLED, Subnets: [!Ref PublicSubnet] } }
+  Ipv6Alb:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties: { IpAddressType: dualstack-without-public-ipv4, Subnets: [a, b, c] }
 
   # FSx for ONTAP: a fixed throughput, and per HA pair with provisioned IOPS.
   Ontap:

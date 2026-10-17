@@ -135,7 +135,7 @@ jobs:
 | `AWS::EC2::NatGateway` | 時間料金 |
 | `AWS::EC2::EIP` | パブリックIPv4アドレス |
 | `AWS::EC2::VPCEndpoint` | Interface型は時間料金×サブネット数（AZ数）。Gateway Load Balancer型は時間料金。Gateway型は無料 |
-| `AWS::ElasticLoadBalancingV2::LoadBalancer` | ALB、NLB、GWLBの時間料金。internet-facingなら、サブネットごとにパブリックIPv4を1つ |
+| `AWS::ElasticLoadBalancingV2::LoadBalancer` | ALB、NLB、GWLBの時間料金。internet-facingなら、サブネットごとにパブリックIPv4を1つ（`dualstack-without-public-ipv4`なら数えません） |
 | `AWS::ElasticLoadBalancing::LoadBalancer` | Classic Load Balancerの時間料金 |
 | `AWS::EC2::Instance` | インスタンスの時間料金（Linux）、`BlockDeviceMappings`のEBSボリューム、起動時に割り当てられるパブリックIPv4 |
 | `AWS::AutoScaling::AutoScalingGroup` | インスタンスの時間料金×`DesiredCapacity`（なければ`MinSize`）、EBSボリューム、起動時に割り当てられるパブリックIPv4。起動テンプレートか起動設定から読みます |

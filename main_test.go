@@ -46,7 +46,8 @@ var testPrices = &Prices{Source: "test prices", Regions: map[string]map[string]f
 		"fsx|ONTAP|Storage.SAZ_2N:SSD": 0.125, "fsx|ONTAP|ThroughputCapacity.SAZ_2N": 0.72, "fsx|ONTAP|Storage.SAZ_2N2:SSD": 0.125,
 		"fsx|ONTAP|ThroughputCapacity.SAZ_2N2": 1.6, "fsx|ONTAP|ProvisionedSSDIOPS.SAZ_2N2": 0.017,
 		"ddb|ReadCapacityUnit-Hrs": 0.00013, "ddb|ReplWriteCapacityUnit-Hrs": 0.00065, "ddb|IA-ReadCapacityUnit-Hrs": 0.00016, "ddb|IA-WriteCapacityUnit-Hrs": 0.00081,
-		"apigw|cache:0.5": 0.02, "apigw|cache:6.1": 0.2, "ds|Std-MicrosoftAD-DC-Usage": 0.06, "ds|MicrosoftAD-DC-Usage": 0.2, "ds|Small-SimpleAD-Usage": 0.05},
+		"apigw|cache:0.5": 0.02, "apigw|cache:6.1": 0.2, "ds|Std-MicrosoftAD-DC-Usage": 0.06, "ds|MicrosoftAD-DC-Usage": 0.2, "ds|Small-SimpleAD-Usage": 0.05,
+		"elb|Load Balancer-Application": 0.0225},
 }}
 
 func golden(t *testing.T, name, got string) {
