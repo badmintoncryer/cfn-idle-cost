@@ -364,7 +364,7 @@ var rules map[string]func(e *est, p map[string]any)
 func init() {
 	rules = map[string]func(e *est, p map[string]any){
 		"AWS::EC2::NatGateway": func(e *est, p map[string]any) {
-			e.hourly(1, "", "nat|NatGateway-Hours", "NAT Gateway hourly")
+			e.hourly(1, "", "nat|NatGateway-Hours", "NAT Gateway")
 		},
 		"AWS::EC2::EIP": func(e *est, p map[string]any) {
 			e.hourly(1, "", "vpc|PublicIPv4:InUseAddress", "public IPv4 address")
@@ -377,9 +377,9 @@ func init() {
 				if n < 0 {
 					panic(unresolved("SubnetIds is not set"))
 				}
-				e.hourly(float64(n), "AZ", "vpc|VpcEndpoint-Hours", "interface endpoint hourly per AZ")
+				e.hourly(float64(n), "AZ", "vpc|VpcEndpoint-Hours", "interface endpoint")
 			case "GatewayLoadBalancer":
-				e.hourly(1, "", "vpc|VpcEndpoint-GWLBE-Hours", "Gateway Load Balancer endpoint hourly")
+				e.hourly(1, "", "vpc|VpcEndpoint-GWLBE-Hours", "Gateway Load Balancer endpoint")
 			default:
 				panic(unresolved("VpcEndpointType " + t + " is not supported yet"))
 			}
@@ -391,7 +391,7 @@ func init() {
 			if !ok {
 				panic(unresolved("Type " + t + " is not supported"))
 			}
-			e.hourly(1, "", "elb|Load Balancer-"+f, f+" Load Balancer hourly")
+			e.hourly(1, "", "elb|Load Balancer-"+f, f+" Load Balancer")
 			if t == "gateway" || e.str(p, "Scheme", "internet-facing") != "internet-facing" {
 				return
 			}
@@ -412,7 +412,7 @@ func init() {
 			e.hourly(float64(n), "IPv4", "vpc|PublicIPv4:InUseAddress", "public IPv4 per AZ (internet-facing)")
 		},
 		"AWS::ElasticLoadBalancing::LoadBalancer": func(e *est, p map[string]any) {
-			e.hourly(1, "", "elb|Load Balancer", "Classic Load Balancer hourly")
+			e.hourly(1, "", "elb|Load Balancer", "Classic Load Balancer")
 		},
 		"AWS::EC2::Instance": func(e *est, p map[string]any) {
 			t := e.str(p, "InstanceType", "")
@@ -531,10 +531,10 @@ func init() {
 		},
 		"AWS::Kinesis::Stream": func(e *est, p map[string]any) {
 			if e.str(asMap(p["StreamModeDetails"]), "StreamMode", "PROVISIONED") == "ON_DEMAND" {
-				e.hourly(1, "", "kinesis|OnDemand-StreamHour", "on-demand stream hourly")
+				e.hourly(1, "", "kinesis|OnDemand-StreamHour", "on-demand stream")
 				return
 			}
-			e.hourly(e.mustNum(p, "ShardCount"), "shards", "kinesis|Storage-ShardHour", "provisioned shard hourly")
+			e.hourly(e.mustNum(p, "ShardCount"), "shards", "kinesis|Storage-ShardHour", "provisioned shards")
 		},
 		"AWS::KMS::Key": func(e *est, p map[string]any) {
 			e.monthly(1, "", "kms|KMS-Keys", "customer managed key")
@@ -897,7 +897,7 @@ var notCounted = []string{
 func init() {
 	more := map[string]func(e *est, p map[string]any){
 		"AWS::EKS::Cluster": func(e *est, p map[string]any) {
-			e.hourly(1, "", "eks|AmazonEKS-Hours:perCluster", "EKS cluster hourly (standard support)")
+			e.hourly(1, "", "eks|AmazonEKS-Hours:perCluster", "EKS cluster (standard support)")
 		},
 		"AWS::EKS::Nodegroup": func(e *est, p map[string]any) {
 			if e.str(p, "CapacityType", "ON_DEMAND") != "ON_DEMAND" {
@@ -926,7 +926,7 @@ func init() {
 			if n < 0 {
 				panic(unresolved("SubnetMappings is not set"))
 			}
-			e.hourly(float64(n), "endpoints", "nfw|Endpoint-Hour", "firewall endpoint hourly per AZ")
+			e.hourly(float64(n), "endpoints", "nfw|Endpoint-Hour", "firewall endpoint per AZ")
 		},
 		"AWS::WAFv2::WebACL": func(e *est, p map[string]any) {
 			e.monthly(1, "", "waf|WebACLV2", "web ACL")
@@ -980,32 +980,32 @@ func init() {
 			}
 		},
 		"AWS::EC2::TransitGatewayAttachment": func(e *est, p map[string]any) {
-			e.hourly(1, "", "tgw|TransitGatewayVPC", "Transit Gateway VPC attachment hourly")
+			e.hourly(1, "", "tgw|TransitGatewayVPC", "Transit Gateway VPC attachment")
 		},
 		"AWS::EC2::TransitGatewayVpcAttachment": func(e *est, p map[string]any) {
-			e.hourly(1, "", "tgw|TransitGatewayVPC", "Transit Gateway VPC attachment hourly")
+			e.hourly(1, "", "tgw|TransitGatewayVPC", "Transit Gateway VPC attachment")
 		},
 		"AWS::EC2::TransitGatewayPeeringAttachment": func(e *est, p map[string]any) {
-			e.hourly(1, "", "tgw|TransitGatewayPeering", "Transit Gateway peering attachment hourly")
+			e.hourly(1, "", "tgw|TransitGatewayPeering", "Transit Gateway peering attachment")
 		},
 		"AWS::EC2::TransitGatewayConnect": func(e *est, p map[string]any) {
-			e.hourly(1, "", "tgw|TransitGatewayConnect", "Transit Gateway Connect attachment hourly")
+			e.hourly(1, "", "tgw|TransitGatewayConnect", "Transit Gateway Connect attachment")
 		},
 		"AWS::EC2::VPNConnection": func(e *est, p map[string]any) {
-			e.hourly(1, "", "vpc|VPN-Usage-Hours:ipsec.1", "Site-to-Site VPN connection hourly")
+			e.hourly(1, "", "vpc|VPN-Usage-Hours:ipsec.1", "Site-to-Site VPN connection")
 			if _, ok := p["TransitGatewayId"]; ok {
-				e.hourly(1, "", "tgw|TransitGatewayVPN", "Transit Gateway VPN attachment hourly")
+				e.hourly(1, "", "tgw|TransitGatewayVPN", "Transit Gateway VPN attachment")
 			}
 		},
 		"AWS::EC2::ClientVpnTargetNetworkAssociation": func(e *est, p map[string]any) {
-			e.hourly(1, "", "vpc|ClientVPN-EndpointHours", "Client VPN endpoint association hourly")
+			e.hourly(1, "", "vpc|ClientVPN-EndpointHours", "Client VPN endpoint association")
 		},
 		"AWS::Route53Resolver::ResolverEndpoint": func(e *est, p map[string]any) {
 			n := e.length(p, "IpAddresses")
 			if n < 0 {
 				panic(unresolved("IpAddresses is not set"))
 			}
-			e.hourly(float64(n), "ENIs", "resolver|ResolverNetworkInterface", "Resolver endpoint hourly per IP address")
+			e.hourly(float64(n), "ENIs", "resolver|ResolverNetworkInterface", "Resolver endpoint")
 		},
 		"AWS::DocDB::DBInstance": func(e *est, p map[string]any) {
 			e.clusterInstance(p, "docdb", "iopt1", "ServerlessV2ScalingConfiguration", "DocumentDB:ServerlessUsage", "DocumentDB:ServerlessUsage", "DCU")
@@ -1017,7 +1017,7 @@ func init() {
 			b := asMap(p["BrokerNodeGroupInfo"])
 			t := e.mustStr(b, "InstanceType") // kafka.m5.large, express.m7g.large
 			n := e.mustNum(p, "NumberOfBrokerNodes")
-			e.hourly(n, "brokers", "msk|"+strings.ToUpper(t[:1])+t[1:], t+" broker hourly")
+			e.hourly(n, "brokers", "msk|"+strings.ToUpper(t[:1])+t[1:], t+" brokers")
 			if strings.HasPrefix(t, "express.") {
 				return // Express storage is pay-per-use
 			}
@@ -1028,7 +1028,7 @@ func init() {
 			}
 		},
 		"AWS::MSK::ServerlessCluster": func(e *est, p map[string]any) {
-			e.hourly(1, "", "msk|KafkaServerless-ClusterHours", "serverless cluster hourly (partitions not counted)")
+			e.hourly(1, "", "msk|KafkaServerless-ClusterHours", "serverless cluster (partitions not counted)")
 		},
 		"AWS::Redshift::Cluster": func(e *est, p map[string]any) {
 			n := 1.0
@@ -1036,11 +1036,11 @@ func init() {
 				n = e.mustNum(p, "NumberOfNodes")
 			}
 			t := e.mustStr(p, "NodeType")
-			e.hourly(n, "nodes", "redshift|"+t, t+" node hourly")
+			e.hourly(n, "nodes", "redshift|"+t, t+" nodes")
 		},
 		"AWS::DAX::Cluster": func(e *est, p map[string]any) {
 			t := e.mustStr(p, "NodeType")
-			e.hourly(e.mustNum(p, "ReplicationFactor"), "nodes", "dax|"+t, t+" node hourly")
+			e.hourly(e.mustNum(p, "ReplicationFactor"), "nodes", "dax|"+t, t+" nodes")
 		},
 		"AWS::AmazonMQ::Broker": func(e *est, p map[string]any) {
 			engine := map[string]string{"ACTIVEMQ": "ActiveMQ", "RABBITMQ": "RabbitMQ"}[strings.ToUpper(e.mustStr(p, "EngineType"))]
@@ -1056,7 +1056,7 @@ func init() {
 			if n < 0 {
 				n = 1 // SFTP
 			}
-			e.hourly(float64(n), "protocols", "transfer|ProtocolHours", "server hourly per protocol")
+			e.hourly(float64(n), "protocols", "transfer|ProtocolHours", "server")
 		},
 		"AWS::AppRunner::Service": func(e *est, p map[string]any) {
 			mem := e.str(asMap(p["InstanceConfiguration"]), "Memory", "2 GB")
