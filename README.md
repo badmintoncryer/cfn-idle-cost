@@ -177,7 +177,7 @@ and provisioned storage billed whether you use it or not.
 | `AWS::KMS::Key`, `AWS::KMS::ReplicaKey` | $1 per key |
 | `AWS::SecretsManager::Secret` | per secret and per replica |
 | `AWS::Route53::HostedZone` | per hosted zone |
-| `AWS::EKS::Cluster` | cluster hourly (standard support) |
+| `AWS::EKS::Cluster` | cluster hourly, plus the extended support fee when `Version` is past the end of standard support on the date of the prices (the snapshot date, or today with `--live`) |
 | `AWS::EKS::Nodegroup` | instance hourly × `DesiredSize` (or `MinSize`), on-demand, one instance type |
 | `AWS::NetworkFirewall::Firewall` | endpoint hourly × subnets |
 | `AWS::WAFv2::WebACL` | web ACL and its rules (managed rule group fees not counted) |

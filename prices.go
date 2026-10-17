@@ -223,7 +223,9 @@ var selectors = []selector{
 	{name: "ga", service: "AWSGlobalAccelerator", global: true, families: []string{"AWS Global Accelerator"},
 		key: func(a map[string]string, u string) string { return keep(u, "Global-Accelerator-fixed-fee") }},
 	{name: "eks", service: "AmazonEKS", families: []string{"Compute"},
-		key: func(a map[string]string, u string) string { return keep(u, "AmazonEKS-Hours:perCluster") }},
+		key: func(a map[string]string, u string) string {
+			return keep(u, "AmazonEKS-Hours:perCluster", "AmazonEKS-Hours:extendedSupport")
+		}},
 	{name: "nfw", service: "AWSNetworkFirewall", families: []string{"AWS Firewall"},
 		key: func(a map[string]string, u string) string { return keep(u, "Endpoint-Hour") }},
 	{name: "waf", service: "awswaf", families: []string{"Web Application Firewall"},

@@ -14,7 +14,7 @@ import (
 var update = flag.Bool("update", false, "rewrite testdata/*.golden")
 
 // testPrices are fixed so the golden files don't move with the weekly snapshot.
-var testPrices = &Prices{Source: "test prices", Regions: map[string]map[string]float64{
+var testPrices = &Prices{Source: "test prices", AsOf: "2026-10-16", Regions: map[string]map[string]float64{
 	"ap-northeast-1": {
 		"nat|NatGateway-Hours":              0.062,
 		"vpc|PublicIPv4:InUseAddress":       0.005,
@@ -63,7 +63,8 @@ var testPrices = &Prices{Source: "test prices", Regions: map[string]map[string]f
 		"es|r6g.large.search": 0.167, "es|ES:GP3-Storage": 0.122, "es|ES:GP3-Provisioned-ThroughPut": 0.064, "docdb|DocumentDB:ServerlessIOOptimizedUsage": 0.0905},
 	"ap-southeast-1": {"rds|InstanceUsage:db.t3.small|10": 0.044, "rds|MirrorUsage:db.m5.large|12": 1.954, "rds|RDS:Mirror-GP3-Storage|12": 0.23,
 		"rds|InstanceUsage:db.m5.large|20": 0.438, "rds|RDS:GP3-Storage|20": 0.115, "rds|RDS:GP3-Storage|10": 0.115,
-		"ec2|m5.xlarge": 0.192, "emr|m5.xlarge": 0.048, "ebs|EBS:VolumeUsage.gp2": 0.1},
+		"ec2|m5.xlarge": 0.192, "emr|m5.xlarge": 0.048, "ebs|EBS:VolumeUsage.gp2": 0.1,
+		"eks|AmazonEKS-Hours:perCluster": 0.1, "eks|AmazonEKS-Hours:extendedSupport": 0.5},
 	"global": {"arc|Global-Cluster-Hours": 2.5, "arc|Global-ReadinessCheck-Hours": 0.045},
 }}
 

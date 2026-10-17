@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 )
 
 const hoursPerMonth = 730
@@ -1159,9 +1160,7 @@ var notCounted = []string{
 
 func init() {
 	more := map[string]func(e *est, p map[string]any){
-		"AWS::EKS::Cluster": func(e *est, p map[string]any) {
-			e.hourly(1, "", "eks|AmazonEKS-Hours:perCluster", "EKS cluster (standard support)")
-		},
+		"AWS::EKS::Cluster": eksCluster,
 		"AWS::EKS::Nodegroup": func(e *est, p map[string]any) {
 			if e.str(p, "CapacityType", "ON_DEMAND") != "ON_DEMAND" {
 				panic(unresolved("Spot node groups are not supported"))
@@ -1748,4 +1747,46 @@ func (e *est) emrGroup(g map[string]any, role string) {
 		vs := asMap(c["VolumeSpecification"])
 		e.ebs(e.mustStr(vs, "VolumeType"), e.mustNum(vs, "SizeInGB"), e.num(vs, "Iops", 0), e.num(vs, "Throughput", 0), n*e.num(c, "VolumesPerInstance", 1))
 	}
+}
+
+// eksSupport holds the end of standard and of extended support of each EKS
+// Kubernetes version (UTC), from the Amazon EKS release calendar.
+// ponytail: a table to update when EKS releases a version; versions newer than
+// the table are taken to be in standard support.
+var eksSupport = map[string][2]string{
+	"1.31": {"2025-11-26", "2026-11-26"}, "1.32": {"2026-03-23", "2027-03-23"}, "1.33": {"2026-07-29", "2027-07-29"},
+	"1.34": {"2026-12-02", "2027-12-02"}, "1.35": {"2027-03-27", "2028-03-27"}, "1.36": {"2027-08-02", "2028-08-02"},
+	"1.37": {"2027-12-01", "2028-12-01"},
+}
+
+// eksCluster bills the cluster hour, plus the extended support fee when its
+// version is past the end of standard support on the date of the prices (the
+// snapshot date, or today with --live), so a version always gives the same total.
+func eksCluster(e *est, p map[string]any) {
+	e.hourly(1, "", "eks|AmazonEKS-Hours:perCluster", "EKS cluster")
+	v := e.str(p, "Version", "")
+	if v == "" {
+		return // the latest version, in standard support
+	}
+	day := e.prices.AsOf
+	if day == "" {
+		day = time.Now().UTC().Format("2006-01-02")
+	}
+	s, ok := eksSupport[v]
+	if !ok {
+		minor, err := strconv.Atoi(strings.TrimPrefix(v, "1."))
+		if err != nil || minor < 31 {
+			panic(unresolved("Kubernetes version " + v + " is not supported by EKS"))
+		}
+		return // newer than the table
+	}
+	switch {
+	case day >= s[1]:
+		panic(unresolved("Kubernetes " + v + " reached the end of extended support on " + s[1]))
+	case day < s[0]:
+		return
+	case e.str(asMap(p["UpgradePolicy"]), "SupportType", "EXTENDED") == "STANDARD":
+		panic(unresolved("Kubernetes " + v + " reached the end of standard support on " + s[0] + " and SupportType is STANDARD"))
+	}
+	e.hourly(1, "", "eks|AmazonEKS-Hours:extendedSupport", "extended support for Kubernetes "+v+" (since "+s[0]+")")
 }
