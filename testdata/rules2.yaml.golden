@@ -1,0 +1,41 @@
+us-east-1 · 1 stack · idle ≈ $5172/mo
+
+rules2                       $5172/mo
+  ArcCluster    ×1           $1825  routing control cluster
+  MazCluster    ×1            $427  db.m5d.large postgres Multi-AZ DB cluster (3 instances)
+  MazCluster    ×1000 IOPS    $300  provisioned IOPS
+  MazCluster    ×100 GB io1    $38  storage
+  Airflow       ×1            $358  mw1.small environment
+  Airflow       ×2 workers     $80  workers above the included one (MinWorkers)
+  Ca            ×1            $400  private CA (general-purpose mode)
+  Elastic       ×4 vCPU       $385  shard vCPUs × shards × instances per shard
+  Replicator    ×1            $219  replicator (data replicated not counted)
+  Fhir          ×1            $197  FHIR data store
+  Influx        ×1            $175  db.influx.medium Multi-AZ
+  Influx        ×20 GB       $4.00  InfluxIOIncludedT1 storage
+  Ingest        ×1 OCU        $175  minimum Ingestion OCUs
+  Connector     ×2 MCU        $161  connector MCUs (auto scaling minimum)
+  Dms           ×1            $109  dms.t3.medium Multi-AZ (storage above the included amount not counted)
+  WinService    ×1 vCPU        $34  Fargate vCPU (1 tasks)
+  WinService    ×1 vCPU        $34  Fargate Windows OS license (1 tasks)
+  WinService    ×2 GB        $7.46  Fargate memory (1 tasks)
+  ShortCa       ×1             $50  private CA (short-lived certificate mode)
+  Notebook      ×1             $36  ml.t3.medium notebook instance
+  Notebook      ×5 GB        $0.70  notebook storage
+  Readiness     ×1             $33  readiness check
+  GraphqlCache  ×1             $32  SMALL cache (1.55 GB)
+  Consumer      ×2 shards      $22  enhanced fan-out consumer per shard
+  Stream        ×2 shards      $22  provisioned shards
+  Lattice       ×1             $18  VPC Lattice service (requests and data not counted)
+  Reserved      ×2             $15  t3.micro reserved capacity (Linux)
+  Canary        ×8760 runs     $11  canary runs (rate(5 minutes))
+  Ks            ×5 WCU       $2.37  provisioned write capacity
+  Ks            ×10 RCU      $0.95  provisioned read capacity
+  Hourly        ×730 runs    $0.88  canary runs (rate(1 hour))
+  Advanced      ×1           $0.05  advanced parameter
+
+? could not estimate: 2
+  rules2  Cron  Schedule cron(0 8 * * ? *) is not a rate() expression
+  rules2  WinReserved  InstancePlatform Windows is not supported yet
+
+prices: test prices · on-demand list prices, 730 h/mo, USD, free tier ignored

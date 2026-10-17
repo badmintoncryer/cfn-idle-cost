@@ -723,6 +723,9 @@ func rdsInstance(e *est, p map[string]any) {
 	}
 	code, ok := rdsEngineCode[strings.ToLower(engine)]
 	if !ok {
+		code, ok = e.licensedEngineCode(strings.ToLower(engine), p)
+	}
+	if !ok {
 		panic(unresolved("engine " + engine + " is not supported yet"))
 	}
 	if cluster != nil { // Aurora: storage is usage-based, only the instance counts
@@ -756,6 +759,9 @@ func rdsInstance(e *est, p map[string]any) {
 	usage, maz, az := "InstanceUsage", "", "Single-AZ"
 	if multi {
 		usage, maz, az = "Multi-AZUsage", "Multi-AZ-", "Multi-AZ"
+		if strings.HasPrefix(strings.ToLower(engine), "sqlserver") { // SQL Server Multi-AZ is priced as mirroring
+			usage, maz = "MirrorUsage", "Mirror-"
+		}
 	}
 	e.hourly(1, "", "rds|"+usage+":"+class+"|"+code, class+" "+engine+" "+az)
 	size := e.mustNum(p, "AllocatedStorage")
@@ -790,10 +796,60 @@ func rdsInstance(e *est, p map[string]any) {
 	}
 }
 
+// licensedEngineCode returns the Price List engineCode of Oracle and SQL
+// Server, which the license model decides along with the edition.
+func (e *est) licensedEngineCode(engine string, p map[string]any) (string, bool) {
+	engine = strings.TrimSuffix(engine, "-cdb") // the CDB architecture is priced the same
+	byo := map[string]string{"oracle-se2": "19", "oracle-ee": "5", "sqlserver-se": "52", "sqlserver-ee": "53", "sqlserver-dev-ee": "51"}
+	li := map[string]string{"oracle-se2": "20", "sqlserver-ex": "10", "sqlserver-web": "11", "sqlserver-se": "12", "sqlserver-ee": "15"}
+	def := "license-included"
+	if strings.HasPrefix(engine, "oracle") {
+		def = "bring-your-own-license"
+		if engine == "oracle-se2" {
+			def = e.mustStr(p, "LicenseModel") // either is possible, and there is no default to rely on
+		}
+	}
+	switch lm := e.str(p, "LicenseModel", def); lm {
+	case "license-included":
+		code, ok := li[engine]
+		return code, ok
+	case "bring-your-own-license", "bring-your-own-media":
+		code, ok := byo[engine]
+		return code, ok
+	default:
+		panic(unresolved("LicenseModel " + lm + " is not supported"))
+	}
+}
+
 func rdsCluster(e *est, p map[string]any) {
 	// Aurora clusters bill through their instances and usage-based storage.
-	if !strings.HasPrefix(strings.ToLower(e.str(p, "Engine", "aurora")), "aurora") {
-		panic(unresolved("Multi-AZ DB clusters are not supported yet"))
+	engine := strings.ToLower(e.str(p, "Engine", "aurora"))
+	if strings.HasPrefix(engine, "aurora") {
+		return
+	}
+	// A Multi-AZ DB cluster: one writer and two readable standbys, priced per cluster.
+	code, ok := rdsEngineCode[engine]
+	if !ok {
+		panic(unresolved("engine " + engine + " is not supported yet"))
+	}
+	class := e.mustStr(p, "DBClusterInstanceClass")
+	e.hourly(1, "", "rds|Multi-AZClusterUsage:"+class+"|"+code, class+" "+engine+" Multi-AZ DB cluster (3 instances)")
+	size := e.mustNum(p, "AllocatedStorage")
+	k := func(s string) string { return "rds|RDS:Multi-AZCluster-" + s + "|" + code }
+	switch t := e.mustStr(p, "StorageType"); t {
+	case "gp3":
+		if p["Iops"] != nil || p["StorageThroughput"] != nil {
+			panic(unresolved("gp3 IOPS and throughput of Multi-AZ DB clusters are not supported yet"))
+		}
+		e.monthly(size, "GB gp3", k("GP3-Storage"), "storage")
+	case "io1":
+		e.monthly(size, "GB io1", k("PIOPS-Storage"), "storage")
+		e.monthly(e.mustNum(p, "Iops"), "IOPS", k("PIOPS"), "provisioned IOPS")
+	case "io2":
+		e.monthly(size, "GB io2", k("PIOPS-Storage-IO2"), "storage")
+		e.monthly(e.mustNum(p, "Iops"), "IOPS", k("IO2-PIOPS"), "provisioned IOPS")
+	default:
+		panic(unresolved("StorageType " + t + " is not supported"))
 	}
 }
 
@@ -1003,18 +1059,26 @@ func ecsService(e *est, p map[string]any) {
 	n := e.num(p, "DesiredCount", 1)
 	_, td := e.ref(p, "TaskDefinition")
 	tp := td.Properties
-	if os := e.str(asMap(tp["RuntimePlatform"]), "OperatingSystemFamily", "LINUX"); os != "LINUX" {
+	plat := asMap(tp["RuntimePlatform"])
+	pre := "" // x86 Linux
+	switch os := e.str(plat, "OperatingSystemFamily", "LINUX"); {
+	case os == "LINUX":
+		if e.str(plat, "CpuArchitecture", "X86_64") == "ARM64" {
+			pre = "ARM-"
+		}
+	case strings.HasPrefix(os, "WINDOWS_SERVER_"):
+		pre = "Windows-"
+	default:
 		panic(unresolved("Fargate on " + os + " is not supported yet"))
-	}
-	arm := ""
-	if e.str(asMap(tp["RuntimePlatform"]), "CpuArchitecture", "X86_64") == "ARM64" {
-		arm = "ARM-"
 	}
 	vcpu := e.mustNum(tp, "Cpu") / 1024
 	gb := e.mustNum(tp, "Memory") / 1024
-	e.hourly(n*vcpu, "vCPU", "fargate|Fargate-"+arm+"vCPU-Hours:perCPU", fmt.Sprintf("Fargate vCPU (%g tasks)", n))
-	e.hourly(n*gb, "GB", "fargate|Fargate-"+arm+"GB-Hours", fmt.Sprintf("Fargate memory (%g tasks)", n))
-	if es := e.num(asMap(tp["EphemeralStorage"]), "SizeInGiB", 20); es > 20 {
+	e.hourly(n*vcpu, "vCPU", "fargate|Fargate-"+pre+"vCPU-Hours:perCPU", fmt.Sprintf("Fargate vCPU (%g tasks)", n))
+	if pre == "Windows-" {
+		e.hourly(n*vcpu, "vCPU", "fargate|Fargate-Windows-OS-Hours:perCPU", fmt.Sprintf("Fargate Windows OS license (%g tasks)", n))
+	}
+	e.hourly(n*gb, "GB", "fargate|Fargate-"+pre+"GB-Hours", fmt.Sprintf("Fargate memory (%g tasks)", n))
+	if es := e.num(asMap(tp["EphemeralStorage"]), "SizeInGiB", 20); es > 20 && pre != "Windows-" {
 		e.hourly(n*(es-20), "GB", "fargate|Fargate-EphemeralStorage-GB-Hours", "Fargate ephemeral storage above 20 GB")
 	}
 	vpc := asMap(asMap(p["NetworkConfiguration"])["AwsvpcConfiguration"])
@@ -1026,11 +1090,9 @@ func ecsService(e *est, p map[string]any) {
 // notCounted are types that cost money with zero traffic but have no rule yet.
 // They are listed in the report instead of being skipped silently.
 var notCounted = []string{
-	"AWS::EMR::Cluster", "AWS::DocDBElastic::Cluster", "AWS::WorkSpaces::Workspace",
-	"AWS::MWAA::Environment", "AWS::AppStream::Fleet", "AWS::Kendra::Index", "AWS::DMS::ReplicationInstance",
-	"AWS::Timestream::InfluxDBInstance", "AWS::EC2::Host", "AWS::EC2::CapacityReservation",
+	"AWS::WorkSpaces::Workspace", "AWS::AppStream::Fleet", "AWS::Kendra::Index", "AWS::EC2::Host",
 	"AWS::ElasticBeanstalk::Environment", "AWS::Lightsail::Instance", "AWS::Lightsail::Database",
-	"AWS::GameLift::Fleet", "AWS::MediaLive::Channel", "AWS::KafkaConnect::Connector",
+	"AWS::GameLift::Fleet", "AWS::MediaLive::Channel",
 	"AWS::Shield::Protection", "AWS::Batch::ComputeEnvironment", "AWS::EC2::VerifiedAccessEndpoint",
 	"AWS::CloudWatch::Dashboard", "AWS::Connect::PhoneNumber", // not in the Price List
 }
@@ -1406,4 +1468,218 @@ func aossCollection(e *est, p map[string]any) {
 	}
 	e.hourly(ocu, "OCU", "aoss|IndexingOCU", "indexing "+why)
 	e.hourly(ocu, "OCU", "aoss|SearchOCU", "search "+why)
+}
+
+func init() {
+	more := map[string]func(e *est, p map[string]any){
+		"AWS::ACMPCA::CertificateAuthority": func(e *est, p map[string]any) {
+			if e.str(p, "UsageMode", "GENERAL_PURPOSE") == "SHORT_LIVED_CERTIFICATE" {
+				e.monthly(1, "", "pca|ShortLivedCertificatePrivateCA", "private CA (short-lived certificate mode)")
+				return
+			}
+			e.monthly(1, "", "pca|PaidPrivateCA", "private CA (general-purpose mode)")
+		},
+		"AWS::DMS::ReplicationInstance": func(e *est, p map[string]any) {
+			class := e.mustStr(p, "ReplicationInstanceClass")
+			usage, az := "InstanceUsg:", "Single-AZ"
+			if e.flag(p, "MultiAZ") {
+				usage, az = "Multi-AZUsg:", "Multi-AZ"
+			}
+			// ponytail: each class includes some storage (50 or 100 GB); storage above it is not counted.
+			e.hourly(1, "", "dms|"+usage+class, class+" "+az+" (storage above the included amount not counted)")
+		},
+		"AWS::SageMaker::NotebookInstance": func(e *est, p map[string]any) {
+			t := e.mustStr(p, "InstanceType")
+			e.hourly(1, "", "notebook|"+t, t+" notebook instance")
+			e.monthly(e.num(p, "VolumeSizeInGB", 5), "GB", "notebook|VolumeUsage.gp2", "notebook storage")
+		},
+		"AWS::OSIS::Pipeline": func(e *est, p map[string]any) {
+			e.hourly(e.mustNum(p, "MinUnits"), "OCU", "osis|IngestionOCU", "minimum Ingestion OCUs")
+		},
+		"AWS::EC2::CapacityReservation": func(e *est, p map[string]any) {
+			if pl := e.mustStr(p, "InstancePlatform"); pl != "Linux/UNIX" {
+				panic(unresolved("InstancePlatform " + pl + " is not supported yet"))
+			}
+			if e.str(p, "Tenancy", "default") != "default" {
+				panic(unresolved("dedicated tenancy is not supported yet"))
+			}
+			t := e.mustStr(p, "InstanceType")
+			e.hourly(e.mustNum(p, "InstanceCount"), "", "ec2|"+t, t+" reserved capacity (Linux)")
+		},
+		"AWS::Synthetics::Canary": func(e *est, p map[string]any) {
+			if !e.flag(p, "StartCanaryAfterCreation") && p["StartCanaryAfterCreation"] != nil {
+				return // created stopped
+			}
+			sch := asMap(p["Schedule"])
+			if e.num(sch, "DurationInSeconds", 0) > 0 {
+				panic(unresolved("the canary stops after Schedule.DurationInSeconds"))
+			}
+			expr := e.mustStr(sch, "Expression")
+			m := canaryRate.FindStringSubmatch(expr)
+			if m == nil {
+				panic(unresolved("Schedule " + expr + " is not a rate() expression"))
+			}
+			n, _ := strconv.ParseFloat(m[1], 64)
+			if n == 0 {
+				return // rate(0 minutes) runs once
+			}
+			if strings.HasPrefix(m[2], "hour") {
+				n *= 60
+			}
+			e.monthly(hoursPerMonth*60/n, "runs", "cw|CW:Canary-runs", "canary runs ("+expr+")")
+		},
+		"AWS::Kinesis::StreamConsumer": func(e *est, p map[string]any) {
+			_, s := e.ref(p, "StreamARN")
+			if e.str(asMap(s.Properties["StreamModeDetails"]), "StreamMode", "PROVISIONED") == "ON_DEMAND" {
+				panic(unresolved("enhanced fan-out on on-demand streams is not supported yet"))
+			}
+			e.hourly(e.mustNum(s.Properties, "ShardCount"), "shards", "kinesis|EnhancedFanoutHour", "enhanced fan-out consumer per shard")
+		},
+		"AWS::KafkaConnect::Connector": func(e *est, p map[string]any) {
+			c := asMap(p["Capacity"])
+			if pc := asMap(c["ProvisionedCapacity"]); pc != nil {
+				n := e.num(pc, "McuCount", 1) * e.mustNum(pc, "WorkerCount")
+				e.hourly(n, "MCU", "msk|Kafka.mcu.general", "connector MCUs")
+				return
+			}
+			as := asMap(c["AutoScaling"])
+			n := e.num(as, "McuCount", 1) * e.mustNum(as, "MinWorkerCount")
+			e.hourly(n, "MCU", "msk|Kafka.mcu.general", "connector MCUs (auto scaling minimum)")
+		},
+		"AWS::MSK::Replicator": func(e *est, p map[string]any) {
+			e.hourly(1, "", "msk|KafkaReplication-ReplicatorHours", "replicator (data replicated not counted)")
+		},
+		"AWS::SSM::Parameter": func(e *est, p map[string]any) {
+			if e.str(p, "Tier", "Standard") == "Advanced" {
+				e.hourly(1, "", "ssm|PS-Advanced-Param-Tier1", "advanced parameter")
+			}
+		},
+		"AWS::Cassandra::Table": func(e *est, p map[string]any) {
+			bm := asMap(p["BillingMode"])
+			if e.str(bm, "Mode", "ON_DEMAND") != "PROVISIONED" {
+				return
+			}
+			pt := asMap(bm["ProvisionedThroughput"])
+			e.hourly(e.mustNum(pt, "ReadCapacityUnits"), "RCU", "mcs|ReadCapacityUnit-Hrs", "provisioned read capacity")
+			e.hourly(e.mustNum(pt, "WriteCapacityUnits"), "WCU", "mcs|WriteCapacityUnit-Hrs", "provisioned write capacity")
+		},
+		"AWS::MWAA::Environment": mwaa,
+		"AWS::AppSync::ApiCache": func(e *est, p map[string]any) {
+			t := e.mustStr(p, "Type")
+			gb, ok := appsyncCacheGB[t]
+			if !ok {
+				panic(unresolved("Type " + t + " is not supported"))
+			}
+			e.hourly(1, "", "appsync|cache:"+gb, t+" cache ("+gb+" GB)")
+		},
+		"AWS::HealthLake::FHIRDatastore": func(e *est, p map[string]any) {
+			e.hourly(1, "", "healthlake|FHIRDataStore", "FHIR data store")
+		},
+		"AWS::Route53RecoveryControl::Cluster": func(e *est, p map[string]any) {
+			e.hourly(1, "", "arc|Global-Cluster-Hours", "routing control cluster")
+		},
+		"AWS::Route53RecoveryReadiness::ReadinessCheck": func(e *est, p map[string]any) {
+			e.hourly(1, "", "arc|Global-ReadinessCheck-Hours", "readiness check")
+		},
+		"AWS::VpcLattice::Service": func(e *est, p map[string]any) {
+			e.hourly(1, "", "vpc|VPCLattice-Service-Hourly", "VPC Lattice service (requests and data not counted)")
+		},
+		"AWS::DocDBElastic::Cluster": func(e *est, p map[string]any) {
+			vcpu := e.mustNum(p, "ShardCapacity") * e.mustNum(p, "ShardCount") * e.mustNum(p, "ShardInstanceCount")
+			e.hourly(vcpu, "vCPU", "docdb|ElasticCPUUsage", "shard vCPUs × shards × instances per shard")
+		},
+		"AWS::Timestream::InfluxDBInstance": func(e *est, p map[string]any) {
+			t := e.mustStr(p, "DbInstanceType") // db.influx.large
+			usage, az, label := "InstanceUsage-", "SingleAZ-", "Single-AZ"
+			if e.str(p, "DeploymentType", "SINGLE_AZ") == "WITH_MULTIAZ_STANDBY" {
+				usage, az, label = "MultiAZUsage-", "MultiAZ-", "Multi-AZ"
+			}
+			e.hourly(1, "", "influx|"+usage+"D"+strings.TrimPrefix(t, "d"), t+" "+label)
+			st := e.str(p, "DbStorageType", "InfluxIOIncludedT1")
+			e.monthly(e.mustNum(p, "AllocatedStorage"), "GB", "influx|"+az+"InfluxDBStorage-"+st, st+" storage")
+		},
+	}
+	for k, v := range more {
+		rules[k] = v
+	}
+}
+
+var canaryRate = regexp.MustCompile(`^rate\(\s*(\d+)\s+(minutes?|hours?)\s*\)$`)
+
+// mwaa bills the environment class, which includes one worker, two schedulers
+// and two web servers (one each on mw1.micro), plus the minimum above those.
+func mwaa(e *est, p map[string]any) {
+	class := e.str(p, "EnvironmentClass", "mw1.small")
+	name, ok := map[string]string{"mw1.micro": "Micro", "mw1.small": "Small", "mw1.medium": "Medium", "mw1.large": "Large", "mw1.xlarge": "XLarge", "mw1.2xlarge": "2XLarge"}[class]
+	if !ok {
+		panic(unresolved("EnvironmentClass " + class + " is not supported"))
+	}
+	inc := 2.0
+	if name == "Micro" {
+		inc = 1
+	}
+	e.hourly(1, "", "mwaa|"+name+"Environment", class+" environment")
+	e.hourly(e.num(p, "MinWorkers", 1)-1, "workers", "mwaa|"+name+"Worker", "workers above the included one (MinWorkers)")
+	e.hourly(e.num(p, "Schedulers", inc)-inc, "schedulers", "mwaa|"+name+"Scheduler", "schedulers above the included ones")
+	e.hourly(e.num(p, "MinWebservers", inc)-inc, "web servers", "mwaa|"+name+"WebServer", "web servers above the included ones (MinWebservers)")
+}
+
+// appsyncCacheGB maps an AppSync cache Type to the memory size the Price List keys it by.
+var appsyncCacheGB = map[string]string{
+	"SMALL": "1.55", "MEDIUM": "3.22", "LARGE": "12.3", "XLARGE": "25.05", "LARGE_2X": "50.47", "LARGE_4X": "101.38", "LARGE_8X": "203.26", "LARGE_12X": "317.77",
+	"T2_SMALL": "1.55", "T2_MEDIUM": "3.22", "R4_LARGE": "12.3", "R4_XLARGE": "25.05", "R4_2XLARGE": "50.47", "R4_4XLARGE": "101.38", "R4_8XLARGE": "203.26",
+}
+
+func init() {
+	rules["AWS::EMR::Cluster"] = func(e *est, p map[string]any) {
+		if why := e.emrTransient(p); why != "" {
+			e.items = append(e.items, Item{Quantity: "×0", Reason: why})
+			return
+		}
+		in := asMap(p["Instances"])
+		if in["MasterInstanceFleet"] != nil || in["CoreInstanceFleet"] != nil {
+			panic(unresolved("instance fleets are not supported yet"))
+		}
+		e.emrGroup(asMap(in["MasterInstanceGroup"]), "primary")
+		if g := asMap(in["CoreInstanceGroup"]); g != nil {
+			e.emrGroup(g, "core")
+		}
+	}
+	rules["AWS::EMR::InstanceGroupConfig"] = func(e *est, p map[string]any) {
+		if id, ok := asMap(p["JobFlowId"])["Ref"].(string); ok {
+			if c, ok := e.st.Resources[id]; ok && e.emrTransient(e.props(c)) != "" {
+				return // shown on the cluster
+			}
+		}
+		e.emrGroup(p, strings.ToLower(e.mustStr(p, "InstanceRole")))
+	}
+}
+
+// emrTransient says why a cluster does not stay up while idle, or "".
+func (e *est) emrTransient(p map[string]any) string {
+	if p["AutoTerminationPolicy"] != nil {
+		return "terminates after its AutoTerminationPolicy idle timeout"
+	}
+	if in := asMap(p["Instances"]); in["KeepJobFlowAliveWhenNoSteps"] != nil && !e.flag(in, "KeepJobFlowAliveWhenNoSteps") {
+		return "terminates when its steps finish (KeepJobFlowAliveWhenNoSteps: false)"
+	}
+	return ""
+}
+
+// emrGroup prices the instances of an EMR instance group: EC2 (Linux), the EMR
+// fee, and the EBS volumes attached to each. The root volume is not counted.
+func (e *est) emrGroup(g map[string]any, role string) {
+	if e.str(g, "Market", "ON_DEMAND") != "ON_DEMAND" {
+		panic(unresolved("Spot instance groups are not supported"))
+	}
+	t := e.mustStr(g, "InstanceType")
+	n := e.mustNum(g, "InstanceCount")
+	e.hourly(n, "", "ec2|"+t, t+" "+role+" instances (Linux)")
+	e.hourly(n, "", "emr|"+t, "EMR fee, "+role)
+	l, _ := asMap(g["EbsConfiguration"])["EbsBlockDeviceConfigs"].([]any)
+	for _, c := range l {
+		c := asMap(c)
+		vs := asMap(c["VolumeSpecification"])
+		e.ebs(e.mustStr(vs, "VolumeType"), e.mustNum(vs, "SizeInGB"), e.num(vs, "Iops", 0), e.num(vs, "Throughput", 0), n*e.num(c, "VolumesPerInstance", 1))
+	}
 }

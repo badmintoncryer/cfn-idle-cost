@@ -1,0 +1,51 @@
+# Third batch; priced with testPrices["ap-southeast-1"] (us-east-1 list prices).
+# Transient adds a $0 line, and its task group adds none.
+Resources:
+  Express:
+    Type: AWS::RDS::DBInstance
+    Properties: { Engine: sqlserver-ex, DBInstanceClass: db.t3.small, AllocatedStorage: 20 }
+  Standard:
+    Type: AWS::RDS::DBInstance
+    Properties: { Engine: sqlserver-se, DBInstanceClass: db.m5.large, AllocatedStorage: 20, StorageType: gp3, MultiAZ: true }
+  Oracle:
+    Type: AWS::RDS::DBInstance
+    Properties: { Engine: oracle-se2, LicenseModel: license-included, DBInstanceClass: db.m5.large, AllocatedStorage: 20 }
+  OracleNoLicense:
+    Type: AWS::RDS::DBInstance
+    Properties: { Engine: oracle-se2, DBInstanceClass: db.m5.large, AllocatedStorage: 20 }
+  Emr:
+    Type: AWS::EMR::Cluster
+    Properties:
+      Name: e
+      ReleaseLabel: emr-7.0.0
+      JobFlowRole: r
+      ServiceRole: s
+      Instances:
+        MasterInstanceGroup: { InstanceType: m5.xlarge, InstanceCount: 1 }
+        CoreInstanceGroup:
+          InstanceType: m5.xlarge
+          InstanceCount: 2
+          EbsConfiguration: { EbsBlockDeviceConfigs: [{ VolumeSpecification: { SizeInGB: 64, VolumeType: gp2 }, VolumesPerInstance: 2 }] }
+  Task:
+    Type: AWS::EMR::InstanceGroupConfig
+    Properties: { JobFlowId: !Ref Emr, InstanceRole: TASK, InstanceType: m5.xlarge, InstanceCount: 1 }
+  Transient:
+    Type: AWS::EMR::Cluster
+    Properties:
+      Name: t
+      ReleaseLabel: emr-7.0.0
+      JobFlowRole: r
+      ServiceRole: s
+      AutoTerminationPolicy: { IdleTimeout: 3600 }
+      Instances: { MasterInstanceGroup: { InstanceType: m5.xlarge, InstanceCount: 1 } }
+  TransientTask:
+    Type: AWS::EMR::InstanceGroupConfig
+    Properties: { JobFlowId: !Ref Transient, InstanceRole: TASK, InstanceType: m5.xlarge, InstanceCount: 4 }
+  Fleet:
+    Type: AWS::EMR::Cluster
+    Properties:
+      Name: f
+      ReleaseLabel: emr-7.0.0
+      JobFlowRole: r
+      ServiceRole: s
+      Instances: { MasterInstanceFleet: { TargetOnDemandCapacity: 1, InstanceTypeConfigs: [{ InstanceType: m5.xlarge }] } }

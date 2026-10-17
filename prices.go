@@ -82,7 +82,9 @@ func in(s string, set ...string) bool {
 	return false
 }
 
-var rdsEngines = []string{"2", "14", "16", "18", "21"} // mysql, postgres, aurora-mysql, mariadb, aurora-postgresql
+var rdsEngines = []string{"2", "14", "16", "18", "21", // mysql, postgres, aurora-mysql, mariadb, aurora-postgresql
+	"5", "19", "20", // oracle-ee BYOL, oracle-se2 BYOL, oracle-se2 license included
+	"10", "11", "12", "15", "51", "52", "53"} // sqlserver ex, web, se, ee (license included); dev-ee, se, ee (bring your own media)
 
 var selectors = []selector{
 	{name: "ec2", service: "AmazonEC2", families: []string{"Compute Instance"},
@@ -105,7 +107,7 @@ var selectors = []selector{
 		}},
 	{name: "vpc", service: "AmazonVPC",
 		key: func(a map[string]string, u string) string {
-			return keep(u, "PublicIPv4:InUseAddress", "VpcEndpoint-Hours", "VpcEndpoint-GWLBE-Hours", "VPN-Usage-Hours:ipsec.1", "ClientVPN-EndpointHours")
+			return keep(u, "PublicIPv4:InUseAddress", "VpcEndpoint-Hours", "VpcEndpoint-GWLBE-Hours", "VPN-Usage-Hours:ipsec.1", "ClientVPN-EndpointHours", "VPCLattice-Service-Hourly")
 		}},
 	{name: "tgw", service: "AmazonVPC",
 		key: func(a map[string]string, u string) string {
@@ -128,7 +130,7 @@ var selectors = []selector{
 			}
 			if a["productFamily"] == "Database Instance" {
 				base, _, _ := strings.Cut(u, ":")
-				if !in(base, "InstanceUsage", "Multi-AZUsage", "InstanceUsageIOOptimized") {
+				if !in(base, "InstanceUsage", "Multi-AZUsage", "InstanceUsageIOOptimized", "Multi-AZClusterUsage", "MirrorUsage") {
 					return ""
 				}
 				// usagetype abbreviates xlarge to xl, so key on instanceType instead
@@ -192,7 +194,9 @@ var selectors = []selector{
 				"ReplWriteCapacityUnit-Hrs", "IA-ReplWriteCapacityUnit-Hrs")
 		}},
 	{name: "kinesis", service: "AmazonKinesis", families: []string{"Kinesis Streams"},
-		key: func(a map[string]string, u string) string { return keep(u, "Storage-ShardHour", "OnDemand-StreamHour") }},
+		key: func(a map[string]string, u string) string {
+			return keep(u, "Storage-ShardHour", "OnDemand-StreamHour", "EnhancedFanoutHour")
+		}},
 	{name: "kms", service: "awskms", families: []string{"Encryption Key"},
 		key: func(a map[string]string, u string) string { return keep(u, "KMS-Keys") }},
 	{name: "secrets", service: "AWSSecretsManager", families: []string{"Secret"},
@@ -208,7 +212,8 @@ var selectors = []selector{
 		key: func(a map[string]string, u string) string { return keep(u, "ProvisionedTP-MiBpsHrs") }},
 	{name: "fargate", service: "AmazonECS", families: []string{"Compute"},
 		key: func(a map[string]string, u string) string {
-			return keep(u, "Fargate-vCPU-Hours:perCPU", "Fargate-GB-Hours", "Fargate-ARM-vCPU-Hours:perCPU", "Fargate-ARM-GB-Hours", "Fargate-EphemeralStorage-GB-Hours")
+			return keep(u, "Fargate-vCPU-Hours:perCPU", "Fargate-GB-Hours", "Fargate-ARM-vCPU-Hours:perCPU", "Fargate-ARM-GB-Hours", "Fargate-EphemeralStorage-GB-Hours",
+				"Fargate-Windows-vCPU-Hours:perCPU", "Fargate-Windows-OS-Hours:perCPU", "Fargate-Windows-GB-Hours")
 		}},
 	{name: "r53", service: "AmazonRoute53", global: true, families: []string{"DNS Zone"},
 		key: func(a map[string]string, u string) string { return keep(u, "HostedZone") }},
@@ -223,16 +228,18 @@ var selectors = []selector{
 		key: func(a map[string]string, u string) string { return keep(u, "Endpoint-Hour") }},
 	{name: "waf", service: "awswaf", families: []string{"Web Application Firewall"},
 		key: func(a map[string]string, u string) string { return keep(u, "WebACLV2", "RuleV2") }},
-	{name: "cw", service: "AmazonCloudWatch", families: []string{"Alarm"},
+	{name: "cw", service: "AmazonCloudWatch", families: []string{"Alarm", "Canaries"},
 		key: func(a map[string]string, u string) string {
-			return keep(u, "CW:AlarmMonitorUsage", "CW:HighResAlarmMonitorUsage", "CW:CompositeAlarmMonitorUsage")
+			return keep(u, "CW:AlarmMonitorUsage", "CW:HighResAlarmMonitorUsage", "CW:CompositeAlarmMonitorUsage", "CW:Canary-runs")
 		}},
 	{name: "lambda", service: "AWSLambda", families: []string{"Serverless"},
 		key: func(a map[string]string, u string) string {
 			return keep(u, "Lambda-Provisioned-Concurrency", "Lambda-Provisioned-Concurrency-ARM")
 		}},
-	{name: "docdb", service: "AmazonDocDB", families: []string{"Database Instance", "Serverless"},
-		key: func(a map[string]string, u string) string { return dbInstanceKey(a, u, "DocumentDB:ServerlessUsage") }},
+	{name: "docdb", service: "AmazonDocDB", families: []string{"Database Instance", "Serverless", "Database Utilization"},
+		key: func(a map[string]string, u string) string {
+			return dbInstanceKey(a, u, "DocumentDB:ServerlessUsage", "ElasticCPUUsage")
+		}},
 	{name: "neptune", service: "AmazonNeptune", families: []string{"Database Instance", "Serverless"},
 		key: func(a map[string]string, u string) string {
 			return dbInstanceKey(a, u, "Neptune:ServerlessUsage", "Neptune:ServerlessIOOptimizedUsage")
@@ -258,7 +265,7 @@ var selectors = []selector{
 		liveFilter: func(d string) map[string]string { return map[string]string{"instanceName": d} }},
 	{name: "msk", service: "AmazonMSK", families: []string{"Managed Streaming for Apache Kafka (MSK)"},
 		key: func(a map[string]string, u string) string {
-			if (strings.HasPrefix(u, "Kafka.") || strings.HasPrefix(u, "Express.")) && !strings.Contains(u, "PrivateConnectivity") || u == "KafkaServerless-ClusterHours" {
+			if (strings.HasPrefix(u, "Kafka.") || strings.HasPrefix(u, "Express.")) && !strings.Contains(u, "PrivateConnectivity") || in(u, "KafkaServerless-ClusterHours", "KafkaReplication-ReplicatorHours") {
 				return u
 			}
 			return ""
@@ -293,6 +300,76 @@ var selectors = []selector{
 	{name: "ds", service: "AWSDirectoryService", families: []string{"AWS Directory Service"},
 		key: func(a map[string]string, u string) string {
 			return keep(u, "MicrosoftAD-DC-Usage", "Std-MicrosoftAD-DC-Usage", "Small-SimpleAD-Usage", "Large-SimpleAD-Usage")
+		}},
+	{name: "pca", service: "AWSCertificateManager", families: []string{"AWS Certificate Manager"},
+		key: func(a map[string]string, u string) string {
+			return keep(u, "PaidPrivateCA", "ShortLivedCertificatePrivateCA")
+		}},
+	{name: "dms", service: "AWSDatabaseMigrationSvc", families: []string{"Replication Server"},
+		key: func(a map[string]string, u string) string {
+			if strings.HasPrefix(u, "InstanceUsg:dms.") || strings.HasPrefix(u, "Multi-AZUsg:dms.") {
+				return u
+			}
+			return ""
+		}},
+	{name: "notebook", service: "AmazonSageMaker", families: []string{"ML Instance", "Storage"},
+		key: func(a map[string]string, u string) string {
+			if v, ok := strings.CutPrefix(u, "Notebk:"); ok && (a["component"] == "Notebook" || v == "VolumeUsage.gp2") {
+				return v
+			}
+			return ""
+		},
+		liveFilter: func(d string) map[string]string {
+			if strings.HasPrefix(d, "ml.") {
+				return map[string]string{"productFamily": "ML Instance", "component": "Notebook", "instanceName": d}
+			}
+			return map[string]string{"productFamily": "Storage"}
+		}},
+	{name: "osis", service: "AmazonES", families: []string{"Amazon OpenSearch Service Ingestion"},
+		key: func(a map[string]string, u string) string { return keep(u, "IngestionOCU") }},
+	{name: "ssm", service: "AWSSystemsManager", families: []string{"AWS Systems Manager"},
+		key: func(a map[string]string, u string) string { return keep(u, "PS-Advanced-Param-Tier1") }},
+	{name: "mcs", service: "AmazonMCS", families: []string{"Provisioned IOPS"},
+		key: func(a map[string]string, u string) string {
+			return keep(u, "ReadCapacityUnit-Hrs", "WriteCapacityUnit-Hrs")
+		}},
+	// MWAA products have no productFamily.
+	{name: "mwaa", service: "AmazonMWAA",
+		key: func(a map[string]string, u string) string {
+			v, ok := strings.CutPrefix(u, "Airflow-")
+			if ok && (strings.HasSuffix(v, "Environment") || strings.HasSuffix(v, "Worker") || strings.HasSuffix(v, "Scheduler") || strings.HasSuffix(v, "WebServer")) {
+				return v
+			}
+			return ""
+		}},
+	{name: "appsync", service: "AWSAppSync", families: []string{"API Calls"},
+		key: func(a map[string]string, u string) string {
+			if strings.HasPrefix(u, "AppSyncCacheUsage:") {
+				return "cache:" + a["cachememorysize"]
+			}
+			return ""
+		}},
+	{name: "emr", service: "ElasticMapReduce", families: []string{"Elastic Map Reduce Instance"}, filters: map[string]string{"softwareType": "EMR"},
+		key: func(a map[string]string, u string) string {
+			if strings.HasPrefix(u, "BoxUsage:") {
+				return a["instanceType"]
+			}
+			return ""
+		},
+		liveFilter: byInstanceType},
+	{name: "healthlake", service: "AmazonHealthLake", families: []string{"Machine Learning"},
+		key: func(a map[string]string, u string) string { return keep(u, "FHIRDataStore") }},
+	// Application Recovery Controller has one offer, for the "aws-other" location.
+	{name: "arc", service: "AWSR53AppRecoveryController", global: true, families: []string{"Application Recovery Controller"},
+		key: func(a map[string]string, u string) string {
+			return keep(u, "Global-Cluster-Hours", "Global-ReadinessCheck-Hours")
+		}},
+	{name: "influx", service: "AmazonTimestream", families: []string{"Database Instance", "Influx Optimized Storage"},
+		key: func(a map[string]string, u string) string {
+			if strings.Contains(u, "Db.influx") || strings.Contains(u, "InfluxDBStorage") {
+				return u
+			}
+			return ""
 		}},
 }
 
