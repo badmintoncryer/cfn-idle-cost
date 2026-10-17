@@ -137,18 +137,19 @@ jobs:
 | `AWS::EC2::VPCEndpoint` | Interface型は時間料金×サブネット数（AZ数）。Gateway Load Balancer型は時間料金。Gateway型は無料 |
 | `AWS::ElasticLoadBalancingV2::LoadBalancer` | ALB、NLB、GWLBの時間料金。internet-facingなら、サブネットごとにパブリックIPv4を1つ |
 | `AWS::ElasticLoadBalancing::LoadBalancer` | Classic Load Balancerの時間料金 |
-| `AWS::EC2::Instance` | インスタンスの時間料金（Linux）と、`BlockDeviceMappings`のEBSボリューム |
-| `AWS::AutoScaling::AutoScalingGroup` | インスタンスの時間料金×`DesiredCapacity`（なければ`MinSize`）とEBSボリューム。起動テンプレートか起動設定から読みます |
+| `AWS::EC2::Instance` | インスタンスの時間料金（Linux）、`BlockDeviceMappings`のEBSボリューム、起動時に割り当てられるパブリックIPv4 |
+| `AWS::AutoScaling::AutoScalingGroup` | インスタンスの時間料金×`DesiredCapacity`（なければ`MinSize`）、EBSボリューム、起動時に割り当てられるパブリックIPv4。起動テンプレートか起動設定から読みます |
 | `AWS::EC2::Volume` | 容量、gp3の3000 IOPS・125 MiB/sを超える分、io1・io2のIOPS |
 | `AWS::RDS::DBInstance` | インスタンスの時間料金（シングルAZ・マルチAZ）、割り当てたストレージ、プロビジョンドIOPS、gp3の基準値を超えるIOPSとスループット。Auroraは、プロビジョンドのインスタンスか、Serverless v2の最小ACU（I/O-Optimizedにも対応） |
 | `AWS::OpenSearchService::Domain`、`AWS::Elasticsearch::Domain` | データノード、専用マスターノード、UltraWarmノード、EBSの容量・IOPS・スループット |
 | `AWS::ElastiCache::CacheCluster`、`ReplicationGroup` | ノードの時間料金×ノード数 |
 | `AWS::ElastiCache::ServerlessCache` | データストレージの最小量（1 GB。Valkeyは100 MB。`CacheUsageLimits`で最小量を指定していればその値） |
 | `AWS::DynamoDB::Table` | プロビジョニングしたRCU・WCU（GSIを含みます。StandardとStandard-IAに対応） |
+| `AWS::DynamoDB::GlobalTable` | スタックと同じリージョンにあるレプリカの、プロビジョニングしたRCUとAuto Scalingの最小WCU（GSIを含みます。レプリカが2つ以上なら、書き込みにはレプリケートされたWCUの料金を使います）。ほかのリージョンのレプリカは、数を行に書くだけで、料金には含めません |
 | `AWS::Kinesis::Stream` | プロビジョンドのシャード時間、またはオンデマンドのストリーム時間 |
-| `AWS::ECS::Service`（Fargate） | vCPU、メモリ、20 GBを超えるエフェメラルストレージ×`DesiredCount`（x86とARM） |
+| `AWS::ECS::Service`（Fargate） | vCPU、メモリ、20 GBを超えるエフェメラルストレージ、パブリックIPv4（`AssignPublicIp: ENABLED`のとき）×`DesiredCount`（x86とARM） |
 | `AWS::EFS::FileSystem` | プロビジョンドスループット |
-| `AWS::FSx::FileSystem` | Windows、Lustre、OpenZFSのストレージ容量とスループット容量。容量1 GBあたり3 IOPSを超えるSSD IOPS |
+| `AWS::FSx::FileSystem` | Windows、Lustre、OpenZFS、ONTAPのストレージ容量とスループット容量。容量1 GBあたり3 IOPSを超えるSSD IOPS（ONTAPの容量プールは使った分だけかかるので含みません） |
 | `AWS::KMS::Key`、`AWS::KMS::ReplicaKey` | キー1つにつき$1 |
 | `AWS::SecretsManager::Secret` | シークレットごとの料金 |
 | `AWS::Route53::HostedZone` | ホストゾーンごとの料金 |
@@ -176,20 +177,24 @@ jobs:
 | `AWS::MemoryDB::Cluster` | ノードの時間単価 × シャード数 ×（1 + レプリカ数）（RedisとValkey） |
 | `AWS::SageMaker::Endpoint` | プロダクションバリアントごとに、インスタンスの時間単価 × `InitialInstanceCount`（サーバーレスのバリアントはアイドル時$0） |
 | `AWS::CodePipeline::Pipeline` | アクティブなV1パイプラインごとの料金（V2は実行時間の分だけかかるので、アイドル時は$0） |
+| `AWS::ApiGateway::Stage` | `CacheClusterEnabled`のとき、`CacheClusterSize`に応じたキャッシュクラスターの時間料金 |
+| `AWS::DirectoryService::MicrosoftAD` | ドメインコントローラー2台の時間料金（StandardとEnterprise）。あとから追加したドメインコントローラーはテンプレートに現れないため含みません |
+| `AWS::DirectoryService::SimpleAD` | ディレクトリの時間料金（SmallとLarge） |
 
 使った分だけかかる費用は、意図して対象から外しています。S3、Lambda、AuroraのストレージとI/O、CloudWatch Logs、データ転送、リクエスト料金がこれに当たります。
 
 ### まだ見積もらないもの
 
-アクセスがゼロでも費用がかかるのに、まだルールのないリソースタイプ（EMR、WorkSpaces、Directory Service、CloudWatchダッシュボードなど）は、`! not counted yet`に載せます。そのため、こうした費用が黙って抜け落ちることはありません。一部だけ対応しているリソース（FSx for ONTAP、プロビジョンドモードのDynamoDBグローバルテーブル、RDSのOracleとSQL Server、マルチAZ DBクラスター、Fargate SpotとWindowsのFargate、Spotのノードグループ、Local Zonesのインスタンス、API Gatewayのキャッシュ）は、`? could not estimate`に載ります。
+アクセスがゼロでも費用がかかるのに、まだルールのないリソースタイプ（EMR、WorkSpaces、DMS、CloudWatchダッシュボードなど）は、`! not counted yet`に載せます。そのため、こうした費用が黙って抜け落ちることはありません。一部だけ対応しているリソース（RDSのOracleとSQL Server、マルチAZ DBクラスター、Fargate SpotとWindowsのFargate、Spotのノードグループ、Local Zonesのインスタンス）は、`? could not estimate`に載ります。
 
 ## 前提
 
 - オンデマンドの定価（USD）で、1か月を730時間として計算します。Savings Plans、リザーブドインスタンス、無料利用枠は考慮しません。
-- EC2インスタンスは、Linux・共有テナンシーの料金で見積もります（AMIは読みません）。AMIから決まるルートボリューム（`BlockDeviceMappings`に`VolumeSize`がないもの）と、インスタンスに自動で割り当てられるパブリックIPは数えません。
+- EC2インスタンスは、Linux・共有テナンシーの料金で見積もります（AMIは読みません）。AMIから決まるルートボリューム（`BlockDeviceMappings`に`VolumeSize`がないもの）は数えません。
+- インスタンス、Auto Scalingグループ、Fargateのタスクに起動時に割り当てられるパブリックIPv4は、`AssociatePublicIpAddress`（Fargateは`AssignPublicIp`）で割り当てると指定しているときに数えます。指定がなければ、すべてのサブネットが同じテンプレートにあり、`MapPublicIpOnLaunch`がtrueのときに数えます。サブネットが別のスタックなどにあって決まらないときは、IPの行を出さず、リソースのほかの費用だけを見積もります。同じテンプレートでElastic IPを関連付けたインスタンスは、IPを二重に数えません。
 - テンプレートから読み取れない値は推測しません。たとえば、Defaultのないパラメータや、別スタックへの参照です。こうしたリソースは、理由と一緒に`? could not estimate`に載ります。Defaultのあるパラメータは、そのDefaultで見積もり、そのことを行に書きます。別の値を使うときは`--parameter`で渡します。
 - `Conditions`（`Fn::Equals`、`Fn::And`、`Fn::Or`、`Fn::Not`）と`Fn::If`は、パラメータと`AWS::Region`だけで決まるときに評価します。`Condition`がfalseのリソースは作られないので、一覧に載せません。`AWS::AccountId`など、それ以外の値で決まる条件を持つリソースは`? could not estimate`に載ります。
-- Auto Scalingグループは、`DesiredCapacity`があればその値を、なければ`MinSize`を使います。DynamoDBは、Auto Scalingの最小値ではなく、テーブルに設定したプロビジョニング容量を使います。
+- Auto Scalingグループは、`DesiredCapacity`があればその値を、なければ`MinSize`を使います。DynamoDBは、Auto Scalingの最小値ではなく、テーブルに設定したプロビジョニング容量を使います。ただしグローバルテーブルは、書き込み容量をAuto Scalingの範囲でしか指定できないため、その最小値を使います。
 - 素のテンプレートにはコンストラクトのパスがないため、行には論理IDを表示します。
 
 ## インストール

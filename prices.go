@@ -188,7 +188,8 @@ var selectors = []selector{
 		}},
 	{name: "ddb", service: "AmazonDynamoDB", families: []string{"Provisioned IOPS", "DDB-Operation-ReplicatedWrite"},
 		key: func(a map[string]string, u string) string {
-			return keep(u, "ReadCapacityUnit-Hrs", "WriteCapacityUnit-Hrs", "IA-ReadCapacityUnit-Hrs", "IA-WriteCapacityUnit-Hrs")
+			return keep(u, "ReadCapacityUnit-Hrs", "WriteCapacityUnit-Hrs", "IA-ReadCapacityUnit-Hrs", "IA-WriteCapacityUnit-Hrs",
+				"ReplWriteCapacityUnit-Hrs", "IA-ReplWriteCapacityUnit-Hrs")
 		}},
 	{name: "kinesis", service: "AmazonKinesis", families: []string{"Kinesis Streams"},
 		key: func(a map[string]string, u string) string { return keep(u, "Storage-ShardHour", "OnDemand-StreamHour") }},
@@ -286,6 +287,13 @@ var selectors = []selector{
 		key: func(a map[string]string, u string) string { return keep(u, "activePipeline") }},
 	{name: "apprunner", service: "AWSAppRunner", families: []string{"Compute"},
 		key: func(a map[string]string, u string) string { return keep(u, "AppRunner-Provisioned-GB-hours") }},
+	// cacheMemorySizeGb is the CacheClusterSize value (1.6), not the usagetype's (1.55GB).
+	{name: "apigw", service: "AmazonApiGateway", families: []string{"Amazon API Gateway Cache"},
+		key: func(a map[string]string, u string) string { return "cache:" + a["cacheMemorySizeGb"] }},
+	{name: "ds", service: "AWSDirectoryService", families: []string{"AWS Directory Service"},
+		key: func(a map[string]string, u string) string {
+			return keep(u, "MicrosoftAD-DC-Usage", "Std-MicrosoftAD-DC-Usage", "Small-SimpleAD-Usage", "Large-SimpleAD-Usage")
+		}},
 }
 
 // dbInstanceKey keys RDS-like instance prices by instanceType (usagetype
