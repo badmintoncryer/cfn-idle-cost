@@ -107,7 +107,7 @@ jobs:
         working-directory: head
       - run: npm ci && npx cdk synth -q
         working-directory: base
-      - uses: badmintoncryer/cfn-idle-cost@v0
+      - uses: badmintoncryer/cfn-idle-cost@v1
         with: { base: base/cdk.out, path: head/cdk.out, max-increase: 50 }
 ```
 
@@ -122,7 +122,7 @@ jobs:
 | `comment` | `false`にするとコメントを投稿しません。デフォルトは`true`です。 |
 | `github-token` | コメントに使うトークン。デフォルトは`github.token`です。 |
 
-`@v0`は最新のリリースを使います。`@v0.0.5`のように書くと、そのバージョンに固定できます。
+`@v1`は最新のリリースを使います。`@v1.0.0`のように書くと、そのバージョンに固定できます。
 
 `cdk synth`は`cdk.context.json`からコンテキストを読みます。このファイルをコミットしておかないと、lookupのためにsynthでAWSの認証情報が必要になります。
 

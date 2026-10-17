@@ -119,7 +119,7 @@ jobs:
         working-directory: head
       - run: npm ci && npx cdk synth -q
         working-directory: base
-      - uses: badmintoncryer/cfn-idle-cost@v0
+      - uses: badmintoncryer/cfn-idle-cost@v1
         with: { base: base/cdk.out, path: head/cdk.out, max-increase: 50 }
 ```
 
@@ -135,7 +135,7 @@ Markdown to the job summary, and fails the job when a budget is exceeded.
 | `comment` | `false` to skip the comment. Default `true`. |
 | `github-token` | Token used to comment. Default `github.token`. |
 
-`@v0` runs the latest release; `@v0.0.5` pins that version.
+`@v1` runs the latest release; `@v1.0.0` pins that version.
 
 `cdk synth` reads context from `cdk.context.json`; commit it, or the synth
 needs AWS credentials for lookups.
