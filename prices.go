@@ -195,7 +195,7 @@ var selectors = []selector{
 		}},
 	{name: "kinesis", service: "AmazonKinesis", families: []string{"Kinesis Streams"},
 		key: func(a map[string]string, u string) string {
-			return keep(u, "Storage-ShardHour", "OnDemand-StreamHour", "EnhancedFanoutHour")
+			return keep(u, "Storage-ShardHour", "Extended-ShardHour", "OnDemand-StreamHour", "EnhancedFanoutHour")
 		}},
 	{name: "kms", service: "awskms", families: []string{"Encryption Key"},
 		key: func(a map[string]string, u string) string { return keep(u, "KMS-Keys") }},
@@ -238,7 +238,7 @@ var selectors = []selector{
 		}},
 	{name: "docdb", service: "AmazonDocDB", families: []string{"Database Instance", "Serverless", "Database Utilization"},
 		key: func(a map[string]string, u string) string {
-			return dbInstanceKey(a, u, "DocumentDB:ServerlessUsage", "ElasticCPUUsage")
+			return dbInstanceKey(a, u, "DocumentDB:ServerlessUsage", "DocumentDB:ServerlessIOOptimizedUsage", "ElasticCPUUsage")
 		}},
 	{name: "neptune", service: "AmazonNeptune", families: []string{"Database Instance", "Serverless"},
 		key: func(a map[string]string, u string) string {
@@ -572,12 +572,16 @@ func eachEntry(dec *json.Decoder, fn func(key string) error) error {
 	return err
 }
 
-// BuildPrices downloads the bulk offers of every service the selectors use, for
-// every commercial region, and returns the snapshot.
-func BuildPrices(regions []string, logf func(string, ...any)) (*Prices, error) {
+// BuildPrices downloads the bulk offers of every service the selectors use (or
+// only of services), for every commercial region (or only regions), and returns
+// the snapshot.
+func BuildPrices(regions, only []string, logf func(string, ...any)) (*Prices, error) {
 	byService := map[string][]selector{}
 	var services []string
 	for _, s := range selectors {
+		if len(only) > 0 && !in(s.service, only...) {
+			continue
+		}
 		if byService[s.service] == nil {
 			services = append(services, s.service)
 		}

@@ -27,15 +27,22 @@ type regionDiff struct {
 	Region  string   `json:"region"`
 	Before  float64  `json:"before"`
 	After   float64  `json:"after"`
+	Unknown int      `json:"unknownChanges"` // changes with "?" on either side
 	Changes []Change `json:"changes"`
 }
 
-// Diff is how the idle cost changes from a base cdk.out to the inputs.
+// Diff is how the idle cost changes from a base cdk.out to the inputs. Before
+// and After leave out every resource that is "?" on either side, so one that
+// becomes unresolvable doesn't read as a saving.
 type Diff struct {
-	Before  float64      `json:"before"`
-	After   float64      `json:"after"`
-	Regions []regionDiff `json:"regions"`
-	Prices  string       `json:"prices"`
+	Before  float64 `json:"before"`
+	After   float64 `json:"after"`
+	Unknown int     `json:"unknownChanges"`
+	// NewUnknown counts resources added as, or changed to, "?": their increase
+	// can't be checked, so --max-increase fails on them.
+	NewUnknown int          `json:"newUnknown"`
+	Regions    []regionDiff `json:"regions"`
+	Prices     string       `json:"prices"`
 }
 
 // resourceState is a resource's idle cost in one report; reason is its most
@@ -121,6 +128,20 @@ func NewDiff(base, head Report) *Diff {
 		default:
 			c.Kind = "changed"
 		}
+		rd := region(k[0])
+		if b != nil && h != nil && b.unknown != h.unknown { // keep it out of both totals
+			if h.unknown {
+				rd.Before -= b.monthly
+			} else {
+				rd.After -= h.monthly
+			}
+		}
+		if (b != nil && b.unknown) || (h != nil && h.unknown) {
+			rd.Unknown++
+			if h != nil && h.unknown && (b == nil || !b.unknown) {
+				d.NewUnknown++
+			}
+		}
 		src := h
 		if h == nil {
 			src = b
@@ -132,7 +153,6 @@ func NewDiff(base, head Report) *Diff {
 		if h != nil {
 			c.After, c.AfterReason, c.AfterUnknown = h.monthly, h.reason, h.unknown
 		}
-		rd := region(k[0])
 		rd.Changes = append(rd.Changes, c)
 	}
 	for _, r := range sortedIDs(byRegion) {
@@ -146,6 +166,7 @@ func NewDiff(base, head Report) *Diff {
 		})
 		d.Before += rd.Before
 		d.After += rd.After
+		d.Unknown += rd.Unknown
 		d.Regions = append(d.Regions, *rd)
 	}
 	return d
@@ -187,13 +208,24 @@ func (c Change) note() string {
 
 var changeMark = map[string]string{"added": "+", "removed": "-", "changed": "~"}
 
-func (d *Diff) summary(r string, before, after float64) string {
-	return fmt.Sprintf("%s · idle ≈ %s → %s/mo (%s)", r, money(before), money(after), signed(after-before))
+func (d *Diff) summary(r string, before, after float64, unknown int) string {
+	return fmt.Sprintf("%s · idle ≈ %s → %s/mo (%s)%s", r, money(before), money(after), signed(after-before), unknownNote(unknown))
+}
+
+// unknownNote flags a total that leaves out changes it could not price.
+func unknownNote(n int) string {
+	switch n {
+	case 0:
+		return ""
+	case 1:
+		return " · 1 change could not be estimated"
+	}
+	return fmt.Sprintf(" · %d changes could not be estimated", n)
 }
 
 func (d *Diff) WriteText(w io.Writer) {
 	if len(d.Regions) > 1 {
-		fmt.Fprintln(w, d.summary("total", d.Before, d.After))
+		fmt.Fprintln(w, d.summary("total", d.Before, d.After, d.Unknown))
 		fmt.Fprintln(w)
 	}
 	printed := 0
@@ -204,7 +236,7 @@ func (d *Diff) WriteText(w io.Writer) {
 		if printed++; printed > 1 {
 			fmt.Fprintln(w)
 		}
-		fmt.Fprintln(w, d.summary(r.Region, r.Before, r.After))
+		fmt.Fprintln(w, d.summary(r.Region, r.Before, r.After, r.Unknown))
 		if len(r.Changes) == 0 {
 			fmt.Fprintln(w, "\n  no change")
 			continue
@@ -223,7 +255,7 @@ func (d *Diff) WriteText(w io.Writer) {
 }
 
 func (d *Diff) WriteMarkdown(w io.Writer) {
-	fmt.Fprintf(w, "### Idle cost %s → %s/mo (%s)\n\n", money(d.Before), money(d.After), signed(d.After-d.Before))
+	fmt.Fprintf(w, "### Idle cost %s → %s/mo (%s)%s\n\n", money(d.Before), money(d.After), signed(d.After-d.Before), unknownNote(d.Unknown))
 	var all []Change
 	for _, r := range d.Regions {
 		all = append(all, r.Changes...)

@@ -9,11 +9,11 @@ rules3                    $2514/mo
   Emr        ×1             $35  EMR fee, primary
   Emr        ×256 GB gp2    $26  EBS gp2 storage
   Oracle     ×1            $320  db.m5.large oracle-se2 Single-AZ
-  Oracle     ×20 GB gp2   $2.30  storage
+  Oracle     ×20 GB gp3   $2.30  storage
   Task       ×1            $140  m5.xlarge task instances (Linux)
   Task       ×1             $35  EMR fee, task
   Express    ×1             $32  db.t3.small sqlserver-ex Single-AZ
-  Express    ×20 GB gp2   $2.30  storage
+  Express    ×20 GB gp3   $2.30  storage
   Transient  ×0           $0.00  terminates after its AutoTerminationPolicy idle timeout
 
 ? could not estimate: 2

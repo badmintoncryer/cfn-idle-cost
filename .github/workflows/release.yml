@@ -25,12 +25,11 @@ jobs:
       - uses: actions/setup-node@v7
         with: { node-version: 24 }
       - run: npm install -g npm@latest
-      - run: |
-          tag="${{ inputs.tag || github.ref_name }}"
-          scripts/npm-publish.sh "${tag#v}"
+      - run: scripts/npm-publish.sh "${TAG#v}"
+        env: { TAG: "${{ inputs.tag || github.ref_name }}" } # via env, not pasted into the script
       # Point the major tag (v1) at this release, for uses: badmintoncryer/cfn-idle-cost@v1.
       - name: Move the major tag
+        env: { TAG: "${{ inputs.tag || github.ref_name }}" }
         run: |
-          tag="${{ inputs.tag || github.ref_name }}"
-          git tag -f "${tag%%.*}" "$tag"
-          git push -f origin "${tag%%.*}"
+          git tag -f "${TAG%%.*}" "$TAG"
+          git push -f origin "${TAG%%.*}"

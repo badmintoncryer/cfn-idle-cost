@@ -45,9 +45,10 @@ runs:
         GH_REPO: ${{ github.repository }}
       run: |
         set -f # inputs are split on spaces, never globbed
-        # @v1.2.3 runs that npm version; @v1, @main or a SHA run the latest.
+        # @v1.2.3 runs that npm version, @v1 the latest 1.x; @main or a SHA run the latest.
         version=latest
-        [[ "$ACTION_REF" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] && version="${ACTION_REF#v}"
+        if [[ "$ACTION_REF" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then version="${ACTION_REF#v}"
+        elif [[ "$ACTION_REF" =~ ^v[0-9]+$ ]]; then version="${ACTION_REF#v}"; fi
         flags=(--format md)
         [ -n "$IN_BASE" ] && flags+=(--base "$IN_BASE")
         [ -n "$IN_MAX" ] && flags+=(--max "$IN_MAX")
@@ -56,18 +57,24 @@ runs:
         code=0
         npx -y "cfn-idle-cost@$version" "${flags[@]}" $IN_ARGS $IN_PATH > "$out" || code=$?
         echo "exit-code=$code" >> "$GITHUB_OUTPUT"
-        if [ "$code" != 0 ] && [ "$code" != 3 ]; then exit "$code"; fi
-        cat "$out" >> "$GITHUB_STEP_SUMMARY"
+        if [ "$code" = 0 ] || [ "$code" = 3 ]; then
+          cat "$out" >> "$GITHUB_STEP_SUMMARY"
+        else # replace an earlier result in the comment, so it doesn't look current
+          echo "cfn-idle-cost failed (exit $code); see the job log." > "$out"
+        fi
         if [ "$IN_COMMENT" = true ] && [ -n "$PR" ]; then
           marker="<!-- cfn-idle-cost -->"
-          { echo "$marker"; cat "$out"; } > "$out.body"
+          # GitHub rejects comments over 65536 characters; cut at a line boundary.
+          { echo "$marker"; awk '{ n += length($0) + 1; if (n > 60000) { print "\n(truncated; the job summary has it all)"; exit } print }' "$out"; } > "$out.body"
+          # A read-only token (pull requests from forks, Dependabot) can't comment: warn, don't fail.
           ids=$(gh api "repos/$GH_REPO/issues/$PR/comments" --paginate \
-            --jq ".[] | select(.body | startswith(\"$marker\")) | .id")
+            --jq ".[] | select(.body | startswith(\"$marker\")) | .id") || ids=""
           id="${ids%%$'\n'*}"
           if [ -n "$id" ]; then
-            gh api -X PATCH "repos/$GH_REPO/issues/comments/$id" -F body=@"$out.body" > /dev/null
+            gh api -X PATCH "repos/$GH_REPO/issues/comments/$id" -F body=@"$out.body" > /dev/null || posted=no
           else
-            gh api "repos/$GH_REPO/issues/$PR/comments" -F body=@"$out.body" > /dev/null
+            gh api "repos/$GH_REPO/issues/$PR/comments" -F body=@"$out.body" > /dev/null || posted=no
           fi
+          [ "${posted:-}" = no ] && echo "::warning::cfn-idle-cost could not comment on the pull request (the token may be read-only); the result is in the job summary."
         fi
         exit "$code"

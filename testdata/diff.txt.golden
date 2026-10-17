@@ -1,4 +1,4 @@
-ap-northeast-1 · idle ≈ $57 → $24/mo (-$33)
+ap-northeast-1 · idle ≈ $56 → $24/mo (-$32) · 1 change could not be estimated
 
   - app  Nat       $45 → $0.00    -$45  NAT Gateway
   ~ app  Server  $9.93 →   $20  +$9.93  t3.micro on-demand (Linux) → t3.small on-demand (Linux)

@@ -42,3 +42,13 @@ packages don't include Windows yet; the GitHub Release still has the Windows
 binary. Once npm support allows the name, add `windows/amd64:win32/x64` back to
 `TARGETS` in `scripts/npm-publish.sh`, publish it once from a laptop and run
 `npm trust` for it like the others.
+
+## A new price key
+
+The weekly `refresh-prices` run picks up keys that a new or changed selector in
+`prices.go` adds. To ship one sooner, fetch only that service's offers and copy
+the new keys into `prices.json`:
+
+```sh
+go run . prices -services AmazonKinesis -o /tmp/kinesis.json
+```

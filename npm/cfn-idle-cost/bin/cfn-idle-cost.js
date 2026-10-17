@@ -12,4 +12,7 @@ try {
   process.exit(1);
 }
 const r = spawnSync(bin, process.argv.slice(2), { stdio: 'inherit' });
+if (r.error) {
+  console.error(`cfn-idle-cost: could not run ${bin}: ${r.error.message}`);
+}
 process.exit(r.status ?? 1);

@@ -147,6 +147,8 @@ func run(args []string, stdout io.Writer) error {
 	if *base != "" {
 		d = NewDiff(NewReport(baseStacks, Estimate(baseStacks, prices), prices), rep)
 	}
+	// Before writing: WriteJSON rounds the totals to cents in place.
+	budget := checkBudget(rep, d, *maxTotal, *maxIncrease)
 	switch {
 	case d != nil && *format == "json":
 		err = d.WriteJSON(stdout)
@@ -164,7 +166,7 @@ func run(args []string, stdout io.Writer) error {
 	if err != nil {
 		return err
 	}
-	return checkBudget(rep, d, *maxTotal, *maxIncrease)
+	return budget
 }
 
 // checkBudget returns overBudget when a --max or --max-increase gate fails.
@@ -175,11 +177,15 @@ func checkBudget(rep Report, d *Diff, maxTotal, maxIncrease float64) error {
 	if n := rep.unknownCount(); n > 0 {
 		fmt.Fprintf(os.Stderr, "warning: %d resources could not be estimated or are not counted; the real idle cost may be higher\n", n)
 	}
+	// Cents, not money(): "$10/mo is over --max $10" would read as a contradiction.
 	if total := rep.Total(); maxTotal >= 0 && total > maxTotal {
-		return overBudget{fmt.Sprintf("over budget: idle cost %s/mo is over --max %s", money(total), money(maxTotal))}
+		return overBudget{fmt.Sprintf("over budget: idle cost $%.2f/mo is over --max $%.2f", total, maxTotal)}
 	}
 	if d != nil && maxIncrease >= 0 && d.After-d.Before > maxIncrease {
-		return overBudget{fmt.Sprintf("over budget: idle cost grows by %s/mo, over --max-increase %s", money(d.After-d.Before), money(maxIncrease))}
+		return overBudget{fmt.Sprintf("over budget: idle cost grows by $%.2f/mo, over --max-increase $%.2f", d.After-d.Before, maxIncrease)}
+	}
+	if d != nil && maxIncrease >= 0 && d.NewUnknown > 0 {
+		return overBudget{fmt.Sprintf("over budget: %d added or changed resource(s) could not be estimated, so --max-increase can't be checked", d.NewUnknown)}
 	}
 	return nil
 }
@@ -245,14 +251,18 @@ func runPrices(args []string) error {
 	fs := flag.NewFlagSet("prices", flag.ContinueOnError)
 	out := fs.String("o", "prices.json", "output file")
 	regions := fs.String("regions", "", "comma-separated regions (default: all commercial regions)")
+	services := fs.String("services", "", "comma-separated offer codes, e.g. AmazonKinesis (default: all), to fetch the keys a new selector adds")
 	if err := fs.Parse(args); err != nil {
 		return usageError{err.Error()}
 	}
-	var rs []string
+	var rs, ss []string
 	if *regions != "" {
 		rs = strings.Split(*regions, ",")
 	}
-	p, err := BuildPrices(rs, func(f string, a ...any) { fmt.Fprintf(os.Stderr, f+"\n", a...) })
+	if *services != "" {
+		ss = strings.Split(*services, ",")
+	}
+	p, err := BuildPrices(rs, ss, func(f string, a ...any) { fmt.Fprintf(os.Stderr, f+"\n", a...) })
 	if err != nil {
 		return err
 	}
