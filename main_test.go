@@ -242,6 +242,8 @@ func TestBundledPrices(t *testing.T) {
 			"elasticache|Redis|cache.t3.micro", "ddb|ReadCapacityUnit-Hrs", "kinesis|Storage-ShardHour",
 			"kms|KMS-Keys", "secrets|AWSSecretsManager-Secrets", "efs|ProvisionedTP-MiBpsHrs",
 			"fargate|Fargate-vCPU-Hours:perCPU", "fsx|Windows|Storage", "r53|HostedZone",
+			"rdsproxy|RDS:ProxyUsage", "rdsproxy|RDS:Proxy-ASv2-Usage", "aoss|IndexingOCU", "aoss|SearchOCU",
+			"memorydb|Redis|db.t4g.small", "memorydb|Valkey|db.t4g.small", "sagemaker|ml.m5.large",
 		} {
 			if v, ok := p.Get(r, k); !ok || v <= 0 {
 				t.Errorf("%s: %s = %v, %v", r, k, v, ok)

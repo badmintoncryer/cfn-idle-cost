@@ -1,5 +1,7 @@
 # Resource types added in 0.0.3; priced with testPrices["eu-west-1"].
 # EdgeBox is in a Local Zone, whose prices are not supported.
+Conditions:
+  Never: !Equals [!Ref "AWS::Region", nowhere-1]
 Resources:
   Cluster:
     Type: AWS::EKS::Cluster
@@ -107,6 +109,10 @@ Resources:
   PipelineV2:
     Type: AWS::CodePipeline::Pipeline
     Properties: { PipelineType: V2, RoleArn: arn, Stages: [] }
+  OffBoard:
+    Type: AWS::CloudWatch::Dashboard
+    Condition: Never
+    Properties: { DashboardBody: "{}" }
   Board:
     Type: AWS::CloudWatch::Dashboard
     Properties: { DashboardBody: "{}" }

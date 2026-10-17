@@ -65,6 +65,15 @@ func estimateResource(st *Stack, prices *Prices, id string) (items []Item) {
 		}
 	}()
 	rule := rules[e.r.Type]
+	if c := e.r.Condition; c != "" {
+		on, ok := e.tryCondition(c)
+		if ok && !on {
+			return nil // not created
+		}
+		if !ok && rule != nil {
+			panic(unresolved("depends on Condition " + c))
+		}
+	}
 	if rule == nil {
 		if in(e.r.Type, notCounted...) {
 			nc := base
@@ -72,15 +81,6 @@ func estimateResource(st *Stack, prices *Prices, id string) (items []Item) {
 			return []Item{nc}
 		}
 		return nil
-	}
-	if c := e.r.Condition; c != "" {
-		on, ok := e.tryCondition(c)
-		if !ok {
-			panic(unresolved("depends on Condition " + c))
-		}
-		if !on {
-			return nil // not created
-		}
 	}
 	rule(e, e.props(e.r))
 	for _, it := range e.items {
