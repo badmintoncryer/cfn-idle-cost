@@ -15,7 +15,7 @@ more                             $3836/mo
   Vectors        ×0.5 OCU          $88  indexing minimum OCUs, no standby replicas
   Vectors        ×0.5 OCU          $88  search minimum OCUs, no standby replicas
   Memory         ×4 nodes         $140  db.t4g.small Redis
-  Cluster        ×1                $73  EKS cluster (standard support)
+  Cluster        ×1                $73  EKS cluster
   Vpn            ×1                $36  Site-to-Site VPN connection
   Vpn            ×1                $36  Transit Gateway VPN attachment
   DocsInstance   ×1                $71  db.t4g.medium instance, I/O-Optimized

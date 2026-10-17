@@ -1,6 +1,6 @@
-ap-southeast-1 · 1 stack · idle ≈ $2514/mo
+ap-southeast-1 · 1 stack · idle ≈ $3098/mo
 
-rules3                    $2514/mo
+rules3                    $3098/mo
   Standard   ×1           $1426  db.m5.large sqlserver-se Multi-AZ
   Standard   ×20 GB gp3   $4.60  storage
   Emr        ×2            $280  m5.xlarge core instances (Linux)
@@ -8,16 +8,22 @@ rules3                    $2514/mo
   Emr        ×2             $70  EMR fee, core
   Emr        ×1             $35  EMR fee, primary
   Emr        ×256 GB gp2    $26  EBS gp2 storage
+  Extended   ×1            $365  extended support for Kubernetes 1.32 (since 2026-03-23)
+  Extended   ×1             $73  EKS cluster
   Oracle     ×1            $320  db.m5.large oracle-se2 Single-AZ
   Oracle     ×20 GB gp3   $2.30  storage
   Task       ×1            $140  m5.xlarge task instances (Linux)
   Task       ×1             $35  EMR fee, task
+  Current    ×1             $73  EKS cluster
+  Latest     ×1             $73  EKS cluster
   Express    ×1             $32  db.t3.small sqlserver-ex Single-AZ
   Express    ×20 GB gp3   $2.30  storage
   Transient  ×0           $0.00  terminates after its AutoTerminationPolicy idle timeout
 
-? could not estimate: 2
+? could not estimate: 4
+  rules3  Ancient  Kubernetes version 1.29 is not supported by EKS
   rules3  Fleet  instance fleets are not supported yet
   rules3  OracleNoLicense  LicenseModel is not set
+  rules3  StandardOnly  Kubernetes 1.32 reached the end of standard support on 2026-03-23 and SupportType is STANDARD
 
 prices: test prices · on-demand list prices, 730 h/mo, USD, free tier ignored

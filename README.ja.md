@@ -154,7 +154,7 @@ jobs:
 | `AWS::KMS::Key`、`AWS::KMS::ReplicaKey` | キー1つにつき$1 |
 | `AWS::SecretsManager::Secret` | シークレットとレプリカごとの料金 |
 | `AWS::Route53::HostedZone` | ホストゾーンごとの料金 |
-| `AWS::EKS::Cluster` | クラスターの時間料金（標準サポート） |
+| `AWS::EKS::Cluster` | クラスターの時間料金。`Version`が価格の基準日（同梱のスナップショットの日付、`--live`なら当日）に標準サポートを過ぎていれば、延長サポートの料金も加えます |
 | `AWS::EKS::Nodegroup` | インスタンスの時間料金×`DesiredSize`（なければ`MinSize`）。オンデマンドで、インスタンスタイプが1つの場合 |
 | `AWS::NetworkFirewall::Firewall` | エンドポイントの時間料金×サブネット数 |
 | `AWS::WAFv2::WebACL` | Web ACLとルール（マネージドルールグループの追加料金は含みません） |
