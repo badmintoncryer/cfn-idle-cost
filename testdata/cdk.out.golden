@@ -12,8 +12,8 @@ App                              $86/mo
 
 Prod-Edge                        $54/mo
   Stream           ×2 shards     $28  provisioned shard hourly
-  Alb              ×1            $18  Application Load Balancer hourly
-  Alb              ×2 IPv4     $7.30  public IPv4 per AZ (internet-facing)
+  LoadBalancer     ×1            $18  Application Load Balancer hourly
+  LoadBalancer     ×2 IPv4     $7.30  public IPv4 per AZ (internet-facing)
 
 ? could not estimate: 3
   App  ProdKey  depends on Condition IsProd

@@ -20,8 +20,8 @@
 | App | `Vpc/EIP` | ×1 | $3.65 | public IPv4 address |
 | App | `Archive/Secret` | ×1 | $0.40 | secret |
 | Prod-Edge | `Stream` | ×2 shards | $28 | provisioned shard hourly |
-| Prod-Edge | `Alb` | ×1 | $18 | Application Load Balancer hourly |
-| Prod-Edge | `Alb` | ×2 IPv4 | $7.30 | public IPv4 per AZ (internet-facing) |
+| Prod-Edge | `LoadBalancer` | ×1 | $18 | Application Load Balancer hourly |
+| Prod-Edge | `LoadBalancer` | ×2 IPv4 | $7.30 | public IPv4 per AZ (internet-facing) |
 
 #### us-east-1
 

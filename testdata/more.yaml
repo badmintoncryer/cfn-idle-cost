@@ -1,4 +1,5 @@
 # Resource types added in 0.0.3; priced with testPrices["eu-west-1"].
+# EdgeBox is in a Local Zone, whose prices are not supported.
 Resources:
   Cluster:
     Type: AWS::EKS::Cluster
@@ -64,3 +65,18 @@ Resources:
   Proxy:
     Type: AWS::RDS::DBProxy
     Properties: { DBProxyName: p, EngineFamily: MYSQL, Auth: [], RoleArn: arn, VpcSubnetIds: [a] }
+  EdgeBox:
+    Type: AWS::EC2::Instance
+    Properties: { InstanceType: t3.medium, AvailabilityZone: eu-west-1-lhr-1a }
+  Pipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties: { PipelineType: V1, RoleArn: arn, Stages: [] }
+  PipelineV2:
+    Type: AWS::CodePipeline::Pipeline
+    Properties: { PipelineType: V2, RoleArn: arn, Stages: [] }
+  Board:
+    Type: AWS::CloudWatch::Dashboard
+    Properties: { DashboardBody: "{}" }
+  RegionBox:
+    Type: AWS::EC2::Instance
+    Properties: { InstanceType: t3.medium, AvailabilityZone: !Select [0, !GetAZs ""] }

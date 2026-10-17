@@ -1,6 +1,6 @@
-eu-west-1 · 1 stack · idle ≈ $2514/mo
+eu-west-1 · 1 stack · idle ≈ $2548/mo
 
-more                            $2514/mo
+more                            $2548/mo
   Broker        ×1               $661  mq.m5.large RabbitMQ Multi-AZ
   Firewall      ×2 endpoints     $577  firewall endpoint hourly per AZ
   Kafka         ×3 brokers       $495  kafka.m5.large broker hourly
@@ -13,13 +13,19 @@ more                            $2514/mo
   DocsInstance  ×1                $71  db.t4g.medium instance, I/O-Optimized
   Nodes         ×2                $67  t3.medium on-demand (Linux), DesiredSize
   Attach        ×1                $36  Transit Gateway VPC attachment hourly
+  RegionBox     ×1                $33  t3.medium on-demand (Linux)
   Live          ×2 concurrency    $18  provisioned concurrency (1024 MB)
   Acl           ×1              $5.00  web ACL
   Acl           ×3 rules        $3.00  rules (managed rule group fees not counted)
+  Pipeline      ×1              $1.00  active V1 pipeline
   MathAlarm     ×2 metrics      $0.60  high-resolution alarm per metric
   Alarm         ×1 metrics      $0.10  alarm per metric
 
-! not counted yet: 1 (these cost money idle; cfn-idle-cost has no rule for them)
+? could not estimate: 1
+  more  EdgeBox  Local Zone eu-west-1-lhr-1a prices are not supported yet
+
+! not counted yet: 2 (these cost money idle; cfn-idle-cost has no rule for them)
+  more  Board  AWS::CloudWatch::Dashboard
   more  Proxy  AWS::RDS::DBProxy
 
 prices: test prices · on-demand list prices, 730 h/mo, USD, free tier ignored

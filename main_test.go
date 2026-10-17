@@ -36,7 +36,7 @@ var testPrices = &Prices{Source: "test prices", Regions: map[string]map[string]f
 		"lambda|Lambda-Provisioned-Concurrency-ARM": 0.0000033334, "tgw|TransitGatewayVPC": 0.05, "tgw|TransitGatewayVPN": 0.05,
 		"vpc|VPN-Usage-Hours:ipsec.1": 0.05, "resolver|ResolverNetworkInterface": 0.125,
 		"docdb|InstanceUsageIOOptimized:db.t4g.medium": 0.0975, "msk|Kafka.m5.large": 0.226, "msk|Kafka.Storage.GP2": 0.11,
-		"mq|RabbitMQ|Multi-AZ|m5.large": 0.906, "transfer|ProtocolHours": 0.3,
+		"mq|RabbitMQ|Multi-AZ|m5.large": 0.906, "transfer|ProtocolHours": 0.3, "codepipeline|activePipeline": 1,
 	},
 	"us-east-1": {"rds|Aurora:ServerlessV2IOOptimizedUsage|21": 0.16, "kms|KMS-Keys": 1, "ebs|EBS:VolumeUsage.gp3": 0.08, "ebs|EBS:VolumeP-IOPS.gp3": 0.005, "secrets|AWSSecretsManager-Secrets": 0.4},
 }}

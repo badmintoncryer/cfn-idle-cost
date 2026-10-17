@@ -1,7 +1,8 @@
 {
-  "asOf": "2026-10-15",
+  "asOf": "2026-10-16",
   "regions": {
     "af-south-1": {
+      "codepipeline|activePipeline": 1,
       "cw|CW:AlarmMonitorUsage": 0.1,
       "cw|CW:CompositeAlarmMonitorUsage": 0.5,
       "cw|CW:HighResAlarmMonitorUsage": 0.3,
@@ -1850,6 +1851,7 @@
       "waf|WebACLV2": 5
     },
     "ap-east-1": {
+      "codepipeline|activePipeline": 1,
       "cw|CW:AlarmMonitorUsage": 0.1,
       "cw|CW:CompositeAlarmMonitorUsage": 0.5,
       "cw|CW:HighResAlarmMonitorUsage": 0.3,
@@ -5458,6 +5460,7 @@
     },
     "ap-northeast-1": {
       "apprunner|AppRunner-Provisioned-GB-hours": 0.00885,
+      "codepipeline|activePipeline": 1,
       "cw|CW:AlarmMonitorUsage": 0.1,
       "cw|CW:CompositeAlarmMonitorUsage": 0.5,
       "cw|CW:HighResAlarmMonitorUsage": 0.3,
@@ -9466,6 +9469,7 @@
       "waf|WebACLV2": 5
     },
     "ap-northeast-2": {
+      "codepipeline|activePipeline": 1,
       "cw|CW:AlarmMonitorUsage": 0.1,
       "cw|CW:CompositeAlarmMonitorUsage": 0.5,
       "cw|CW:HighResAlarmMonitorUsage": 0.3,
@@ -12393,6 +12397,7 @@
       "waf|WebACLV2": 5
     },
     "ap-northeast-3": {
+      "codepipeline|activePipeline": 1,
       "cw|CW:AlarmMonitorUsage": 0.1,
       "cw|CW:CompositeAlarmMonitorUsage": 0.5,
       "cw|CW:HighResAlarmMonitorUsage": 0.3,
@@ -14566,6 +14571,7 @@
     },
     "ap-south-1": {
       "apprunner|AppRunner-Provisioned-GB-hours": 0.007448,
+      "codepipeline|activePipeline": 1,
       "cw|CW:AlarmMonitorUsage": 0.1,
       "cw|CW:CompositeAlarmMonitorUsage": 0.5,
       "cw|CW:HighResAlarmMonitorUsage": 0.3,
@@ -17584,6 +17590,7 @@
       "waf|WebACLV2": 5
     },
     "ap-south-2": {
+      "codepipeline|activePipeline": 1,
       "cw|CW:AlarmMonitorUsage": 0.1,
       "cw|CW:CompositeAlarmMonitorUsage": 0.5,
       "cw|CW:HighResAlarmMonitorUsage": 0.3,
@@ -19572,6 +19579,7 @@
     },
     "ap-southeast-1": {
       "apprunner|AppRunner-Provisioned-GB-hours": 0.00885,
+      "codepipeline|activePipeline": 1,
       "cw|CW:AlarmMonitorUsage": 0.1,
       "cw|CW:CompositeAlarmMonitorUsage": 0.5,
       "cw|CW:HighResAlarmMonitorUsage": 0.3,
@@ -22740,6 +22748,7 @@
     },
     "ap-southeast-2": {
       "apprunner|AppRunner-Provisioned-GB-hours": 0.008512,
+      "codepipeline|activePipeline": 1,
       "cw|CW:AlarmMonitorUsage": 0.1,
       "cw|CW:CompositeAlarmMonitorUsage": 0.5,
       "cw|CW:HighResAlarmMonitorUsage": 0.3,
@@ -26183,6 +26192,7 @@
       "waf|WebACLV2": 5
     },
     "ap-southeast-3": {
+      "codepipeline|activePipeline": 1,
       "cw|CW:AlarmMonitorUsage": 0.1,
       "cw|CW:CompositeAlarmMonitorUsage": 0.5,
       "cw|CW:HighResAlarmMonitorUsage": 0.3,
@@ -28335,6 +28345,7 @@
       "waf|WebACLV2": 5
     },
     "ap-southeast-4": {
+      "codepipeline|activePipeline": 1,
       "cw|CW:AlarmMonitorUsage": 0.1,
       "cw|CW:CompositeAlarmMonitorUsage": 0.5,
       "cw|CW:HighResAlarmMonitorUsage": 0.3,
@@ -35206,6 +35217,7 @@
       "waf|WebACLV2": 5
     },
     "ca-central-1": {
+      "codepipeline|activePipeline": 1,
       "cw|CW:AlarmMonitorUsage": 0.1,
       "cw|CW:CompositeAlarmMonitorUsage": 0.5,
       "cw|CW:HighResAlarmMonitorUsage": 0.3,
@@ -39936,6 +39948,7 @@
     },
     "eu-central-1": {
       "apprunner|AppRunner-Provisioned-GB-hours": 0.008176,
+      "codepipeline|activePipeline": 1,
       "cw|CW:AlarmMonitorUsage": 0.1,
       "cw|CW:CompositeAlarmMonitorUsage": 0.5,
       "cw|CW:HighResAlarmMonitorUsage": 0.3,
@@ -43781,6 +43794,7 @@
       "waf|WebACLV2": 5
     },
     "eu-central-2": {
+      "codepipeline|activePipeline": 1,
       "cw|CW:AlarmMonitorUsage": 0.1,
       "cw|CW:CompositeAlarmMonitorUsage": 0.5,
       "cw|CW:HighResAlarmMonitorUsage": 0.3,
@@ -45574,6 +45588,7 @@
       "waf|WebACLV2": 5
     },
     "eu-north-1": {
+      "codepipeline|activePipeline": 1,
       "cw|CW:AlarmMonitorUsage": 0.1,
       "cw|CW:CompositeAlarmMonitorUsage": 0.5,
       "cw|CW:HighResAlarmMonitorUsage": 0.3,
@@ -48181,6 +48196,7 @@
       "waf|WebACLV2": 5
     },
     "eu-south-1": {
+      "codepipeline|activePipeline": 1,
       "cw|CW:AlarmMonitorUsage": 0.1,
       "cw|CW:CompositeAlarmMonitorUsage": 0.5,
       "cw|CW:HighResAlarmMonitorUsage": 0.3,
@@ -50099,6 +50115,7 @@
       "waf|WebACLV2": 5
     },
     "eu-south-2": {
+      "codepipeline|activePipeline": 1,
       "cw|CW:AlarmMonitorUsage": 0.1,
       "cw|CW:CompositeAlarmMonitorUsage": 0.5,
       "cw|CW:HighResAlarmMonitorUsage": 0.3,
@@ -52780,6 +52797,7 @@
     },
     "eu-west-1": {
       "apprunner|AppRunner-Provisioned-GB-hours": 0.007,
+      "codepipeline|activePipeline": 1,
       "cw|CW:AlarmMonitorUsage": 0.1,
       "cw|CW:CompositeAlarmMonitorUsage": 0.5,
       "cw|CW:HighResAlarmMonitorUsage": 0.3,
@@ -56938,6 +56956,7 @@
     },
     "eu-west-2": {
       "apprunner|AppRunner-Provisioned-GB-hours": 0.008176,
+      "codepipeline|activePipeline": 1,
       "cw|CW:AlarmMonitorUsage": 0.1,
       "cw|CW:CompositeAlarmMonitorUsage": 0.5,
       "cw|CW:HighResAlarmMonitorUsage": 0.3,
@@ -59914,6 +59933,7 @@
     },
     "eu-west-3": {
       "apprunner|AppRunner-Provisioned-GB-hours": 0.00848,
+      "codepipeline|activePipeline": 1,
       "cw|CW:AlarmMonitorUsage": 0.1,
       "cw|CW:CompositeAlarmMonitorUsage": 0.5,
       "cw|CW:HighResAlarmMonitorUsage": 0.3,
@@ -62521,6 +62541,7 @@
       "r53|HostedZone": 0.5
     },
     "il-central-1": {
+      "codepipeline|activePipeline": 1,
       "cw|CW:AlarmMonitorUsage": 0.1,
       "cw|CW:CompositeAlarmMonitorUsage": 0.5,
       "cw|CW:HighResAlarmMonitorUsage": 0.3,
@@ -64042,6 +64063,7 @@
       "waf|WebACLV2": 5
     },
     "me-central-1": {
+      "codepipeline|activePipeline": 1,
       "cw|CW:AlarmMonitorUsage": 0.1,
       "cw|CW:CompositeAlarmMonitorUsage": 0.5,
       "cw|CW:HighResAlarmMonitorUsage": 0.3,
@@ -65447,6 +65469,7 @@
       "waf|WebACLV2": 5
     },
     "me-south-1": {
+      "codepipeline|activePipeline": 1,
       "cw|CW:AlarmMonitorUsage": 0.1,
       "cw|CW:CompositeAlarmMonitorUsage": 0.5,
       "cw|CW:HighResAlarmMonitorUsage": 0.3,
@@ -68541,6 +68564,7 @@
       "waf|WebACLV2": 5
     },
     "sa-east-1": {
+      "codepipeline|activePipeline": 1,
       "cw|CW:AlarmMonitorUsage": 0.135,
       "cw|CW:CompositeAlarmMonitorUsage": 0.675,
       "cw|CW:HighResAlarmMonitorUsage": 0.405,
@@ -71440,6 +71464,7 @@
     },
     "us-east-1": {
       "apprunner|AppRunner-Provisioned-GB-hours": 0.007,
+      "codepipeline|activePipeline": 1,
       "cw|CW:AlarmMonitorUsage": 0.1,
       "cw|CW:CompositeAlarmMonitorUsage": 0.5,
       "cw|CW:HighResAlarmMonitorUsage": 0.3,
@@ -75834,6 +75859,7 @@
     },
     "us-east-2": {
       "apprunner|AppRunner-Provisioned-GB-hours": 0.007,
+      "codepipeline|activePipeline": 1,
       "cw|CW:AlarmMonitorUsage": 0.1,
       "cw|CW:CompositeAlarmMonitorUsage": 0.5,
       "cw|CW:HighResAlarmMonitorUsage": 0.3,
@@ -80008,6 +80034,7 @@
       "waf|WebACLV2": 5
     },
     "us-west-1": {
+      "codepipeline|activePipeline": 1,
       "cw|CW:AlarmMonitorUsage": 0.1,
       "cw|CW:CompositeAlarmMonitorUsage": 0.5,
       "cw|CW:HighResAlarmMonitorUsage": 0.3,
@@ -82862,6 +82889,7 @@
     },
     "us-west-2": {
       "apprunner|AppRunner-Provisioned-GB-hours": 0.007,
+      "codepipeline|activePipeline": 1,
       "cw|CW:AlarmMonitorUsage": 0.1,
       "cw|CW:CompositeAlarmMonitorUsage": 0.5,
       "cw|CW:HighResAlarmMonitorUsage": 0.3,

@@ -160,12 +160,13 @@ jobs:
 | `AWS::AmazonMQ::Broker` | ブローカーの時間料金（ActiveMQとRabbitMQ、シングル・マルチAZ） |
 | `AWS::Transfer::Server` | プロトコルごとの時間料金 |
 | `AWS::AppRunner::Service` | 最小数のプロビジョニング済みインスタンスのメモリ |
+| `AWS::CodePipeline::Pipeline` | アクティブなV1パイプラインごとの料金（V2は実行時間の分だけかかるので、アイドル時は$0） |
 
 使った分だけかかる費用は、意図して対象から外しています。S3、Lambda、AuroraのストレージとI/O、CloudWatch Logs、データ転送、リクエスト料金がこれに当たります。
 
 ### まだ見積もらないもの
 
-アクセスがゼロでも費用がかかるのに、まだルールのないリソースタイプ（RDS Proxy、OpenSearch Serverless、SageMakerのエンドポイント、EMR、MemoryDB、WorkSpaces、Directory Serviceなど）は、`! not counted yet`に載せます。そのため、こうした費用が黙って抜け落ちることはありません。一部だけ対応しているリソース（FSx for ONTAP、プロビジョンドモードのDynamoDBグローバルテーブル、RDSのOracleとSQL Server、マルチAZ DBクラスター、Fargate SpotとWindowsのFargate、Spotのノードグループ）は、`? could not estimate`に載ります。
+アクセスがゼロでも費用がかかるのに、まだルールのないリソースタイプ（RDS Proxy、OpenSearch Serverless、SageMakerのエンドポイント、EMR、MemoryDB、WorkSpaces、Directory Service、CloudWatchダッシュボードなど）は、`! not counted yet`に載せます。そのため、こうした費用が黙って抜け落ちることはありません。一部だけ対応しているリソース（FSx for ONTAP、プロビジョンドモードのDynamoDBグローバルテーブル、RDSのOracleとSQL Server、マルチAZ DBクラスター、Fargate SpotとWindowsのFargate、Spotのノードグループ、Local Zonesのインスタンス、API Gatewayのキャッシュ）は、`? could not estimate`に載ります。
 
 ## 前提
 

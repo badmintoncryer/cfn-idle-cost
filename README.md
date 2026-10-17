@@ -174,6 +174,7 @@ and provisioned storage billed whether you use it or not.
 | `AWS::AmazonMQ::Broker` | broker hourly (ActiveMQ and RabbitMQ, single or multi-AZ) |
 | `AWS::Transfer::Server` | hourly per protocol |
 | `AWS::AppRunner::Service` | memory of the minimum provisioned instances |
+| `AWS::CodePipeline::Pipeline` | per active V1 pipeline (V2 pipelines bill per minute: $0 idle) |
 
 Usage-only charges are left out on purpose: S3, Lambda, Aurora storage and
 I/O, CloudWatch Logs, data transfer, requests.
@@ -182,10 +183,11 @@ I/O, CloudWatch Logs, data transfer, requests.
 
 Resource types that cost money with zero traffic but have no rule yet, such as
 RDS Proxy, OpenSearch Serverless, SageMaker endpoints, EMR, MemoryDB,
-WorkSpaces and Directory Service, are listed under `! not counted yet`, so
+WorkSpaces, Directory Service and CloudWatch dashboards, are listed under `! not counted yet`, so
 their cost is never left out silently. Partly supported types (FSx for ONTAP,
 provisioned DynamoDB global tables, Oracle and SQL Server on RDS, Multi-AZ DB
-clusters, Fargate Spot and Windows, Spot node groups) are listed under
+clusters, Fargate Spot and Windows, Spot node groups, instances in Local
+Zones, API Gateway caches) are listed under
 `? could not estimate`.
 
 ## Assumptions

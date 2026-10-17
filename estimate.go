@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"math"
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -309,6 +310,7 @@ func init() {
 			if e.str(p, "Tenancy", "default") != "default" {
 				panic(unresolved("dedicated tenancy is not supported yet"))
 			}
+			e.notLocalZone(p)
 			e.hourly(1, "", "ec2|"+t, t+" on-demand (Linux)")
 			e.blockDevices(bdm, 1)
 		},
@@ -431,6 +433,25 @@ func init() {
 		},
 		"AWS::FSx::FileSystem": fsx,
 		"AWS::ECS::Service":    ecsService,
+	}
+}
+
+// localZone matches Local Zone and Wavelength names (us-east-1-bos-1a), whose
+// prices differ from the region's.
+var localZone = regexp.MustCompile(`^[a-z]{2}-[a-z]+-[0-9]+-[a-z0-9-]+[a-z]$`)
+
+// notLocalZone stops the estimate of an instance placed in a Local Zone, by its
+// AvailabilityZone or its subnet's.
+func (e *est) notLocalZone(p map[string]any) {
+	// Only literal zone names can be Local Zones; Fn::GetAZs picks the region's own.
+	az, _ := p["AvailabilityZone"].(string)
+	if r, ok := p["SubnetId"].(map[string]any); ok && az == "" {
+		if sub, ok := e.st.Resources[fmt.Sprint(r["Ref"])]; ok {
+			az, _ = sub.Properties["AvailabilityZone"].(string)
+		}
+	}
+	if localZone.MatchString(az) {
+		panic(unresolved("Local Zone " + az + " prices are not supported yet"))
 	}
 }
 
@@ -750,6 +771,7 @@ var notCounted = []string{
 	"AWS::ElasticBeanstalk::Environment", "AWS::Lightsail::Instance", "AWS::Lightsail::Database",
 	"AWS::GameLift::Fleet", "AWS::MediaLive::Channel", "AWS::KafkaConnect::Connector",
 	"AWS::Shield::Protection", "AWS::Batch::ComputeEnvironment", "AWS::EC2::VerifiedAccessEndpoint",
+	"AWS::CloudWatch::Dashboard", "AWS::Connect::PhoneNumber", // not in the Price List
 }
 
 func init() {
@@ -815,6 +837,20 @@ func init() {
 		},
 		"AWS::CloudWatch::CompositeAlarm": func(e *est, p map[string]any) {
 			e.monthly(1, "", "cw|CW:CompositeAlarmMonitorUsage", "composite alarm")
+		},
+		"AWS::CodePipeline::Pipeline": func(e *est, p map[string]any) {
+			switch t := e.mustStr(p, "PipelineType"); t {
+			case "V1":
+				e.monthly(1, "", "codepipeline|activePipeline", "active V1 pipeline")
+			case "V2": // billed per action execution minute
+			default:
+				panic(unresolved("PipelineType " + t + " is not supported"))
+			}
+		},
+		"AWS::ApiGateway::Stage": func(e *est, p map[string]any) {
+			if e.flag(p, "CacheClusterEnabled") {
+				panic(unresolved("API cache clusters are not supported yet"))
+			}
 		},
 		"AWS::Lambda::Version": lambdaProvisioned,
 		"AWS::Lambda::Alias":   lambdaProvisioned,

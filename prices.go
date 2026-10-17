@@ -263,6 +263,8 @@ var selectors = []selector{
 		}},
 	{name: "transfer", service: "AWSTransfer", families: []string{"AWS Transfer Family"},
 		key: func(a map[string]string, u string) string { return keep(u, "ProtocolHours") }},
+	{name: "codepipeline", service: "AWSCodePipeline", families: []string{"Active Pipeline"},
+		key: func(a map[string]string, u string) string { return keep(u, "activePipeline") }},
 	{name: "apprunner", service: "AWSAppRunner", families: []string{"Compute"},
 		key: func(a map[string]string, u string) string { return keep(u, "AppRunner-Provisioned-GB-hours") }},
 }

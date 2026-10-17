@@ -4,7 +4,19 @@
     "ProdEdge": {
       "type": "aws:cloudformation:stack",
       "environment": "aws://123456789012/ap-northeast-1",
-      "properties": { "templateFile": "ProdEdge.template.json", "stackName": "Prod-Edge" }
+      "properties": {
+        "templateFile": "ProdEdge.template.json",
+        "stackName": "Prod-Edge"
+      },
+      "displayName": "Prod/Edge",
+      "metadata": {
+        "/Prod/Edge/LoadBalancer/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "Alb"
+          }
+        ]
+      }
     }
   }
 }

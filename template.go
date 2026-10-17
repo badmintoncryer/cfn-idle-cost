@@ -20,6 +20,7 @@ type Stack struct {
 	Parameters map[string]Param
 	Resources  map[string]Resource
 	paths      map[string]string // logical ID -> construct path, from the cloud assembly
+	cdkPath    string            // construct path of the stack (Stage/Stack), stripped from resource paths
 }
 
 type Param struct {
@@ -150,6 +151,7 @@ func loadAssembly(dir string) ([]*Stack, error) {
 			Environment  string                   `json:"environment"`
 			Metadata     map[string][]cdkMetadata `json:"metadata"`
 			MetadataFile string                   `json:"additionalMetadataFile"`
+			DisplayName  string                   `json:"displayName"`
 			Properties   struct {
 				TemplateFile  string `json:"templateFile"`
 				StackName     string `json:"stackName"`
@@ -179,6 +181,7 @@ func loadAssembly(dir string) ([]*Stack, error) {
 			if s.Name == "" {
 				s.Name = id
 			}
+			s.cdkPath = a.DisplayName
 			if r := a.Environment[strings.LastIndex(a.Environment, "/")+1:]; r != "unknown-region" {
 				s.Region = r
 			}
@@ -242,7 +245,7 @@ func loadAssembly(dir string) ([]*Stack, error) {
 			if s := nested[f]; s != nil {
 				// ponytail: nested stacks share the root's path map; a logical ID used in
 				// both shows the root's path. Key by template if that ever happens.
-				s.Name, s.Region, s.paths = roots[i].Name, roots[i].Region, roots[i].paths
+				s.Name, s.Region, s.paths, s.cdkPath = roots[i].Name, roots[i].Region, roots[i].paths, roots[i].cdkPath
 				out = append(out, s)
 				delete(nested, f)
 			}
@@ -289,7 +292,9 @@ func (s *Stack) DisplayPath(logicalID string) string {
 		return logicalID
 	}
 	p = strings.TrimPrefix(p, "/")
-	if _, rest, ok := strings.Cut(p, "/"); ok {
+	if rest, ok := strings.CutPrefix(p, s.cdkPath+"/"); ok && s.cdkPath != "" {
+		p = rest // a stack inside a Stage: "Prod/Edge/Key" -> "Key"
+	} else if _, rest, ok := strings.Cut(p, "/"); ok {
 		p = rest
 	}
 	p = strings.TrimSuffix(p, "/Resource")
