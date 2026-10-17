@@ -152,18 +152,19 @@ and provisioned storage billed whether you use it or not.
 | `AWS::EC2::VPCEndpoint` | Interface: hourly × subnets (AZs). Gateway Load Balancer: hourly. Gateway: free |
 | `AWS::ElasticLoadBalancingV2::LoadBalancer` | ALB / NLB / GWLB hourly, plus one public IPv4 per subnet when internet-facing |
 | `AWS::ElasticLoadBalancing::LoadBalancer` | Classic Load Balancer hourly |
-| `AWS::EC2::Instance` | instance hourly (Linux), EBS volumes in `BlockDeviceMappings` |
-| `AWS::AutoScaling::AutoScalingGroup` | instance hourly × `DesiredCapacity` (or `MinSize`), EBS volumes, from its launch template or launch configuration |
+| `AWS::EC2::Instance` | instance hourly (Linux), EBS volumes in `BlockDeviceMappings`, the public IPv4 it gets at launch |
+| `AWS::AutoScaling::AutoScalingGroup` | instance hourly × `DesiredCapacity` (or `MinSize`), EBS volumes and public IPv4 at launch, from its launch template or launch configuration |
 | `AWS::EC2::Volume` | size, gp3 IOPS / throughput above 3000 / 125 MiB/s, io1 / io2 IOPS |
 | `AWS::RDS::DBInstance` | instance hourly (Single-AZ / Multi-AZ), allocated storage, provisioned IOPS and throughput above the gp3 baseline. Aurora: provisioned instances, or Serverless v2 minimum ACU (I/O-Optimized aware) |
 | `AWS::OpenSearchService::Domain`, `AWS::Elasticsearch::Domain` | data, dedicated master and UltraWarm nodes, EBS storage / IOPS / throughput |
 | `AWS::ElastiCache::CacheCluster`, `ReplicationGroup` | node hourly × nodes |
 | `AWS::ElastiCache::ServerlessCache` | minimum data storage (1 GB, 100 MB for Valkey, or your `CacheUsageLimits` minimum) |
 | `AWS::DynamoDB::Table` | provisioned RCU / WCU, including GSIs (Standard and Standard-IA) |
+| `AWS::DynamoDB::GlobalTable` | provisioned RCU and the auto scaling minimum WCU of the replica in the stack's region, including GSIs (replicated WCU with two or more replicas). Replicas in other regions are counted in the line, not priced |
 | `AWS::Kinesis::Stream` | provisioned shard hours, or the on-demand stream hour |
-| `AWS::ECS::Service` (Fargate) | vCPU, memory and ephemeral storage above 20 GB × `DesiredCount` (x86 and ARM) |
+| `AWS::ECS::Service` (Fargate) | vCPU, memory, ephemeral storage above 20 GB and public IPv4 (`AssignPublicIp: ENABLED`) × `DesiredCount` (x86 and ARM) |
 | `AWS::EFS::FileSystem` | provisioned throughput |
-| `AWS::FSx::FileSystem` | storage and throughput capacity for Windows, Lustre and OpenZFS, SSD IOPS above the included 3 per GB |
+| `AWS::FSx::FileSystem` | storage and throughput capacity for Windows, Lustre, OpenZFS and ONTAP, SSD IOPS above the included 3 per GB (the ONTAP capacity pool is pay-per-use) |
 | `AWS::KMS::Key`, `AWS::KMS::ReplicaKey` | $1 per key |
 | `AWS::SecretsManager::Secret` | per secret |
 | `AWS::Route53::HostedZone` | per hosted zone |
@@ -191,6 +192,9 @@ and provisioned storage billed whether you use it or not.
 | `AWS::MemoryDB::Cluster` | node hourly × shards × (1 + replicas) (Redis and Valkey) |
 | `AWS::SageMaker::Endpoint` | instance hourly × `InitialInstanceCount` per production variant (serverless variants: $0 idle) |
 | `AWS::CodePipeline::Pipeline` | per active V1 pipeline (V2 pipelines bill per minute: $0 idle) |
+| `AWS::ApiGateway::Stage` | cache cluster hourly by `CacheClusterSize` when `CacheClusterEnabled` |
+| `AWS::DirectoryService::MicrosoftAD` | 2 domain controllers hourly (Standard or Enterprise). Controllers added later are not in the template |
+| `AWS::DirectoryService::SimpleAD` | directory hourly (Small or Large) |
 
 Usage-only charges are left out on purpose: S3, Lambda, Aurora storage and
 I/O, CloudWatch Logs, data transfer, requests.
@@ -198,11 +202,10 @@ I/O, CloudWatch Logs, data transfer, requests.
 ### Not counted yet
 
 Resource types that cost money with zero traffic but have no rule yet, such as
-EMR, WorkSpaces, Directory Service and CloudWatch dashboards, are listed under `! not counted yet`, so
-their cost is never left out silently. Partly supported types (FSx for ONTAP,
-provisioned DynamoDB global tables, Oracle and SQL Server on RDS, Multi-AZ DB
-clusters, Fargate Spot and Windows, Spot node groups, instances in Local
-Zones, API Gateway caches) are listed under
+EMR, WorkSpaces, DMS and CloudWatch dashboards, are listed under `! not counted yet`, so
+their cost is never left out silently. Partly supported types (Oracle and SQL
+Server on RDS, Multi-AZ DB clusters, Fargate Spot and Windows, Spot node
+groups, instances in Local Zones) are listed under
 `? could not estimate`.
 
 ## Assumptions
@@ -211,8 +214,13 @@ Zones, API Gateway caches) are listed under
   Instances and the free tier are ignored.
 - EC2 instances are priced as Linux with shared tenancy (the AMI is not read).
   A root volume that comes from the AMI (no `VolumeSize` in
-  `BlockDeviceMappings`) is not counted, and neither are public IPs that
-  instances get automatically.
+  `BlockDeviceMappings`) is not counted.
+- A public IPv4 that an instance, Auto Scaling group or Fargate task gets at
+  launch is counted when `AssociatePublicIpAddress` (or `AssignPublicIp`) says
+  so, or else when every subnet is in the template with `MapPublicIpOnLaunch:
+  true`. When a subnet comes from elsewhere, no line is added and the rest of
+  the resource is still estimated. An instance with an Elastic IP attached in
+  the same template is not counted twice.
 - A value that cannot be read from the template, such as a Parameter without a
   default or a reference to another stack, is never guessed: the resource is
   listed under `? could not estimate` with the reason. A Parameter with a
@@ -225,6 +233,8 @@ Zones, API Gateway caches) are listed under
   `? could not estimate`.
 - An Auto Scaling group uses `DesiredCapacity` when set, otherwise `MinSize`.
   DynamoDB uses the table's provisioned capacity, not an auto scaling minimum.
+  Global tables are the exception: their write capacity can only be set as
+  an auto scaling range, so the minimum is used.
 - Plain templates have no construct paths, so lines show the logical ID.
 
 ## Install

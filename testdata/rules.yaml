@@ -1,0 +1,148 @@
+# Resource types added after 1.0.0; priced with testPrices["us-east-1"].
+Resources:
+  # Public IPv4 assigned at launch: by subnet, by AssociatePublicIpAddress, and
+  # the cases that add no line (private, outside this template, opted out, EIP).
+  PublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties: { VpcId: vpc-1, CidrBlock: 10.0.0.0/24, MapPublicIpOnLaunch: true }
+  PrivateSubnet:
+    Type: AWS::EC2::Subnet
+    Properties: { VpcId: vpc-1, CidrBlock: 10.0.1.0/24 }
+  PublicBox:
+    Type: AWS::EC2::Instance
+    Properties: { ImageId: ami-1, InstanceType: t3.micro, SubnetId: !Ref PublicSubnet }
+  PrivateBox:
+    Type: AWS::EC2::Instance
+    Properties: { ImageId: ami-1, InstanceType: t3.micro, SubnetId: !Ref PrivateSubnet }
+  ExternalBox:
+    Type: AWS::EC2::Instance
+    Properties: { ImageId: ami-1, InstanceType: t3.micro, SubnetId: subnet-0123 }
+  OptOutBox:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: ami-1
+      InstanceType: t3.micro
+      NetworkInterfaces: [{ DeviceIndex: "0", SubnetId: !Ref PublicSubnet, AssociatePublicIpAddress: false }]
+  EipBox:
+    Type: AWS::EC2::Instance
+    Properties: { ImageId: ami-1, InstanceType: t3.micro, SubnetId: !Ref PublicSubnet }
+  EipBoxAddress:
+    Type: AWS::EC2::EIP
+    Properties: { InstanceId: !Ref EipBox }
+  Template:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateData:
+        InstanceType: t3.micro
+        NetworkInterfaces: [{ DeviceIndex: 0, AssociatePublicIpAddress: true }]
+  Fleet:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      MinSize: "1"
+      MaxSize: "4"
+      DesiredCapacity: "2"
+      LaunchTemplate: { LaunchTemplateId: !Ref Template, Version: "1" }
+      VPCZoneIdentifier: [!Ref PrivateSubnet]
+  Config:
+    Type: AWS::AutoScaling::LaunchConfiguration
+    Properties: { ImageId: ami-1, InstanceType: t3.micro }
+  MixedFleet:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      MinSize: "1"
+      MaxSize: "1"
+      LaunchConfigurationName: !Ref Config
+      VPCZoneIdentifier: [!Ref PublicSubnet, subnet-0123]
+  Task:
+    Type: AWS::ECS::TaskDefinition
+    Properties: { Cpu: "256", Memory: "512", RequiresCompatibilities: [FARGATE], NetworkMode: awsvpc }
+  Web:
+    Type: AWS::ECS::Service
+    Properties:
+      LaunchType: FARGATE
+      DesiredCount: 2
+      TaskDefinition: !Ref Task
+      NetworkConfiguration: { AwsvpcConfiguration: { AssignPublicIp: ENABLED, Subnets: [!Ref PublicSubnet] } }
+
+  # FSx for ONTAP: a fixed throughput, and per HA pair with provisioned IOPS.
+  Ontap:
+    Type: AWS::FSx::FileSystem
+    Properties:
+      FileSystemType: ONTAP
+      StorageCapacity: 1024
+      SubnetIds: [a]
+      OntapConfiguration: { DeploymentType: SINGLE_AZ_1, ThroughputCapacity: 128 }
+  OntapScaleOut:
+    Type: AWS::FSx::FileSystem
+    Properties:
+      FileSystemType: ONTAP
+      StorageCapacity: 2048
+      SubnetIds: [a]
+      OntapConfiguration:
+        DeploymentType: SINGLE_AZ_2
+        HAPairs: 2
+        ThroughputCapacityPerHAPair: 1536
+        DiskIopsConfiguration: { Mode: USER_PROVISIONED, Iops: 10000 }
+
+  # DynamoDB global tables: two replicas (replicated writes, GSIs), one
+  # Standard-IA replica, and on-demand (no line).
+  Orders:
+    Type: AWS::DynamoDB::GlobalTable
+    Properties:
+      BillingMode: PROVISIONED
+      AttributeDefinitions: [{ AttributeName: pk, AttributeType: S }]
+      KeySchema: [{ AttributeName: pk, KeyType: HASH }]
+      WriteProvisionedThroughputSettings: { WriteCapacityAutoScalingSettings: { MinCapacity: 1, MaxCapacity: 10, TargetTrackingScalingPolicyConfiguration: { TargetValue: 70 } } }
+      GlobalSecondaryIndexes:
+        - IndexName: byDate
+          KeySchema: [{ AttributeName: pk, KeyType: HASH }]
+          Projection: { ProjectionType: ALL }
+          WriteProvisionedThroughputSettings: { WriteCapacityAutoScalingSettings: { MinCapacity: 2, MaxCapacity: 10, TargetTrackingScalingPolicyConfiguration: { TargetValue: 70 } } }
+      Replicas:
+        - Region: !Ref AWS::Region
+          ReadProvisionedThroughputSettings: { ReadCapacityUnits: 10 }
+          GlobalSecondaryIndexes:
+            - IndexName: byDate
+              ReadProvisionedThroughputSettings: { ReadCapacityAutoScalingSettings: { MinCapacity: 5, MaxCapacity: 10, TargetTrackingScalingPolicyConfiguration: { TargetValue: 70 } } }
+        - Region: eu-west-1
+          ReadProvisionedThroughputSettings: { ReadCapacityUnits: 10 }
+  Archive:
+    Type: AWS::DynamoDB::GlobalTable
+    Properties:
+      BillingMode: PROVISIONED
+      AttributeDefinitions: [{ AttributeName: pk, AttributeType: S }]
+      KeySchema: [{ AttributeName: pk, KeyType: HASH }]
+      WriteProvisionedThroughputSettings: { WriteCapacityAutoScalingSettings: { MinCapacity: 1, MaxCapacity: 10, TargetTrackingScalingPolicyConfiguration: { TargetValue: 70 } } }
+      Replicas:
+        - Region: us-east-1
+          TableClass: STANDARD_INFREQUENT_ACCESS
+          ReadProvisionedThroughputSettings: { ReadCapacityAutoScalingSettings: { MinCapacity: 4, MaxCapacity: 10, TargetTrackingScalingPolicyConfiguration: { TargetValue: 70 } } }
+  Sessions:
+    Type: AWS::DynamoDB::GlobalTable
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions: [{ AttributeName: pk, AttributeType: S }]
+      KeySchema: [{ AttributeName: pk, KeyType: HASH }]
+      Replicas: [{ Region: us-east-1 }]
+
+  # API Gateway caches: the default 0.5 GB, 6.1 GB, and no cache.
+  Prod:
+    Type: AWS::ApiGateway::Stage
+    Properties: { RestApiId: api, DeploymentId: d, CacheClusterEnabled: true }
+  Big:
+    Type: AWS::ApiGateway::Stage
+    Properties: { RestApiId: api, DeploymentId: d, CacheClusterEnabled: true, CacheClusterSize: "6.1" }
+  Dev:
+    Type: AWS::ApiGateway::Stage
+    Properties: { RestApiId: api, DeploymentId: d }
+
+  # Directory Service: Managed AD Standard, Enterprise (default), Simple AD.
+  Corp:
+    Type: AWS::DirectoryService::MicrosoftAD
+    Properties: { Name: corp.example.com, Password: x, Edition: Standard, VpcSettings: { VpcId: v, SubnetIds: [a, b] } }
+  CorpEnterprise:
+    Type: AWS::DirectoryService::MicrosoftAD
+    Properties: { Name: corp2.example.com, Password: x, VpcSettings: { VpcId: v, SubnetIds: [a, b] } }
+  Simple:
+    Type: AWS::DirectoryService::SimpleAD
+    Properties: { Name: simple.example.com, Size: Small, VpcSettings: { VpcId: v, SubnetIds: [a, b] } }

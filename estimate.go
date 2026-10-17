@@ -417,6 +417,7 @@ func init() {
 		"AWS::EC2::Instance": func(e *est, p map[string]any) {
 			t := e.str(p, "InstanceType", "")
 			bdm := p["BlockDeviceMappings"]
+			nics := p["NetworkInterfaces"]
 			if lt, ok := p["LaunchTemplate"]; ok {
 				data := e.launchTemplate(asMap(lt))
 				if t == "" {
@@ -424,6 +425,9 @@ func init() {
 				}
 				if bdm == nil {
 					bdm = data["BlockDeviceMappings"]
+				}
+				if nics == nil {
+					nics = data["NetworkInterfaces"]
 				}
 			}
 			if t == "" {
@@ -435,6 +439,14 @@ func init() {
 			e.notLocalZone(p)
 			e.hourly(1, "", "ec2|"+t, t+" on-demand (Linux)")
 			e.blockDevices(bdm, 1)
+			nic := firstMap(nics)
+			subnet := p["SubnetId"]
+			if subnet == nil {
+				subnet = nic["SubnetId"]
+			}
+			if e.autoPublicIP(nic["AssociatePublicIpAddress"], []any{subnet}) && !e.hasEIP() {
+				e.hourly(1, "IPv4", "vpc|PublicIPv4:InUseAddress", "public IPv4 assigned at launch")
+			}
 		},
 		"AWS::AutoScaling::AutoScalingGroup": func(e *est, p map[string]any) {
 			if _, ok := p["MixedInstancesPolicy"]; ok {
@@ -445,18 +457,24 @@ func init() {
 				n, why = e.mustNum(p, "MinSize"), "MinSize"
 			}
 			var t string
-			var bdm any
+			var bdm, assoc any
 			if lt, ok := p["LaunchTemplate"]; ok {
 				data := e.launchTemplate(asMap(lt))
 				t, bdm = e.mustStr(data, "InstanceType"), data["BlockDeviceMappings"]
+				assoc = firstMap(data["NetworkInterfaces"])["AssociatePublicIpAddress"]
 			} else if _, ok := p["LaunchConfigurationName"]; ok {
 				_, lc := e.ref(p, "LaunchConfigurationName")
 				t, bdm = e.mustStr(lc.Properties, "InstanceType"), lc.Properties["BlockDeviceMappings"]
+				assoc = lc.Properties["AssociatePublicIpAddress"]
 			} else {
 				panic(unresolved("no LaunchTemplate or LaunchConfigurationName"))
 			}
 			e.hourly(n, "", "ec2|"+t, fmt.Sprintf("%s on-demand (Linux), %s", t, why))
 			e.blockDevices(bdm, n)
+			subnets, _ := p["VPCZoneIdentifier"].([]any)
+			if e.autoPublicIP(assoc, subnets) {
+				e.hourly(n, "IPv4", "vpc|PublicIPv4:InUseAddress", "public IPv4 assigned at launch, "+why)
+			}
 		},
 		"AWS::EC2::Volume": func(e *est, p map[string]any) {
 			e.ebs(e.str(p, "VolumeType", "gp2"), e.mustNum(p, "Size"), e.num(p, "Iops", 0), e.num(p, "Throughput", 0), 1)
@@ -524,11 +542,7 @@ func init() {
 			e.hourly(r, "RCU", "ddb|"+ia+"ReadCapacityUnit-Hrs", "provisioned read capacity")
 			e.hourly(w, "WCU", "ddb|"+ia+"WriteCapacityUnit-Hrs", "provisioned write capacity")
 		},
-		"AWS::DynamoDB::GlobalTable": func(e *est, p map[string]any) {
-			if e.str(p, "BillingMode", "PROVISIONED") == "PROVISIONED" {
-				panic(unresolved("provisioned global tables are not supported yet"))
-			}
-		},
+		"AWS::DynamoDB::GlobalTable": globalTable,
 		"AWS::Kinesis::Stream": func(e *est, p map[string]any) {
 			if e.str(asMap(p["StreamModeDetails"]), "StreamMode", "PROVISIONED") == "ON_DEMAND" {
 				e.hourly(1, "", "kinesis|OnDemand-StreamHour", "on-demand stream")
@@ -575,6 +589,56 @@ func (e *est) notLocalZone(p map[string]any) {
 	if localZone.MatchString(az) {
 		panic(unresolved("Local Zone " + az + " prices are not supported yet"))
 	}
+}
+
+// autoPublicIP reports whether instances get a public IPv4 at launch: by
+// AssociatePublicIpAddress when set, else by MapPublicIpOnLaunch of every
+// subnet. A subnet outside this template, or a value that doesn't resolve,
+// counts as no, so the instance itself is still estimated.
+func (e *est) autoPublicIP(assoc any, subnets []any) bool {
+	return e.maybe(func() bool {
+		if assoc != nil {
+			return e.flag(map[string]any{"AssociatePublicIpAddress": assoc}, "AssociatePublicIpAddress")
+		}
+		for _, s := range subnets {
+			_, sub := e.ref(map[string]any{"SubnetId": s}, "SubnetId")
+			if sub.Type != "AWS::EC2::Subnet" || !e.flag(sub.Properties, "MapPublicIpOnLaunch") {
+				return false
+			}
+		}
+		return len(subnets) > 0
+	})
+}
+
+// hasEIP reports whether an Elastic IP in this template is attached to the
+// instance; it replaces the auto-assigned address and is counted on its own.
+func (e *est) hasEIP() bool {
+	for _, r := range e.st.Resources {
+		if (r.Type == "AWS::EC2::EIP" || r.Type == "AWS::EC2::EIPAssociation") && asMap(r.Properties["InstanceId"])["Ref"] == e.id {
+			return true
+		}
+	}
+	return false
+}
+
+// maybe returns f's answer, or false when f reads a value that doesn't resolve.
+func (e *est) maybe(f func() bool) (yes bool) {
+	defer func() {
+		if v := recover(); v != nil {
+			if _, ok := v.(unresolved); !ok {
+				panic(v)
+			}
+			yes = false
+		}
+	}()
+	return f()
+}
+
+func firstMap(v any) map[string]any {
+	if l, _ := v.([]any); len(l) > 0 {
+		return asMap(l[0])
+	}
+	return nil
 }
 
 // launchTemplate returns the LaunchTemplateData a LaunchTemplate specification
@@ -832,6 +896,20 @@ func fsx(e *est, p map[string]any) {
 		e.monthly(size, "GB SSD", "fsx|OpenZFS|Storage."+sfx+":SSD", "storage")
 		e.monthly(e.mustNum(c, "ThroughputCapacity"), "MB/s", "fsx|OpenZFS|ThroughputCapacity."+sfx, "throughput capacity")
 		e.userIOPS(asMap(c["DiskIopsConfiguration"]), size, "fsx|OpenZFS|ProvisionedSSDIOPS."+sfx)
+	case "ONTAP":
+		c := asMap(p["OntapConfiguration"])
+		dt := e.mustStr(c, "DeploymentType")
+		sfx, ok := map[string]string{"SINGLE_AZ_1": "SAZ_2N", "SINGLE_AZ_2": "SAZ_2N2", "MULTI_AZ_1": "MAZ", "MULTI_AZ_2": "MAZ2"}[dt]
+		if !ok {
+			panic(unresolved("DeploymentType " + dt + " is not supported yet"))
+		}
+		tput := e.num(c, "ThroughputCapacity", 0)
+		if tput == 0 {
+			tput = e.mustNum(c, "ThroughputCapacityPerHAPair") * e.num(c, "HAPairs", 1)
+		}
+		e.monthly(size, "GB SSD", "fsx|ONTAP|Storage."+sfx+":SSD", "SSD storage (capacity pool is pay-per-use)")
+		e.monthly(tput, "MB/s", "fsx|ONTAP|ThroughputCapacity."+sfx, "throughput capacity")
+		e.userIOPS(asMap(c["DiskIopsConfiguration"]), size, "fsx|ONTAP|ProvisionedSSDIOPS."+sfx)
 	default:
 		panic(unresolved("FSx for " + t + " is not supported yet"))
 	}
@@ -842,6 +920,65 @@ func (e *est) userIOPS(c map[string]any, size float64, key string) {
 	if e.str(c, "Mode", "AUTOMATIC") == "USER_PROVISIONED" {
 		e.monthly(math.Max(0, e.mustNum(c, "Iops")-3*size), "IOPS", key, "SSD IOPS above 3 per GB")
 	}
+}
+
+// globalTable bills the provisioned capacity of the replica in the stack's
+// region. Writes can only be set as an auto scaling range, so the minimum is
+// used; with two or more replicas they are billed as replicated writes.
+// ponytail: other regions' replicas are only counted in the reason; pricing
+// them needs a region per Item.
+func globalTable(e *est, p map[string]any) {
+	if e.str(p, "BillingMode", "PROVISIONED") != "PROVISIONED" {
+		return
+	}
+	replicas, _ := p["Replicas"].([]any)
+	var here map[string]any
+	for _, r := range replicas {
+		if e.mustStr(asMap(r), "Region") == e.st.Region {
+			here = asMap(r)
+		}
+	}
+	if here == nil {
+		panic(unresolved("no replica in " + e.st.Region))
+	}
+	minWrite := func(m map[string]any) float64 {
+		as := asMap(asMap(m["WriteProvisionedThroughputSettings"])["WriteCapacityAutoScalingSettings"])
+		if as == nil {
+			panic(unresolved("WriteProvisionedThroughputSettings is not set"))
+		}
+		return e.mustNum(as, "MinCapacity")
+	}
+	read := func(m map[string]any) float64 {
+		rp := asMap(m["ReadProvisionedThroughputSettings"])
+		if rp["ReadCapacityUnits"] != nil {
+			return e.num(rp, "ReadCapacityUnits", 0)
+		}
+		as := asMap(rp["ReadCapacityAutoScalingSettings"])
+		if as == nil {
+			panic(unresolved("ReadProvisionedThroughputSettings is not set"))
+		}
+		return e.mustNum(as, "MinCapacity")
+	}
+	r, w := read(here), minWrite(p)
+	replicaGSIs, _ := here["GlobalSecondaryIndexes"].([]any)
+	for _, g := range replicaGSIs {
+		r += read(asMap(g))
+	}
+	gsis, _ := p["GlobalSecondaryIndexes"].([]any)
+	for _, g := range gsis {
+		w += minWrite(asMap(g))
+	}
+	ia := ""
+	if e.str(here, "TableClass", "STANDARD") == "STANDARD_INFREQUENT_ACCESS" {
+		ia = "IA-"
+	}
+	wkey, wunit, what, sfx := "WriteCapacityUnit-Hrs", "WCU", "write capacity", ""
+	if len(replicas) > 1 {
+		wkey, wunit, what = "ReplWriteCapacityUnit-Hrs", "rWCU", "replicated write capacity"
+		sfx = fmt.Sprintf(", replica in %s (%d in other regions not counted)", e.st.Region, len(replicas)-1)
+	}
+	e.hourly(r, "RCU", "ddb|"+ia+"ReadCapacityUnit-Hrs", "provisioned read capacity"+sfx)
+	e.hourly(w, wunit, "ddb|"+ia+wkey, what+", auto scaling minimum"+sfx)
 }
 
 func ecsService(e *est, p map[string]any) {
@@ -880,12 +1017,16 @@ func ecsService(e *est, p map[string]any) {
 	if es := e.num(asMap(tp["EphemeralStorage"]), "SizeInGiB", 20); es > 20 {
 		e.hourly(n*(es-20), "GB", "fargate|Fargate-EphemeralStorage-GB-Hours", "Fargate ephemeral storage above 20 GB")
 	}
+	vpc := asMap(asMap(p["NetworkConfiguration"])["AwsvpcConfiguration"])
+	if e.maybe(func() bool { return e.str(vpc, "AssignPublicIp", "DISABLED") == "ENABLED" }) {
+		e.hourly(n, "IPv4", "vpc|PublicIPv4:InUseAddress", fmt.Sprintf("public IPv4 per task (%g tasks)", n))
+	}
 }
 
 // notCounted are types that cost money with zero traffic but have no rule yet.
 // They are listed in the report instead of being skipped silently.
 var notCounted = []string{
-	"AWS::EMR::Cluster", "AWS::DocDBElastic::Cluster", "AWS::WorkSpaces::Workspace", "AWS::DirectoryService::MicrosoftAD", "AWS::DirectoryService::SimpleAD",
+	"AWS::EMR::Cluster", "AWS::DocDBElastic::Cluster", "AWS::WorkSpaces::Workspace",
 	"AWS::MWAA::Environment", "AWS::AppStream::Fleet", "AWS::Kendra::Index", "AWS::DMS::ReplicationInstance",
 	"AWS::Timestream::InfluxDBInstance", "AWS::EC2::Host", "AWS::EC2::CapacityReservation",
 	"AWS::ElasticBeanstalk::Environment", "AWS::Lightsail::Instance", "AWS::Lightsail::Database",
@@ -969,7 +1110,8 @@ func init() {
 		},
 		"AWS::ApiGateway::Stage": func(e *est, p map[string]any) {
 			if e.flag(p, "CacheClusterEnabled") {
-				panic(unresolved("API cache clusters are not supported yet"))
+				size := e.str(p, "CacheClusterSize", "0.5")
+				e.hourly(1, "", "apigw|cache:"+size, size+" GB cache cluster")
 			}
 		},
 		"AWS::Lambda::Version": lambdaProvisioned,
@@ -1127,6 +1269,22 @@ func init() {
 			t := e.mustStr(p, "NodeType")
 			n := e.num(p, "NumShards", 1) * (e.num(p, "NumReplicasPerShard", 1) + 1)
 			e.hourly(n, "nodes", "memorydb|"+engine+"|"+t, t+" "+engine)
+		},
+		"AWS::DirectoryService::MicrosoftAD": func(e *est, p map[string]any) {
+			key := map[string]string{"Enterprise": "ds|MicrosoftAD-DC-Usage", "Standard": "ds|Std-MicrosoftAD-DC-Usage"}
+			ed := e.str(p, "Edition", "Enterprise")
+			if key[ed] == "" {
+				panic(unresolved("Edition " + ed + " is not supported"))
+			}
+			// More domain controllers are added by API call, not in the template.
+			e.hourly(2, "DCs", key[ed], ed+" Edition, 2 domain controllers")
+		},
+		"AWS::DirectoryService::SimpleAD": func(e *est, p map[string]any) {
+			size := e.mustStr(p, "Size")
+			if !in(size, "Small", "Large") {
+				panic(unresolved("Size " + size + " is not supported"))
+			}
+			e.hourly(1, "", "ds|"+size+"-SimpleAD-Usage", size+" Simple AD")
 		},
 		"AWS::SageMaker::Endpoint": func(e *est, p map[string]any) {
 			_, cfg := e.ref(p, "EndpointConfigName")
