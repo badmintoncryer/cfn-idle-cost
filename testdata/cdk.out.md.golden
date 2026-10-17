@@ -1,8 +1,8 @@
-### Idle cost ≈ $141/mo
+### Idle cost ≈ $151/mo
 
 | Region | Stacks | Idle cost |
 |---|---:|---:|
-| ap-northeast-1 | 2 | $140/mo |
+| ap-northeast-1 | 2 | $150/mo |
 | us-east-1 | 1 | $1.00/mo |
 
 <details><summary>Breakdown by resource</summary>
@@ -15,6 +15,7 @@
 | App | `Vpc/SsmEndpoint` | ×2 AZ | $20 | interface endpoint hourly per AZ |
 | App | `Server` | ×1 | $9.93 | t3.micro on-demand (Linux) (default of ServerType) |
 | App | `Server` | ×30 GB gp3 | $2.88 | EBS gp3 storage (default of ServerType) |
+| App | `Spare` | ×1 | $9.93 | t3.micro on-demand (Linux) (default of Env) |
 | App | `Table` | ×5 WCU | $2.71 | provisioned write capacity |
 | App | `Table` | ×10 RCU | $1.08 | provisioned read capacity |
 | App | `Vpc/EIP` | ×1 | $3.65 | public IPv4 address |
@@ -31,10 +32,8 @@
 
 </details>
 
-**Could not estimate (3)**
+**Could not estimate (1)**
 
-- App `ProdKey`: depends on Condition IsProd
-- App `Spare`: InstanceType uses Fn::If
 - App `Worker`: InstanceType is Parameter WorkerType
 
 <sub>cfn-idle-cost · prices: test prices · on-demand list prices, 730 h/mo, USD, free tier ignored</sub>

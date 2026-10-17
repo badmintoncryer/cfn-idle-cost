@@ -1,5 +1,5 @@
 Conditions:
-  IsProd: !Equals [a, b]
+  IsProd: !Equals [!Ref "AWS::AccountId", "123456789012"]
 Resources:
   Server: { Type: AWS::EC2::Instance, Properties: { InstanceType: t3.small } }
   Secret: { Type: AWS::SecretsManager::Secret }

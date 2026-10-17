@@ -3,7 +3,7 @@
 # run is checked against the caller and fails). See docs/release.md.
 name: release
 on:
-  push: { tags: ["v*"] }
+  push: { tags: ["v*.*.*"] } # not v0, which the last step moves
   workflow_dispatch:
     inputs:
       tag: { type: string, required: true }
@@ -28,3 +28,9 @@ jobs:
       - run: |
           tag="${{ inputs.tag || github.ref_name }}"
           scripts/npm-publish.sh "${tag#v}"
+      # Point the major tag (v0) at this release, for uses: badmintoncryer/cfn-idle-cost@v0.
+      - name: Move the major tag
+        run: |
+          tag="${{ inputs.tag || github.ref_name }}"
+          git tag -f "${tag%%.*}" "$tag"
+          git push -f origin "${tag%%.*}"

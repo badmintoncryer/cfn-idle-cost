@@ -18,6 +18,7 @@ type Stack struct {
 	Region     string // from the cloud assembly env; empty when env-agnostic or a plain file
 	Path       string
 	Parameters map[string]Param
+	Conditions map[string]any
 	Resources  map[string]Resource
 	paths      map[string]string // logical ID -> construct path, from the cloud assembly
 	cdkPath    string            // construct path of the stack (Stage/Stack), stripped from resource paths
@@ -26,6 +27,8 @@ type Stack struct {
 type Param struct {
 	Type    string
 	Default any
+	Value   string // from --parameter, when Given
+	Given   bool
 }
 
 type Resource struct {
@@ -46,7 +49,7 @@ func ParseTemplate(path string, raw []byte) (*Stack, error) {
 	if doc == nil {
 		return nil, fmt.Errorf("%s: not a CloudFormation template", path)
 	}
-	s := &Stack{Path: path, Parameters: map[string]Param{}, Resources: map[string]Resource{}}
+	s := &Stack{Path: path, Parameters: map[string]Param{}, Conditions: asMap(doc["Conditions"]), Resources: map[string]Resource{}}
 	for name, p := range asMap(doc["Parameters"]) {
 		pm := asMap(p)
 		t, _ := pm["Type"].(string)

@@ -29,6 +29,9 @@ Flags:
   --max usd            exit 3 if the total idle cost is over usd per month
   --max-increase usd   with --base: exit 3 if the idle cost grows by more than usd per month
   --region r           region for stacks without one (env-agnostic stacks, plain templates)
+  --parameter [Stack:]Key=Value
+                       value of a template parameter, for every stack or only Stack (repeatable);
+                       parameters without one use their Default
   --live               fetch current prices from the AWS Price List Query API
                        (needs credentials with pricing:GetProducts) instead of the bundled snapshot
   --version            print the version
@@ -74,6 +77,8 @@ func run(args []string, stdout io.Writer) error {
 	maxTotal := fs.Float64("max", -1, "")
 	maxIncrease := fs.Float64("max-increase", -1, "")
 	live := fs.Bool("live", false, "")
+	var params paramFlag
+	fs.Var(&params, "parameter", "")
 	showVersion := fs.Bool("version", false, "")
 	// Allow flags after the inputs too (npx cfn-idle-cost cdk.out --format md).
 	var flags, inputs []string
@@ -117,11 +122,15 @@ func run(args []string, stdout io.Writer) error {
 	if err != nil {
 		return err
 	}
+	if unused := params.apply(head); len(unused) > 0 {
+		return usageError{"no stack has parameter " + strings.Join(unused, ", ")}
+	}
 	var baseStacks []*Stack
 	if *base != "" {
 		if baseStacks, err = loadStacks([]string{*base}, *region); err != nil {
 			return err
 		}
+		params.apply(baseStacks) // the base may not have a parameter added since
 	}
 	var prices *Prices
 	if *live {
@@ -173,6 +182,42 @@ func checkBudget(rep Report, d *Diff, maxTotal, maxIncrease float64) error {
 		return overBudget{fmt.Sprintf("over budget: idle cost grows by %s/mo, over --max-increase %s", money(d.After-d.Before), money(maxIncrease))}
 	}
 	return nil
+}
+
+// paramFlag collects --parameter [Stack:]Key=Value.
+type paramFlag []struct{ stack, key, value string }
+
+func (p *paramFlag) String() string { return "" }
+
+func (p *paramFlag) Set(s string) error {
+	k, v, ok := strings.Cut(s, "=")
+	if !ok || k == "" {
+		return fmt.Errorf("--parameter %q: want [Stack:]Key=Value", s)
+	}
+	st, key := "", k
+	if i := strings.LastIndex(k, ":"); i >= 0 {
+		st, key = k[:i], k[i+1:]
+	}
+	*p = append(*p, struct{ stack, key, value string }{st, key, v})
+	return nil
+}
+
+// apply sets the given parameters and returns the ones no stack has.
+func (p paramFlag) apply(stacks []*Stack) (unused []string) {
+	for _, g := range p {
+		used := false
+		for _, s := range stacks {
+			if par, ok := s.Parameters[g.key]; ok && (g.stack == "" || g.stack == s.Name) {
+				par.Value, par.Given = g.value, true
+				s.Parameters[g.key] = par
+				used = true
+			}
+		}
+		if !used {
+			unused = append(unused, strings.TrimPrefix(g.stack+":"+g.key, ":"))
+		}
+	}
+	return unused
 }
 
 // loadStacks loads inputs and fills the region of stacks that have none.

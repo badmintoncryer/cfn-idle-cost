@@ -65,6 +65,39 @@ Resources:
   Proxy:
     Type: AWS::RDS::DBProxy
     Properties: { DBProxyName: p, EngineFamily: MYSQL, Auth: [], RoleArn: arn, VpcSubnetIds: [a] }
+  ProxyTargets:
+    Type: AWS::RDS::DBProxyTargetGroup
+    Properties: { DBProxyName: !Ref Proxy, TargetGroupName: default, DBClusterIdentifiers: [!Ref ProxyDb] }
+  ProxyDb:
+    Type: AWS::RDS::DBCluster
+    Properties: { Engine: aurora-mysql, ServerlessV2ScalingConfiguration: { MinCapacity: 2, MaxCapacity: 8 } }
+  ProxyDbWriter:
+    Type: AWS::RDS::DBInstance
+    Properties: { DBClusterIdentifier: !Ref ProxyDb, DBInstanceClass: db.r6g.large, Engine: aurora-mysql }
+  ProxyDbReader:
+    Type: AWS::RDS::DBInstance
+    Properties: { DBClusterIdentifier: !Ref ProxyDb, DBInstanceClass: db.serverless, Engine: aurora-mysql }
+  Logs:
+    Type: AWS::OpenSearchServerless::Collection
+    Properties: { Name: logs, Type: SEARCH }
+  Logs2:
+    Type: AWS::OpenSearchServerless::Collection
+    Properties: { Name: logs2, Type: SEARCH }
+  Vectors:
+    Type: AWS::OpenSearchServerless::Collection
+    Properties: { Name: vectors, Type: VECTORSEARCH, StandbyReplicas: DISABLED }
+  Memory:
+    Type: AWS::MemoryDB::Cluster
+    Properties: { ClusterName: m, NodeType: db.t4g.small, ACLName: open-access, NumShards: 2 }
+  Model:
+    Type: AWS::SageMaker::Endpoint
+    Properties: { EndpointConfigName: !GetAtt ModelConfig.EndpointConfigName }
+  ModelConfig:
+    Type: AWS::SageMaker::EndpointConfig
+    Properties:
+      ProductionVariants:
+        - { VariantName: main, ModelName: m, InstanceType: ml.m5.large, InitialInstanceCount: 2 }
+        - { VariantName: cheap, ModelName: m, ServerlessConfig: { MaxConcurrency: 5, MemorySizeInMB: 2048 } }
   EdgeBox:
     Type: AWS::EC2::Instance
     Properties: { InstanceType: t3.medium, AvailabilityZone: eu-west-1-lhr-1a }

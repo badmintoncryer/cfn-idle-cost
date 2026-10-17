@@ -69,6 +69,7 @@ nested stacks) or CloudFormation templates (JSON or YAML).
 | `--max <usd>` | Exit `3` if the total idle cost is over `usd` per month. |
 | `--max-increase <usd>` | With `--base`: exit `3` if the idle cost grows by more than `usd` per month. |
 | `--region <r>` | Region for stacks that have none: env-agnostic CDK stacks and plain templates. Stacks with an `env` keep their own region. Without it, such stacks are an error. |
+| `--parameter [Stack:]Key=Value` | Value of a template parameter, for every stack that has it or only `Stack`. Repeat it for more. Parameters without one use their `Default`. |
 | `--live` | Fetch current prices from the [Price List Query API](https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/using-price-list-query-api.html) instead of the bundled snapshot. Needs AWS credentials with `pricing:GetProducts`. |
 | `--version` | Print the version. |
 
@@ -118,12 +119,23 @@ jobs:
         working-directory: head
       - run: npm ci && npx cdk synth -q
         working-directory: base
-      - id: cost
-        run: npx -y cfn-idle-cost --base base/cdk.out head/cdk.out --format md --max-increase 50 > idle-cost.md
-      - if: always()
-        run: gh pr comment ${{ github.event.pull_request.number }} --body-file idle-cost.md --edit-last --create-if-none
-        env: { GH_TOKEN: "${{ github.token }}", GH_REPO: "${{ github.repository }}" }
+      - uses: badmintoncryer/cfn-idle-cost@v0
+        with: { base: base/cdk.out, path: head/cdk.out, max-increase: 50 }
 ```
+
+The action posts one comment and updates it on every push, writes the same
+Markdown to the job summary, and fails the job when a budget is exceeded.
+
+| Input | What it does |
+|---|---|
+| `path` | `cdk.out` or templates (space-separated) of the pull request. Default `cdk.out`. |
+| `base` | `cdk.out` or template of the base branch. Without it, the comment shows the total idle cost. |
+| `max`, `max-increase` | Same as the flags. |
+| `args` | More flags, e.g. `--region us-east-1 --parameter Env=prod`. |
+| `comment` | `false` to skip the comment. Default `true`. |
+| `github-token` | Token used to comment. Default `github.token`. |
+
+`@v0` runs the latest release; `@v0.0.5` pins that version.
 
 `cdk synth` reads context from `cdk.context.json`; commit it, or the synth
 needs AWS credentials for lookups.
@@ -174,6 +186,10 @@ and provisioned storage billed whether you use it or not.
 | `AWS::AmazonMQ::Broker` | broker hourly (ActiveMQ and RabbitMQ, single or multi-AZ) |
 | `AWS::Transfer::Server` | hourly per protocol |
 | `AWS::AppRunner::Service` | memory of the minimum provisioned instances |
+| `AWS::RDS::DBProxy` | per vCPU of the target instances, or per ACU of Serverless v2 targets at their minimum (targets must be in the same template) |
+| `AWS::OpenSearchServerless::Collection` | minimum indexing and search OCUs (1 + 1 with standby replicas, 0.5 + 0.5 without), once per collection type in a stack, since collections share OCUs. Collections in a collection group are not estimated |
+| `AWS::MemoryDB::Cluster` | node hourly × shards × (1 + replicas) (Redis and Valkey) |
+| `AWS::SageMaker::Endpoint` | instance hourly × `InitialInstanceCount` per production variant (serverless variants: $0 idle) |
 | `AWS::CodePipeline::Pipeline` | per active V1 pipeline (V2 pipelines bill per minute: $0 idle) |
 
 Usage-only charges are left out on purpose: S3, Lambda, Aurora storage and
@@ -182,8 +198,7 @@ I/O, CloudWatch Logs, data transfer, requests.
 ### Not counted yet
 
 Resource types that cost money with zero traffic but have no rule yet, such as
-RDS Proxy, OpenSearch Serverless, SageMaker endpoints, EMR, MemoryDB,
-WorkSpaces, Directory Service and CloudWatch dashboards, are listed under `! not counted yet`, so
+EMR, WorkSpaces, Directory Service and CloudWatch dashboards, are listed under `! not counted yet`, so
 their cost is never left out silently. Partly supported types (FSx for ONTAP,
 provisioned DynamoDB global tables, Oracle and SQL Server on RDS, Multi-AZ DB
 clusters, Fargate Spot and Windows, Spot node groups, instances in Local
@@ -199,10 +214,15 @@ Zones, API Gateway caches) are listed under
   `BlockDeviceMappings`) is not counted, and neither are public IPs that
   instances get automatically.
 - A value that cannot be read from the template, such as a Parameter without a
-  default, a reference to another stack, `Fn::If` or a resource with a
-  `Condition`, is never guessed: the resource is listed under
-  `? could not estimate` with the reason. A Parameter with a `Default` is
-  estimated with that default, and the line says so.
+  default or a reference to another stack, is never guessed: the resource is
+  listed under `? could not estimate` with the reason. A Parameter with a
+  `Default` is estimated with that default, and the line says so; pass
+  `--parameter` to use another value.
+- `Conditions` (`Fn::Equals`, `Fn::And`, `Fn::Or`, `Fn::Not`) and `Fn::If` are
+  evaluated when they depend only on parameters and `AWS::Region`. A resource
+  whose `Condition` is false is not created, so it is not listed. A condition
+  on anything else, such as `AWS::AccountId`, makes the resource
+  `? could not estimate`.
 - An Auto Scaling group uses `DesiredCapacity` when set, otherwise `MinSize`.
   DynamoDB uses the table's provisioned capacity, not an auto scaling minimum.
 - Plain templates have no construct paths, so lines show the logical ID.

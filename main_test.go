@@ -31,6 +31,9 @@ var testPrices = &Prices{Source: "test prices", Regions: map[string]map[string]f
 		"kinesis|Storage-ShardHour":         0.0195,
 	},
 	"eu-west-1": {
+		"rdsproxy|RDS:ProxyUsage": 0.015, "rdsproxy|RDS:Proxy-ASv2-Usage": 0.015, "rds|InstanceUsage:db.r6g.large|16": 0.276,
+		"rds|Aurora:ServerlessV2Usage|16": 0.13, "aoss|IndexingOCU": 0.24, "aoss|SearchOCU": 0.24,
+		"memorydb|Redis|db.t4g.small": 0.048, "sagemaker|ml.m5.large": 0.128,
 		"eks|AmazonEKS-Hours:perCluster": 0.1, "ec2|t3.medium": 0.0456, "nfw|Endpoint-Hour": 0.395,
 		"waf|WebACLV2": 5, "waf|RuleV2": 1, "cw|CW:AlarmMonitorUsage": 0.1, "cw|CW:HighResAlarmMonitorUsage": 0.3,
 		"lambda|Lambda-Provisioned-Concurrency-ARM": 0.0000033334, "tgw|TransitGatewayVPC": 0.05, "tgw|TransitGatewayVPN": 0.05,
@@ -93,6 +96,22 @@ func TestYAMLTemplate(t *testing.T) {
 // The rules added in 0.0.3, and a type listed as "not counted yet".
 func TestMoreTypes(t *testing.T) {
 	golden(t, "more.yaml", report(t, "eu-west-1", "testdata/more.yaml"))
+}
+
+// --parameter turns the Condition on: ProdKey is created and Spare is an m5.large.
+func TestParameter(t *testing.T) {
+	var b bytes.Buffer
+	if err := run([]string{"testdata/cdk.out", "--region", "us-east-1", "--parameter", "App:Env=prod", "--parameter", "WorkerType=t3.nano"}, &b); err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"ProdKey", "m5.large", "t3.nano"} {
+		if !strings.Contains(b.String(), want) {
+			t.Errorf("no %s in\n%s", want, b.String())
+		}
+	}
+	if err := run([]string{"testdata/cdk.out", "--region", "us-east-1", "--parameter", "Nope=1"}, io.Discard); err == nil {
+		t.Error("an unknown parameter was accepted")
+	}
 }
 
 func TestMissingRegion(t *testing.T) {

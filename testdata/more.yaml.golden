@@ -1,31 +1,41 @@
-eu-west-1 · 1 stack · idle ≈ $2548/mo
+eu-west-1 · 1 stack · idle ≈ $3836/mo
 
-more                            $2548/mo
-  Broker        ×1               $661  mq.m5.large RabbitMQ Multi-AZ
-  Firewall      ×2 endpoints     $577  firewall endpoint hourly per AZ
-  Kafka         ×3 brokers       $495  kafka.m5.large broker hourly
-  Kafka         ×300 GB           $33  broker storage
-  Sftp          ×1 protocols     $219  server hourly per protocol
-  Inbound       ×2 ENIs          $182  Resolver endpoint hourly per IP address
-  Cluster       ×1                $73  EKS cluster hourly (standard support)
-  Vpn           ×1                $36  Site-to-Site VPN connection hourly
-  Vpn           ×1                $36  Transit Gateway VPN attachment hourly
-  DocsInstance  ×1                $71  db.t4g.medium instance, I/O-Optimized
-  Nodes         ×2                $67  t3.medium on-demand (Linux), DesiredSize
-  Attach        ×1                $36  Transit Gateway VPC attachment hourly
-  RegionBox     ×1                $33  t3.medium on-demand (Linux)
-  Live          ×2 concurrency    $18  provisioned concurrency (1024 MB)
-  Acl           ×1              $5.00  web ACL
-  Acl           ×3 rules        $3.00  rules (managed rule group fees not counted)
-  Pipeline      ×1              $1.00  active V1 pipeline
-  MathAlarm     ×2 metrics      $0.60  high-resolution alarm per metric
-  Alarm         ×1 metrics      $0.10  alarm per metric
+more                             $3836/mo
+  Broker         ×1               $661  mq.m5.large RabbitMQ Multi-AZ
+  Firewall       ×2 endpoints     $577  firewall endpoint hourly per AZ
+  Kafka          ×3 brokers       $495  kafka.m5.large broker hourly
+  Kafka          ×300 GB           $33  broker storage
+  Logs           ×1 OCU           $175  indexing minimum OCUs, standby replicas
+  Logs           ×1 OCU           $175  search minimum OCUs, standby replicas
+  Sftp           ×1 protocols     $219  server hourly per protocol
+  ProxyDbWriter  ×1               $201  db.r6g.large aurora-mysql
+  ProxyDbReader  ×2 ACU           $190  Serverless v2 minimum capacity
+  Model          ×2               $187  ml.m5.large hosting (main)
+  Inbound        ×2 ENIs          $182  Resolver endpoint hourly per IP address
+  Vectors        ×0.5 OCU          $88  indexing minimum OCUs, no standby replicas
+  Vectors        ×0.5 OCU          $88  search minimum OCUs, no standby replicas
+  Memory         ×4 nodes         $140  db.t4g.small Redis
+  Cluster        ×1                $73  EKS cluster hourly (standard support)
+  Vpn            ×1                $36  Site-to-Site VPN connection hourly
+  Vpn            ×1                $36  Transit Gateway VPN attachment hourly
+  DocsInstance   ×1                $71  db.t4g.medium instance, I/O-Optimized
+  Nodes          ×2                $67  t3.medium on-demand (Linux), DesiredSize
+  Proxy          ×2 vCPU           $22  per vCPU of the target instances
+  Proxy          ×2 ACU            $22  per ACU of the Serverless v2 targets (minimum)
+  Attach         ×1                $36  Transit Gateway VPC attachment hourly
+  RegionBox      ×1                $33  t3.medium on-demand (Linux)
+  Live           ×2 concurrency    $18  provisioned concurrency (1024 MB)
+  Acl            ×1              $5.00  web ACL
+  Acl            ×3 rules        $3.00  rules (managed rule group fees not counted)
+  Pipeline       ×1              $1.00  active V1 pipeline
+  MathAlarm      ×2 metrics      $0.60  high-resolution alarm per metric
+  Alarm          ×1 metrics      $0.10  alarm per metric
+  Logs2          ×1              $0.00  shares the OCUs of Logs
 
 ? could not estimate: 1
   more  EdgeBox  Local Zone eu-west-1-lhr-1a prices are not supported yet
 
-! not counted yet: 2 (these cost money idle; cfn-idle-cost has no rule for them)
+! not counted yet: 1 (these cost money idle; cfn-idle-cost has no rule for them)
   more  Board  AWS::CloudWatch::Dashboard
-  more  Proxy  AWS::RDS::DBProxy
 
 prices: test prices · on-demand list prices, 730 h/mo, USD, free tier ignored

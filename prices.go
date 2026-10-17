@@ -236,6 +236,25 @@ var selectors = []selector{
 		key: func(a map[string]string, u string) string {
 			return dbInstanceKey(a, u, "Neptune:ServerlessUsage", "Neptune:ServerlessIOOptimizedUsage")
 		}},
+	{name: "rdsproxy", service: "AmazonRDS", families: []string{"RDSProxy"},
+		key: func(a map[string]string, u string) string { return keep(u, "RDS:ProxyUsage", "RDS:Proxy-ASv2-Usage") }},
+	{name: "aoss", service: "AmazonES", families: []string{"Amazon OpenSearch Service Serverless"},
+		key: func(a map[string]string, u string) string { return keep(u, "IndexingOCU", "SearchOCU") }},
+	{name: "memorydb", service: "AmazonMemoryDB", families: []string{"Amazon MemoryDB"},
+		key: func(a map[string]string, u string) string {
+			if strings.HasPrefix(u, "NodeUsage:") {
+				return a["engine"] + "|" + a["instanceType"]
+			}
+			return ""
+		}},
+	{name: "sagemaker", service: "AmazonSageMaker", families: []string{"ML Instance"}, filters: map[string]string{"component": "Hosting"},
+		key: func(a map[string]string, u string) string {
+			if strings.HasPrefix(u, "Host:") {
+				return a["instanceName"]
+			}
+			return ""
+		},
+		liveFilter: func(d string) map[string]string { return map[string]string{"instanceName": d} }},
 	{name: "msk", service: "AmazonMSK", families: []string{"Managed Streaming for Apache Kafka (MSK)"},
 		key: func(a map[string]string, u string) string {
 			if (strings.HasPrefix(u, "Kafka.") || strings.HasPrefix(u, "Express.")) && !strings.Contains(u, "PrivateConnectivity") || u == "KafkaServerless-ClusterHours" {

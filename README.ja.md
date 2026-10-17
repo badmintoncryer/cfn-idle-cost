@@ -62,6 +62,7 @@ npx cfn-idle-cost [flags] [cdk.out | template ...]
 | `--max <usd>` | アイドルコストの合計が月`usd`ドルを超えたら、終了コード`3`で終わります。 |
 | `--max-increase <usd>` | `--base`と一緒に使います。アイドルコストの増加が月`usd`ドルを超えたら、終了コード`3`で終わります。 |
 | `--region <r>` | リージョンを持たないスタック（envを指定していないCDKスタックと、素のテンプレート）に使うリージョンです。`env`を指定したスタックは、そのリージョンのまま見積もります。リージョンのないスタックがあるのにこのフラグがなければ、エラーになります。 |
+| `--parameter [Stack:]Key=Value` | テンプレートのパラメータの値を指定します。そのパラメータを持つすべてのスタックに効き、`Stack:`を付けるとそのスタックだけに効きます。複数指定できます。指定しなかったパラメータには`Default`を使います。 |
 | `--live` | 同梱のスナップショットではなく、[Price List Query API](https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/using-price-list-query-api.html)から最新の価格を取得します。`pricing:GetProducts`を許可したAWSの認証情報が必要です。 |
 | `--version` | バージョンを表示します。 |
 
@@ -106,12 +107,22 @@ jobs:
         working-directory: head
       - run: npm ci && npx cdk synth -q
         working-directory: base
-      - id: cost
-        run: npx -y cfn-idle-cost --base base/cdk.out head/cdk.out --format md --max-increase 50 > idle-cost.md
-      - if: always()
-        run: gh pr comment ${{ github.event.pull_request.number }} --body-file idle-cost.md --edit-last --create-if-none
-        env: { GH_TOKEN: "${{ github.token }}", GH_REPO: "${{ github.repository }}" }
+      - uses: badmintoncryer/cfn-idle-cost@v0
+        with: { base: base/cdk.out, path: head/cdk.out, max-increase: 50 }
 ```
+
+このActionはプルリクエストにコメントを1件投稿し、プッシュのたびにそのコメントを更新します。同じMarkdownをジョブのサマリーにも書き出し、予算を超えたときはジョブを失敗させます。
+
+| 入力 | 内容 |
+|---|---|
+| `path` | プルリクエスト側の`cdk.out`またはテンプレート（空白区切りで複数可）。デフォルトは`cdk.out`です。 |
+| `base` | ベースブランチ側の`cdk.out`またはテンプレート。指定しないと、コメントにはアイドルコストの合計を載せます。 |
+| `max`、`max-increase` | 同名のフラグと同じです。 |
+| `args` | そのほかのフラグ。たとえば`--region us-east-1 --parameter Env=prod`です。 |
+| `comment` | `false`にするとコメントを投稿しません。デフォルトは`true`です。 |
+| `github-token` | コメントに使うトークン。デフォルトは`github.token`です。 |
+
+`@v0`は最新のリリースを使います。`@v0.0.5`のように書くと、そのバージョンに固定できます。
 
 `cdk synth`は`cdk.context.json`からコンテキストを読みます。このファイルをコミットしておかないと、lookupのためにsynthでAWSの認証情報が必要になります。
 
@@ -160,19 +171,24 @@ jobs:
 | `AWS::AmazonMQ::Broker` | ブローカーの時間料金（ActiveMQとRabbitMQ、シングル・マルチAZ） |
 | `AWS::Transfer::Server` | プロトコルごとの時間料金 |
 | `AWS::AppRunner::Service` | 最小数のプロビジョニング済みインスタンスのメモリ |
+| `AWS::RDS::DBProxy` | ターゲットのインスタンスのvCPUごとの料金。Serverless v2のターゲットは最小ACUごとの料金（ターゲットが同じテンプレートにある場合だけ） |
+| `AWS::OpenSearchServerless::Collection` | インデックス作成と検索の最小OCU（スタンバイレプリカありで1 + 1、なしで0.5 + 0.5）。コレクションはOCUを共有するので、スタック内でコレクションのタイプごとに1回だけ数えます。コレクショングループに属するコレクションは見積もりません |
+| `AWS::MemoryDB::Cluster` | ノードの時間単価 × シャード数 ×（1 + レプリカ数）（RedisとValkey） |
+| `AWS::SageMaker::Endpoint` | プロダクションバリアントごとに、インスタンスの時間単価 × `InitialInstanceCount`（サーバーレスのバリアントはアイドル時$0） |
 | `AWS::CodePipeline::Pipeline` | アクティブなV1パイプラインごとの料金（V2は実行時間の分だけかかるので、アイドル時は$0） |
 
 使った分だけかかる費用は、意図して対象から外しています。S3、Lambda、AuroraのストレージとI/O、CloudWatch Logs、データ転送、リクエスト料金がこれに当たります。
 
 ### まだ見積もらないもの
 
-アクセスがゼロでも費用がかかるのに、まだルールのないリソースタイプ（RDS Proxy、OpenSearch Serverless、SageMakerのエンドポイント、EMR、MemoryDB、WorkSpaces、Directory Service、CloudWatchダッシュボードなど）は、`! not counted yet`に載せます。そのため、こうした費用が黙って抜け落ちることはありません。一部だけ対応しているリソース（FSx for ONTAP、プロビジョンドモードのDynamoDBグローバルテーブル、RDSのOracleとSQL Server、マルチAZ DBクラスター、Fargate SpotとWindowsのFargate、Spotのノードグループ、Local Zonesのインスタンス、API Gatewayのキャッシュ）は、`? could not estimate`に載ります。
+アクセスがゼロでも費用がかかるのに、まだルールのないリソースタイプ（EMR、WorkSpaces、Directory Service、CloudWatchダッシュボードなど）は、`! not counted yet`に載せます。そのため、こうした費用が黙って抜け落ちることはありません。一部だけ対応しているリソース（FSx for ONTAP、プロビジョンドモードのDynamoDBグローバルテーブル、RDSのOracleとSQL Server、マルチAZ DBクラスター、Fargate SpotとWindowsのFargate、Spotのノードグループ、Local Zonesのインスタンス、API Gatewayのキャッシュ）は、`? could not estimate`に載ります。
 
 ## 前提
 
 - オンデマンドの定価（USD）で、1か月を730時間として計算します。Savings Plans、リザーブドインスタンス、無料利用枠は考慮しません。
 - EC2インスタンスは、Linux・共有テナンシーの料金で見積もります（AMIは読みません）。AMIから決まるルートボリューム（`BlockDeviceMappings`に`VolumeSize`がないもの）と、インスタンスに自動で割り当てられるパブリックIPは数えません。
-- テンプレートから読み取れない値は推測しません。たとえば、Defaultのないパラメータ、別スタックへの参照、`Fn::If`、`Condition`付きのリソースです。こうしたリソースは、理由と一緒に`? could not estimate`に載ります。Defaultのあるパラメータは、そのDefaultで見積もり、そのことを行に書きます。
+- テンプレートから読み取れない値は推測しません。たとえば、Defaultのないパラメータや、別スタックへの参照です。こうしたリソースは、理由と一緒に`? could not estimate`に載ります。Defaultのあるパラメータは、そのDefaultで見積もり、そのことを行に書きます。別の値を使うときは`--parameter`で渡します。
+- `Conditions`（`Fn::Equals`、`Fn::And`、`Fn::Or`、`Fn::Not`）と`Fn::If`は、パラメータと`AWS::Region`だけで決まるときに評価します。`Condition`がfalseのリソースは作られないので、一覧に載せません。`AWS::AccountId`など、それ以外の値で決まる条件を持つリソースは`? could not estimate`に載ります。
 - Auto Scalingグループは、`DesiredCapacity`があればその値を、なければ`MinSize`を使います。DynamoDBは、Auto Scalingの最小値ではなく、テーブルに設定したプロビジョニング容量を使います。
 - 素のテンプレートにはコンストラクトのパスがないため、行には論理IDを表示します。
 

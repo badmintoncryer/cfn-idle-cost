@@ -1,0 +1,73 @@
+name: cfn-idle-cost
+description: Comment the monthly idle cost of a CDK app or CloudFormation template (or how a pull request changes it) and fail over budget.
+branding: { icon: dollar-sign, color: orange }
+inputs:
+  path:
+    description: cdk.out directory or template files (space-separated), synthesized from the pull request.
+    default: cdk.out
+  base:
+    description: cdk.out (or template) synthesized from the base branch. With it, the comment shows only what changes.
+    default: ""
+  max:
+    description: Fail if the total idle cost is over this many USD per month.
+    default: ""
+  max-increase:
+    description: With base, fail if the idle cost grows by more than this many USD per month.
+    default: ""
+  args:
+    description: More flags, e.g. "--region us-east-1 --parameter Env=prod".
+    default: ""
+  comment:
+    description: Post the result as a pull request comment, updated on each run.
+    default: "true"
+  github-token:
+    description: Token used to comment.
+    default: ${{ github.token }}
+outputs:
+  exit-code:
+    description: 0 ok, 3 over budget.
+    value: ${{ steps.run.outputs.exit-code }}
+runs:
+  using: composite
+  steps:
+    - id: run
+      shell: bash
+      env:
+        ACTION_REF: ${{ github.action_ref }}
+        IN_PATH: ${{ inputs.path }}
+        IN_BASE: ${{ inputs.base }}
+        IN_MAX: ${{ inputs.max }}
+        IN_MAX_INCREASE: ${{ inputs.max-increase }}
+        IN_ARGS: ${{ inputs.args }}
+        IN_COMMENT: ${{ inputs.comment }}
+        PR: ${{ github.event.pull_request.number }}
+        GH_TOKEN: ${{ inputs.github-token }}
+        GH_REPO: ${{ github.repository }}
+      run: |
+        set -f # inputs are split on spaces, never globbed
+        # @v1.2.3 runs that npm version; @v0, @main or a SHA run the latest.
+        version=latest
+        [[ "$ACTION_REF" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] && version="${ACTION_REF#v}"
+        flags=(--format md)
+        [ -n "$IN_BASE" ] && flags+=(--base "$IN_BASE")
+        [ -n "$IN_MAX" ] && flags+=(--max "$IN_MAX")
+        [ -n "$IN_MAX_INCREASE" ] && flags+=(--max-increase "$IN_MAX_INCREASE")
+        out="$RUNNER_TEMP/idle-cost.md"
+        code=0
+        npx -y "cfn-idle-cost@$version" "${flags[@]}" $IN_ARGS $IN_PATH > "$out" || code=$?
+        echo "exit-code=$code" >> "$GITHUB_OUTPUT"
+        if [ "$code" != 0 ] && [ "$code" != 3 ]; then exit "$code"; fi
+        cat "$out" >> "$GITHUB_STEP_SUMMARY"
+        if [ "$IN_COMMENT" = true ] && [ -n "$PR" ]; then
+          marker="<!-- cfn-idle-cost -->"
+          { echo "$marker"; cat "$out"; } > "$out.body"
+          ids=$(gh api "repos/$GH_REPO/issues/$PR/comments" --paginate \
+            --jq ".[] | select(.body | startswith(\"$marker\")) | .id")
+          id="${ids%%$'\n'*}"
+          if [ -n "$id" ]; then
+            gh api -X PATCH "repos/$GH_REPO/issues/comments/$id" -F body=@"$out.body" > /dev/null
+          else
+            gh api "repos/$GH_REPO/issues/$PR/comments" -F body=@"$out.body" > /dev/null
+          fi
+        fi
+        exit "$code"

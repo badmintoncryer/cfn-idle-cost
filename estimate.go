@@ -73,10 +73,16 @@ func estimateResource(st *Stack, prices *Prices, id string) (items []Item) {
 		}
 		return nil
 	}
-	if e.r.Condition != "" {
-		panic(unresolved("depends on Condition " + e.r.Condition))
+	if c := e.r.Condition; c != "" {
+		on, ok := e.tryCondition(c)
+		if !ok {
+			panic(unresolved("depends on Condition " + c))
+		}
+		if !on {
+			return nil // not created
+		}
 	}
-	rule(e, e.r.Properties)
+	rule(e, e.props(e.r))
 	for _, it := range e.items {
 		b := base
 		b.Quantity, b.Monthly, b.Reason = it.Quantity, it.Monthly, it.Reason
@@ -102,6 +108,9 @@ func (e *est) resolve(name string, v any) any {
 			return e.st.Region
 		}
 		if p, ok := e.st.Parameters[ref]; ok {
+			if p.Given {
+				return p.Value
+			}
 			if p.Default == nil || strings.HasPrefix(p.Type, "AWS::SSM::") {
 				panic(unresolved(fmt.Sprintf("%s is Parameter %s", name, ref)))
 			}
@@ -116,6 +125,118 @@ func (e *est) resolve(name string, v any) any {
 		panic(unresolved(fmt.Sprintf("%s uses %s", name, k)))
 	}
 	panic(unresolved(name + " is empty"))
+}
+
+// ---- conditions
+
+// noValue stands for Ref AWS::NoValue while props rewrites a tree.
+var noValue = &struct{}{}
+
+// props returns the properties of r with every Fn::If whose condition resolves
+// replaced by the chosen branch, and AWS::NoValue removed. An Fn::If that does
+// not resolve is kept, so reading through it is still unresolved.
+func (e *est) props(r Resource) map[string]any {
+	m, _ := e.pick(r.Properties).(map[string]any)
+	return m
+}
+
+func (e *est) pick(v any) any {
+	switch x := v.(type) {
+	case map[string]any:
+		if len(x) == 1 {
+			if x["Ref"] == "AWS::NoValue" {
+				return noValue
+			}
+			if l, ok := x["Fn::If"].([]any); ok && len(l) == 3 {
+				name, _ := l[0].(string)
+				if on, ok := e.tryCondition(name); ok {
+					if on {
+						return e.pick(l[1])
+					}
+					return e.pick(l[2])
+				}
+				return x
+			}
+		}
+		out := make(map[string]any, len(x))
+		for k, c := range x {
+			if c = e.pick(c); c != noValue {
+				out[k] = c
+			}
+		}
+		return out
+	case []any:
+		out := make([]any, 0, len(x))
+		for _, c := range x {
+			if c = e.pick(c); c != noValue {
+				out = append(out, c)
+			}
+		}
+		return out
+	}
+	return v
+}
+
+func (e *est) tryCondition(name string) (on, ok bool) {
+	defer func() {
+		if v := recover(); v != nil {
+			if _, isU := v.(unresolved); !isU {
+				panic(v)
+			}
+			ok = false
+		}
+	}()
+	return e.condition(name, map[string]any{"Condition": name}), true
+}
+
+// condition evaluates a Conditions expression; it panics when a value does not
+// resolve (see resolve).
+func (e *est) condition(name string, v any) bool {
+	m, _ := v.(map[string]any)
+	if len(m) != 1 {
+		panic(unresolved("Condition " + name + " is not a condition"))
+	}
+	for fn, arg := range m {
+		l, _ := arg.([]any)
+		switch fn {
+		case "Condition":
+			c, _ := arg.(string)
+			def, ok := e.st.Conditions[c]
+			if !ok {
+				panic(unresolved("Condition " + c + " is not defined"))
+			}
+			return e.condition(c, def)
+		case "Fn::Equals":
+			if len(l) != 2 {
+				break
+			}
+			return fmt.Sprint(e.scalar(name, l[0])) == fmt.Sprint(e.scalar(name, l[1]))
+		case "Fn::Not":
+			if len(l) != 1 {
+				break
+			}
+			return !e.condition(name, l[0])
+		case "Fn::And", "Fn::Or":
+			and := fn == "Fn::And"
+			for _, c := range l {
+				if e.condition(name, c) != and {
+					return !and
+				}
+			}
+			return and
+		}
+		panic(unresolved("Condition " + name + " uses " + fn))
+	}
+	panic("unreachable")
+}
+
+// scalar resolves a condition operand, which may itself be an Fn::If.
+func (e *est) scalar(name string, v any) any {
+	v = e.pick(v)
+	if v == noValue {
+		return ""
+	}
+	return e.resolve("Condition "+name, v)
 }
 
 // str returns m[key], def when absent; panics when present but unresolvable.
@@ -196,6 +317,7 @@ func (e *est) ref(m map[string]any, key string) (string, Resource) {
 		}
 	}
 	if r, ok := e.st.Resources[id]; ok {
+		r.Properties = e.props(r)
 		return id, r
 	}
 	panic(unresolved(key + " does not point to a resource in this template"))
@@ -763,9 +885,7 @@ func ecsService(e *est, p map[string]any) {
 // notCounted are types that cost money with zero traffic but have no rule yet.
 // They are listed in the report instead of being skipped silently.
 var notCounted = []string{
-	"AWS::RDS::DBProxy", "AWS::OpenSearchServerless::Collection", "AWS::SageMaker::Endpoint",
-	"AWS::EMR::Cluster", "AWS::DocDBElastic::Cluster", "AWS::MemoryDB::Cluster",
-	"AWS::WorkSpaces::Workspace", "AWS::DirectoryService::MicrosoftAD", "AWS::DirectoryService::SimpleAD",
+	"AWS::EMR::Cluster", "AWS::DocDBElastic::Cluster", "AWS::WorkSpaces::Workspace", "AWS::DirectoryService::MicrosoftAD", "AWS::DirectoryService::SimpleAD",
 	"AWS::MWAA::Environment", "AWS::AppStream::Fleet", "AWS::Kendra::Index", "AWS::DMS::ReplicationInstance",
 	"AWS::Timestream::InfluxDBInstance", "AWS::EC2::Host", "AWS::EC2::CapacityReservation",
 	"AWS::ElasticBeanstalk::Environment", "AWS::Lightsail::Instance", "AWS::Lightsail::Database",
@@ -993,4 +1113,139 @@ func (e *est) clusterInstance(p map[string]any, svc, ioptType, scalingProp, serv
 		usage, sfx = "InstanceUsageIOOptimized", ", I/O-Optimized"
 	}
 	e.hourly(1, "", svc+"|"+usage+":"+class, class+" instance"+sfx)
+}
+
+func init() {
+	more := map[string]func(e *est, p map[string]any){
+		"AWS::RDS::DBProxy":                     rdsProxy,
+		"AWS::OpenSearchServerless::Collection": aossCollection,
+		"AWS::MemoryDB::Cluster": func(e *est, p map[string]any) {
+			engine := "Redis"
+			if strings.EqualFold(e.str(p, "Engine", "redis"), "valkey") {
+				engine = "Valkey"
+			}
+			t := e.mustStr(p, "NodeType")
+			n := e.num(p, "NumShards", 1) * (e.num(p, "NumReplicasPerShard", 1) + 1)
+			e.hourly(n, "nodes", "memorydb|"+engine+"|"+t, t+" "+engine)
+		},
+		"AWS::SageMaker::Endpoint": func(e *est, p map[string]any) {
+			_, cfg := e.ref(p, "EndpointConfigName")
+			l, ok := cfg.Properties["ProductionVariants"].([]any)
+			if !ok || len(l) == 0 {
+				panic(unresolved("ProductionVariants is not a list"))
+			}
+			for _, v := range l {
+				v := asMap(v)
+				if sc, ok := v["ServerlessConfig"]; ok {
+					if e.num(asMap(sc), "ProvisionedConcurrency", 0) > 0 {
+						panic(unresolved("serverless provisioned concurrency is not supported yet"))
+					}
+					continue // billed per request
+				}
+				t := e.mustStr(v, "InstanceType")
+				e.hourly(e.mustNum(v, "InitialInstanceCount"), "", "sagemaker|"+t, t+" hosting ("+e.str(v, "VariantName", "variant")+")")
+			}
+		},
+	}
+	for k, v := range more {
+		rules[k] = v
+	}
+}
+
+// rdsProxy bills per vCPU of the provisioned instances behind the proxy, or
+// per ACU of the Serverless v2 ones (their minimum, idle).
+func rdsProxy(e *est, p map[string]any) {
+	var vcpu, acu float64
+	found := false
+	for _, id := range sortedIDs(e.st.Resources) {
+		r := e.st.Resources[id]
+		if r.Type != "AWS::RDS::DBProxyTargetGroup" {
+			continue
+		}
+		tp := e.props(r)
+		if asMap(tp["DBProxyName"])["Ref"] != e.id {
+			continue
+		}
+		found = true
+		for _, key := range []string{"DBInstanceIdentifiers", "DBClusterIdentifiers"} {
+			l, _ := tp[key].([]any)
+			for i := range l {
+				tid, target := e.ref(map[string]any{key: l[i]}, key)
+				instances := []Resource{target}
+				var cluster map[string]any
+				if key == "DBClusterIdentifiers" {
+					cluster, instances = target.Properties, nil
+					for _, iid := range sortedIDs(e.st.Resources) {
+						inst := e.st.Resources[iid]
+						if inst.Type == "AWS::RDS::DBInstance" && asMap(inst.Properties["DBClusterIdentifier"])["Ref"] == tid {
+							instances = append(instances, inst)
+						}
+					}
+					if len(instances) == 0 {
+						panic(unresolved("the instances of the target cluster are not in this template"))
+					}
+				}
+				for _, inst := range instances {
+					ip := e.props(inst)
+					class := e.mustStr(ip, "DBInstanceClass")
+					if class != "db.serverless" {
+						vcpu += dbVCPU(class)
+						continue
+					}
+					if cluster == nil {
+						_, c := e.ref(ip, "DBClusterIdentifier")
+						cluster = e.props(c)
+					}
+					acu += e.mustNum(asMap(cluster["ServerlessV2ScalingConfiguration"]), "MinCapacity")
+				}
+			}
+		}
+	}
+	if !found {
+		panic(unresolved("no DBProxyTargetGroup of this proxy in this template"))
+	}
+	e.hourly(vcpu, "vCPU", "rdsproxy|RDS:ProxyUsage", "per vCPU of the target instances")
+	e.hourly(acu, "ACU", "rdsproxy|RDS:Proxy-ASv2-Usage", "per ACU of the Serverless v2 targets (minimum)")
+}
+
+// dbVCPU reads the vCPU count off an instance class: large is 2, xlarge 4,
+// Nxlarge 4N, and the burstable micro/small/medium are 2.
+// ponytail: naming rule, not data; metal and odd legacy classes are unresolved.
+func dbVCPU(class string) float64 {
+	size := class[strings.LastIndex(class, ".")+1:]
+	switch size {
+	case "micro", "small", "medium", "large":
+		return 2
+	case "xlarge":
+		return 4
+	}
+	if n, err := strconv.Atoi(strings.TrimSuffix(size, "xlarge")); err == nil && strings.HasSuffix(size, "xlarge") {
+		return 4 * float64(n)
+	}
+	panic(unresolved("vCPU count of " + class + " is not known"))
+}
+
+// aossCollection bills the minimum OCUs of a Classic collection. Collections
+// of the same type share them, so only the first one in the stack is counted.
+func aossCollection(e *est, p map[string]any) {
+	if g := e.str(p, "CollectionGroupName", ""); g != "" {
+		panic(unresolved("capacity is set by collection group " + g))
+	}
+	typ := e.str(p, "Type", "SEARCH")
+	for _, id := range sortedIDs(e.st.Resources) {
+		r := e.st.Resources[id]
+		if id == e.id {
+			break
+		}
+		if r.Type == e.r.Type && r.Properties["CollectionGroupName"] == nil && e.str(e.props(r), "Type", "SEARCH") == typ {
+			e.add(1, "", 0, "shares the OCUs of "+e.st.DisplayPath(id))
+			return
+		}
+	}
+	ocu, why := 1.0, "minimum OCUs, standby replicas"
+	if e.str(p, "StandbyReplicas", "ENABLED") == "DISABLED" {
+		ocu, why = 0.5, "minimum OCUs, no standby replicas"
+	}
+	e.hourly(ocu, "OCU", "aoss|IndexingOCU", "indexing "+why)
+	e.hourly(ocu, "OCU", "aoss|SearchOCU", "search "+why)
 }

@@ -2,9 +2,10 @@
   "Parameters": {
     "ServerType": { "Type": "String", "Default": "t3.micro" },
     "WorkerType": { "Type": "String" },
+    "Env": { "Type": "String", "Default": "dev" },
     "BootstrapVersion": { "Type": "AWS::SSM::Parameter::Value<String>", "Default": "/cdk-bootstrap/hnb659fds/version" }
   },
-  "Conditions": { "IsProd": { "Fn::Equals": ["a", "b"] } },
+  "Conditions": { "IsProd": { "Fn::Equals": [{ "Ref": "Env" }, "prod"] } },
   "Resources": {
     "VpcNatGateway": { "Type": "AWS::EC2::NatGateway", "Properties": { "SubnetId": { "Ref": "Subnet1" } } },
     "VpcEIP": { "Type": "AWS::EC2::EIP" },
