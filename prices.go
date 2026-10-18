@@ -366,6 +366,17 @@ var selectors = []selector{
 		key: func(a map[string]string, u string) string {
 			return keep(u, "Global-Cluster-Hours", "Global-ReadinessCheck-Hours")
 		}},
+	{name: "kda", service: "AmazonKinesisAnalytics", families: []string{"Kinesis Analytics"},
+		key: func(a map[string]string, u string) string {
+			return keep(u, "KPU-Hour-Java", "KPU-Hour-Interactive", "RunningApplicationStorage", "RunningApplicationStorage-Interactive")
+		}},
+	// Core network edges are priced per region inside one global offer.
+	{name: "wan", service: "AWSCloudWAN", global: true,
+		key: func(a map[string]string, u string) string { return keep(u, "CloudWAN-CoreNetworkEdge-Hours") }},
+	{name: "r53hc", service: "AmazonRoute53", global: true, families: []string{"DNS Health Check"},
+		key: func(a map[string]string, u string) string {
+			return keep(u, "Health-Check-AWS", "Health-Check-Non-AWS", "Health-Check-Option-AWS", "Health-Check-Option-Non-AWS")
+		}},
 	{name: "influx", service: "AmazonTimestream", families: []string{"Database Instance", "Influx Optimized Storage"},
 		key: func(a map[string]string, u string) string {
 			if strings.Contains(u, "Db.influx") || strings.Contains(u, "InfluxDBStorage") {

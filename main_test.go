@@ -60,12 +60,15 @@ var testPrices = &Prices{Source: "test prices", AsOf: "2026-10-16", Regions: map
 		"rds|Multi-AZClusterUsage:db.m5d.large|14": 0.585, "rds|RDS:Multi-AZCluster-PIOPS-Storage|14": 0.375, "rds|RDS:Multi-AZCluster-PIOPS|14": 0.3,
 		"fargate|Fargate-Windows-vCPU-Hours:perCPU": 0.046552, "fargate|Fargate-Windows-OS-Hours:perCPU": 0.046, "fargate|Fargate-Windows-GB-Hours": 0.00511175,
 		"kinesis|Extended-ShardHour": 0.02, "vpc|VpcEndpoint-Hours": 0.01, "rds|InstanceUsage:db.t4g.micro|14": 0.016, "rds|RDS:GP3-Storage|14": 0.115,
-		"es|r6g.large.search": 0.167, "es|ES:GP3-Storage": 0.122, "es|ES:GP3-Provisioned-ThroughPut": 0.064, "docdb|DocumentDB:ServerlessIOOptimizedUsage": 0.0905},
+		"kda|KPU-Hour-Java": 0.11, "kda|KPU-Hour-Interactive": 0.11, "kda|RunningApplicationStorage": 0.1, "kda|RunningApplicationStorage-Interactive": 0.1,
+		"wan|CloudWAN-CoreNetworkEdge-Hours": 0.5,
+		"es|r6g.large.search":                0.167, "es|ES:GP3-Storage": 0.122, "es|ES:GP3-Provisioned-ThroughPut": 0.064, "docdb|DocumentDB:ServerlessIOOptimizedUsage": 0.0905},
 	"ap-southeast-1": {"rds|InstanceUsage:db.t3.small|10": 0.044, "rds|MirrorUsage:db.m5.large|12": 1.954, "rds|RDS:Mirror-GP3-Storage|12": 0.23,
 		"rds|InstanceUsage:db.m5.large|20": 0.438, "rds|RDS:GP3-Storage|20": 0.115, "rds|RDS:GP3-Storage|10": 0.115,
 		"ec2|m5.xlarge": 0.192, "emr|m5.xlarge": 0.048, "ebs|EBS:VolumeUsage.gp2": 0.1,
 		"eks|AmazonEKS-Hours:perCluster": 0.1, "eks|AmazonEKS-Hours:extendedSupport": 0.5},
-	"global": {"arc|Global-Cluster-Hours": 2.5, "arc|Global-ReadinessCheck-Hours": 0.045},
+	"global": {"arc|Global-Cluster-Hours": 2.5, "arc|Global-ReadinessCheck-Hours": 0.045,
+		"r53hc|Health-Check-AWS": 0.5, "r53hc|Health-Check-Non-AWS": 0.75, "r53hc|Health-Check-Option-AWS": 1, "r53hc|Health-Check-Option-Non-AWS": 2},
 }}
 
 func golden(t *testing.T, name, got string) {
@@ -139,6 +142,11 @@ func TestRules2(t *testing.T) {
 // The third batch: Oracle and SQL Server on RDS, and EMR clusters.
 func TestRules3(t *testing.T) {
 	golden(t, "rules3.yaml", report(t, "ap-southeast-1", "testdata/rules3.yaml"))
+}
+
+// The fourth batch: Managed Flink, Cloud WAN, EC2 Fleet, Spot Fleet and Route 53 health checks.
+func TestRules4(t *testing.T) {
+	golden(t, "rules4.yaml", report(t, "us-east-1", "testdata/rules4.yaml"))
 }
 
 // Fixes from the 2026-10-17 review (see the comments in the template).

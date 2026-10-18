@@ -39,4 +39,4 @@ Resources:
   Docs: { Type: AWS::DocDB::DBCluster, Properties: { StorageType: iopt1, ServerlessV2ScalingConfiguration: { MinCapacity: 1, MaxCapacity: 4 } } }
   DocsWriter: { Type: AWS::DocDB::DBInstance, Properties: { DBClusterIdentifier: !Ref Docs, DBInstanceClass: db.serverless } }
   # Listed instead of left out.
-  Flink: { Type: AWS::KinesisAnalyticsV2::Application, Properties: { RuntimeEnvironment: FLINK-1_18, ServiceExecutionRole: arn } }
+  Kendra: { Type: AWS::Kendra::Index, Properties: { Edition: DEVELOPER_EDITION, Name: k, RoleArn: arn } }

@@ -200,12 +200,16 @@ jobs:
 | `AWS::DocDBElastic::Cluster` | シャードのvCPU×シャード数×シャードごとのインスタンス数 |
 | `AWS::Timestream::InfluxDBInstance` | インスタンスの時間料金（シングルAZ・マルチAZ）と割り当てたストレージ |
 | `AWS::EMR::Cluster`、`AWS::EMR::InstanceGroupConfig` | オンデマンドのインスタンスグループの、EC2の時間料金（Linux）、EMRの料金、EBSボリューム。自動で終了するクラスターと、ステップが終わると終了するクラスターはアイドル時$0 |
+| `AWS::KinesisAnalyticsV2::Application` | KPU（並列度÷KPUあたりの並列度）とオーケストレーション用の1KPU、KPUごとに50GBの実行時ストレージ。CloudFormationは停止した状態で作成するが、起動している前提で数える。StudioノートブックはKPUが2つ、ストレージが1KPU分多い。SQLアプリケーションは見積もらない |
+| `AWS::NetworkManager::CoreNetwork` | `PolicyDocument`にあるエッジロケーションごとの時間料金。スタックのリージョンの価格で計算する |
+| `AWS::EC2::EC2Fleet`、`AWS::EC2::SpotFleet` | インスタンスタイプが1つのフリートの、インスタンスの時間料金（Linux）×オンデマンドの目標容量と、起動テンプレートのEBSボリューム。Spotの分は数えない |
+| `AWS::Route53::HealthCheck` | 月額料金とオプション機能（HTTPS、文字列照合、高速間隔、レイテンシー測定）。テンプレート内のリソースを監視するものはAWSエンドポイント、それ以外はAWS以外のエンドポイントの価格で計算する。`CALCULATED`と`CLOUDWATCH_METRIC`のヘルスチェックは、AWSエンドポイントの価格で計算する |
 
 使った分だけかかる費用は、意図して対象から外しています。S3、Lambda、AuroraのストレージとI/O、CloudWatch Logs、データ転送、リクエスト料金がこれに当たります。
 
 ### まだ見積もらないもの
 
-アクセスがゼロでも費用がかかるのに、まだルールのないリソースタイプのうち、よく使われるもの（WorkSpaces、Kendra、Kinesis Data Analytics、Lightsail、CloudWatchダッシュボードなど）は、`! not counted yet`に載せます。この一覧にないタイプは行を出さずに飛ばすので、見つかりしだい一覧に足していきます。一部だけ対応しているリソース（Fargate Spotとほかのキャパシティプロバイダ、SpotとWindowsのノードグループ、EMRのインスタンスフリート、Aurora Serverless v1、Local Zonesのインスタンス、cronのスケジュールで動くカナリア）は、`? could not estimate`に載ります。
+アクセスがゼロでも費用がかかるのに、まだルールのないリソースタイプのうち、よく使われるもの（WorkSpaces、Kendra、AppStream 2.0、Lightsail、CloudWatchダッシュボードなど）は、`! not counted yet`に載せます。この一覧にないタイプは行を出さずに飛ばすので、見つかりしだい一覧に足していきます。一部だけ対応しているリソース（Fargate Spotとほかのキャパシティプロバイダ、SpotとWindowsのノードグループ、EMRのインスタンスフリート、Aurora Serverless v1、Local Zonesのインスタンス、cronのスケジュールで動くカナリア、Spotだけのフリート、複数のインスタンスタイプを使うフリート）は、`? could not estimate`に載ります。
 
 ## 前提
 

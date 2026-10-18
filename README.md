@@ -223,6 +223,10 @@ and provisioned storage billed whether you use it or not.
 | `AWS::DocDBElastic::Cluster` | shard vCPUs × shards × instances per shard |
 | `AWS::Timestream::InfluxDBInstance` | instance hourly (Single-AZ / Multi-AZ) and allocated storage |
 | `AWS::EMR::Cluster`, `AWS::EMR::InstanceGroupConfig` | EC2 hourly (Linux), EMR fee and EBS volumes of on-demand instance groups. Clusters that auto-terminate or end with their steps: $0 idle |
+| `AWS::KinesisAnalyticsV2::Application` | KPUs (parallelism / parallelism per KPU) plus one for orchestration, and 50 GB of running storage per KPU, as if it runs (CloudFormation creates it stopped). Studio notebooks: two extra KPUs and storage for one. SQL applications are not estimated |
+| `AWS::NetworkManager::CoreNetwork` | hourly per edge location in `PolicyDocument`, priced in the stack's region |
+| `AWS::EC2::EC2Fleet`, `AWS::EC2::SpotFleet` | instance hourly (Linux) × on-demand target capacity, and the EBS volumes of its launch template, when the fleet launches one instance type. Spot capacity is not counted |
+| `AWS::Route53::HealthCheck` | monthly fee and optional features (HTTPS, string matching, fast interval, latency measurement). An endpoint that is a resource in the template is priced as an AWS endpoint, any other as non-AWS. Calculated and CloudWatch metric checks are priced as AWS endpoints |
 
 Usage-only charges are left out on purpose: S3, Lambda, Aurora storage and
 I/O, CloudWatch Logs, data transfer, requests.
@@ -230,12 +234,13 @@ I/O, CloudWatch Logs, data transfer, requests.
 ### Not counted yet
 
 Common resource types that cost money with zero traffic but have no rule yet,
-such as WorkSpaces, Kendra, Kinesis Data Analytics, Lightsail and CloudWatch
+such as WorkSpaces, Kendra, AppStream 2.0, Lightsail and CloudWatch
 dashboards, are listed under `! not counted yet`. Types missing from that list
 are skipped without a line, so the list grows as they are found. Partly
 supported types (Fargate Spot and other capacity providers, Spot and Windows
 node groups, EMR instance fleets, Aurora Serverless v1, instances in Local
-Zones, canaries on a cron schedule) are listed under `? could not estimate`.
+Zones, canaries on a cron schedule, Spot-only fleets and fleets of several
+instance types) are listed under `? could not estimate`.
 
 ## Assumptions
 
