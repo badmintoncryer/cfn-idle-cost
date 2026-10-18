@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"math"
 	"regexp"
@@ -1153,8 +1154,6 @@ var notCounted = []string{
 	"AWS::ElasticBeanstalk::Environment", "AWS::Lightsail::Instance", "AWS::Lightsail::Database",
 	"AWS::GameLift::Fleet", "AWS::MediaLive::Channel",
 	"AWS::Shield::Protection", "AWS::Batch::ComputeEnvironment", "AWS::EC2::VerifiedAccessEndpoint",
-	"AWS::KinesisAnalyticsV2::Application", "AWS::KinesisAnalytics::Application", "AWS::NetworkManager::CoreNetwork",
-	"AWS::EC2::EC2Fleet", "AWS::EC2::SpotFleet", "AWS::Route53::HealthCheck",
 	"AWS::CloudWatch::Dashboard", "AWS::Connect::PhoneNumber", // not in the Price List
 }
 
@@ -1789,4 +1788,204 @@ func eksCluster(e *est, p map[string]any) {
 		panic(unresolved("Kubernetes " + v + " reached the end of standard support on " + s[0] + " and SupportType is STANDARD"))
 	}
 	e.hourly(1, "", "eks|AmazonEKS-Hours:extendedSupport", "extended support for Kubernetes "+v+" (since "+s[0]+")")
+}
+
+func init() {
+	rules["AWS::KinesisAnalyticsV2::Application"] = flinkApp
+	rules["AWS::KinesisAnalytics::Application"] = func(e *est, p map[string]any) {
+		panic(unresolved("SQL applications are not supported"))
+	}
+	rules["AWS::NetworkManager::CoreNetwork"] = coreNetwork
+	rules["AWS::EC2::EC2Fleet"] = func(e *est, p map[string]any) {
+		tc := asMap(p["TargetCapacitySpecification"])
+		if u := e.str(tc, "TargetCapacityUnitType", "units"); u != "units" {
+			panic(unresolved("TargetCapacityUnitType " + u + " is not supported"))
+		}
+		total := e.mustNum(tc, "TotalTargetCapacity")
+		od, spot := e.num(tc, "OnDemandTargetCapacity", 0), e.num(tc, "SpotTargetCapacity", 0)
+		if rest := total - od - spot; rest > 0 { // the rest is of the default type
+			switch d := e.mustStr(tc, "DefaultTargetCapacityType"); d {
+			case "on-demand":
+				od += rest
+			case "spot":
+				spot += rest
+			default:
+				panic(unresolved("DefaultTargetCapacityType " + d + " is not supported"))
+			}
+		}
+		e.fleet(od, spot, e.fleetLaunches(p["LaunchTemplateConfigs"]))
+	}
+	rules["AWS::EC2::SpotFleet"] = func(e *est, p map[string]any) {
+		c := asMap(p["SpotFleetRequestConfigData"])
+		if u := e.str(c, "TargetCapacityUnitType", "units"); u != "units" {
+			panic(unresolved("TargetCapacityUnitType " + u + " is not supported"))
+		}
+		od := e.num(c, "OnDemandTargetCapacity", 0)
+		spot := e.mustNum(c, "TargetCapacity") - od
+		if specs, ok := c["LaunchSpecifications"].([]any); ok {
+			var ls []fleetLaunch
+			for _, s := range specs {
+				s := asMap(s)
+				ls = append(ls, fleetLaunch{e.mustStr(s, "InstanceType"), e.num(s, "WeightedCapacity", 1), s["BlockDeviceMappings"]})
+			}
+			e.fleet(od, spot, ls)
+			return
+		}
+		e.fleet(od, spot, e.fleetLaunches(c["LaunchTemplateConfigs"]))
+	}
+	rules["AWS::Route53::HealthCheck"] = healthCheck
+}
+
+// flinkApp bills a Managed Service for Apache Flink application while it runs.
+// CloudFormation creates it stopped (READY), but it is deployed to be started.
+// A running application uses its KPUs (parallelism / parallelism per KPU), one
+// more for orchestration (two for a Studio notebook), and 50 GB of running
+// storage per KPU (one KPU more for a Studio notebook).
+func flinkApp(e *est, p map[string]any) {
+	rt := e.mustStr(p, "RuntimeEnvironment")
+	if strings.HasPrefix(rt, "SQL") {
+		panic(unresolved("SQL applications are not supported"))
+	}
+	studio := e.str(p, "ApplicationMode", "STREAMING") == "INTERACTIVE"
+	pc := asMap(asMap(asMap(p["ApplicationConfiguration"])["FlinkApplicationConfiguration"])["ParallelismConfiguration"])
+	par, per := 1.0, 1.0 // DEFAULT
+	if e.str(pc, "ConfigurationType", "DEFAULT") == "CUSTOM" {
+		par, per = e.num(pc, "Parallelism", 1), e.num(pc, "ParallelismPerKPU", 1)
+	} else if studio {
+		panic(unresolved("the parallelism of the Studio notebook is not set"))
+	}
+	kpu := math.Ceil(par / per)
+	if studio {
+		e.hourly(kpu+2, "KPU", "kda|KPU-Hour-Interactive", fmt.Sprintf("Studio notebook: %g KPU + 2 for orchestration and the notebook, while running", kpu))
+		e.monthly((kpu+1)*50, "GB", "kda|RunningApplicationStorage-Interactive", "running application storage, 50 GB per KPU")
+		return
+	}
+	e.hourly(kpu+1, "KPU", "kda|KPU-Hour-Java", fmt.Sprintf("%g KPU + 1 for orchestration, while running (created stopped)", kpu))
+	e.monthly(kpu*50, "GB", "kda|RunningApplicationStorage", "running application storage, 50 GB per KPU")
+}
+
+// coreNetwork bills the hourly fee of each edge location in the core network policy.
+// ponytail: every edge is priced in the stack's region (all regions are $0.50
+// today); pricing each in its own region needs a region per Item.
+func coreNetwork(e *est, p map[string]any) {
+	doc := p["PolicyDocument"]
+	if doc == nil {
+		panic(unresolved("PolicyDocument is not set (the edges come from the policy)"))
+	}
+	if m, ok := doc.(map[string]any); ok && len(m) == 1 {
+		for k := range m {
+			if k == "Ref" || strings.HasPrefix(k, "Fn::") {
+				doc = e.resolve("PolicyDocument", doc)
+			}
+		}
+	}
+	if s, ok := doc.(string); ok {
+		if err := json.Unmarshal([]byte(s), &doc); err != nil {
+			panic(unresolved("PolicyDocument is not JSON"))
+		}
+	}
+	n := e.length(asMap(asMap(doc)["core-network-configuration"]), "edge-locations")
+	if n < 0 {
+		panic(unresolved("the policy has no edge-locations"))
+	}
+	e.hourly(float64(n), "edges", "wan|CloudWAN-CoreNetworkEdge-Hours", "core network edge per location")
+}
+
+// fleetLaunch is one instance type a fleet can launch.
+type fleetLaunch struct {
+	typ    string
+	weight float64 // capacity units per instance
+	bdm    any
+}
+
+// fleetLaunches reads the instance types of LaunchTemplateConfigs: each
+// override's, else the launch template's.
+func (e *est) fleetLaunches(v any) []fleetLaunch {
+	cfgs, ok := v.([]any)
+	if !ok {
+		panic(unresolved("LaunchTemplateConfigs is not set"))
+	}
+	var out []fleetLaunch
+	for _, c := range cfgs {
+		c := asMap(c)
+		data := e.launchTemplate(asMap(c["LaunchTemplateSpecification"]))
+		ovs, _ := c["Overrides"].([]any)
+		if len(ovs) == 0 {
+			out = append(out, fleetLaunch{e.mustStr(data, "InstanceType"), 1, data["BlockDeviceMappings"]})
+		}
+		for _, o := range ovs {
+			o := asMap(o)
+			if o["InstanceRequirements"] != nil {
+				panic(unresolved("attribute-based instance type selection is not supported"))
+			}
+			t := e.str(o, "InstanceType", "")
+			if t == "" {
+				t = e.mustStr(data, "InstanceType")
+			}
+			out = append(out, fleetLaunch{t, e.num(o, "WeightedCapacity", 1), data["BlockDeviceMappings"]})
+		}
+	}
+	return out
+}
+
+// fleet bills the on-demand instances of an EC2 Fleet or Spot Fleet, when they
+// can be of only one instance type. Spot capacity has no fixed price.
+func (e *est) fleet(od, spot float64, launches []fleetLaunch) {
+	if od <= 0 {
+		if spot > 0 {
+			panic(unresolved("Spot capacity is not supported"))
+		}
+		return
+	}
+	if len(launches) == 0 {
+		panic(unresolved("no instance type"))
+	}
+	l := launches[0]
+	for _, x := range launches[1:] {
+		if x.typ != l.typ || x.weight != l.weight {
+			panic(unresolved("the fleet can launch several instance types"))
+		}
+	}
+	n := math.Ceil(od / l.weight)
+	why := "on-demand capacity"
+	if spot > 0 {
+		why += fmt.Sprintf(" (%g Spot not counted)", spot)
+	}
+	e.hourly(n, "", "ec2|"+l.typ, l.typ+" on-demand (Linux), "+why)
+	e.blockDevices(l.bdm, n)
+}
+
+// healthCheck bills a Route 53 health check and its optional features. An
+// endpoint counts as AWS when it is a resource in this template, else as
+// non-AWS. Calculated and metric based checks are billed as AWS endpoints.
+func healthCheck(e *est, p map[string]any) {
+	c := asMap(p["HealthCheckConfig"])
+	t := e.mustStr(c, "Type")
+	if in(t, "CALCULATED", "CLOUDWATCH_METRIC", "RECOVERY_CONTROL") {
+		e.monthly(1, "", "r53hc|Health-Check-AWS", t+" health check (first 50 AWS-endpoint checks are free)")
+		return
+	}
+	sfx, where := "-Non-AWS", "non-AWS endpoint (not in this template)"
+	for _, k := range []string{"IPAddress", "FullyQualifiedDomainName"} {
+		m := asMap(c[k])
+		ref, _ := m["Ref"].(string)
+		if _, ok := e.st.Resources[ref]; ok || m["Fn::GetAtt"] != nil {
+			sfx, where = "-AWS", "AWS endpoint (first 50 are free)"
+		}
+	}
+	var opts []string
+	if strings.HasPrefix(t, "HTTPS") {
+		opts = append(opts, "HTTPS")
+	}
+	if strings.HasSuffix(t, "STR_MATCH") {
+		opts = append(opts, "string matching")
+	}
+	if e.num(c, "RequestInterval", 30) == 10 {
+		opts = append(opts, "fast interval")
+	}
+	if e.flag(c, "MeasureLatency") {
+		opts = append(opts, "latency measurement")
+	}
+	e.monthly(1, "", "r53hc|Health-Check"+sfx, t+" health check, "+where)
+	e.monthly(float64(len(opts)), "features", "r53hc|Health-Check-Option"+sfx, "optional features: "+strings.Join(opts, ", "))
 }

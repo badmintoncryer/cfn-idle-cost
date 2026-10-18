@@ -1,0 +1,81 @@
+# Fourth batch: Managed Flink, Cloud WAN, EC2 Fleet, Spot Fleet and Route 53
+# health checks; priced with testPrices["us-east-1"] and ["global"].
+Resources:
+  Flink: { Type: AWS::KinesisAnalyticsV2::Application, Properties: { RuntimeEnvironment: FLINK-1_20, ServiceExecutionRole: arn } }
+  FlinkCustom:
+    Type: AWS::KinesisAnalyticsV2::Application
+    Properties:
+      RuntimeEnvironment: FLINK-1_20
+      ServiceExecutionRole: arn
+      ApplicationConfiguration:
+        FlinkApplicationConfiguration:
+          ParallelismConfiguration: { ConfigurationType: CUSTOM, Parallelism: 4, ParallelismPerKPU: 2, AutoScalingEnabled: true }
+  Studio:
+    Type: AWS::KinesisAnalyticsV2::Application
+    Properties:
+      ApplicationMode: INTERACTIVE
+      RuntimeEnvironment: ZEPPELIN-FLINK-3_0
+      ServiceExecutionRole: arn
+      ApplicationConfiguration:
+        FlinkApplicationConfiguration:
+          ParallelismConfiguration: { ConfigurationType: CUSTOM, Parallelism: 4, ParallelismPerKPU: 1 }
+  StudioDefault: { Type: AWS::KinesisAnalyticsV2::Application, Properties: { ApplicationMode: INTERACTIVE, RuntimeEnvironment: ZEPPELIN-FLINK-3_0, ServiceExecutionRole: arn } }
+  Sql: { Type: AWS::KinesisAnalytics::Application, Properties: { Inputs: [] } }
+  Wan:
+    Type: AWS::NetworkManager::CoreNetwork
+    Properties:
+      GlobalNetworkId: g
+      PolicyDocument:
+        version: "2021.12"
+        core-network-configuration:
+          asn-ranges: ["64512-65534"]
+          edge-locations: [{ location: us-east-1 }, { location: eu-west-1 }, { location: ap-northeast-1 }]
+        segments: [{ name: prod }]
+  WanNoPolicy: { Type: AWS::NetworkManager::CoreNetwork, Properties: { GlobalNetworkId: g } }
+  Lt:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateData:
+        InstanceType: t3.micro
+        BlockDeviceMappings: [{ DeviceName: /dev/xvda, Ebs: { VolumeSize: 20, VolumeType: gp3 } }]
+  # 2 on-demand, the other 2 are Spot by default.
+  Fleet:
+    Type: AWS::EC2::EC2Fleet
+    Properties:
+      TargetCapacitySpecification: { TotalTargetCapacity: 4, OnDemandTargetCapacity: 2, DefaultTargetCapacityType: spot }
+      LaunchTemplateConfigs: [{ LaunchTemplateSpecification: { LaunchTemplateId: !Ref Lt, Version: "1" } }]
+  # One override per subnet, all of one type.
+  FleetOnDemand:
+    Type: AWS::EC2::EC2Fleet
+    Properties:
+      TargetCapacitySpecification: { TotalTargetCapacity: 3, DefaultTargetCapacityType: on-demand }
+      LaunchTemplateConfigs:
+        - LaunchTemplateSpecification: { LaunchTemplateId: !Ref Lt, Version: "1" }
+          Overrides: [{ SubnetId: a }, { SubnetId: b }]
+  FleetTypes:
+    Type: AWS::EC2::EC2Fleet
+    Properties:
+      TargetCapacitySpecification: { TotalTargetCapacity: 2, DefaultTargetCapacityType: on-demand }
+      LaunchTemplateConfigs:
+        - LaunchTemplateSpecification: { LaunchTemplateId: !Ref Lt, Version: "1" }
+          Overrides: [{ InstanceType: t3.micro }, { InstanceType: t3.small }]
+  SpotOnly:
+    Type: AWS::EC2::SpotFleet
+    Properties:
+      SpotFleetRequestConfigData: { IamFleetRole: arn, TargetCapacity: 2, LaunchSpecifications: [{ ImageId: ami, InstanceType: t3.micro }] }
+  # 2 on-demand units at 2 units per instance: 1 instance.
+  SpotMixed:
+    Type: AWS::EC2::SpotFleet
+    Properties:
+      SpotFleetRequestConfigData:
+        IamFleetRole: arn
+        TargetCapacity: 6
+        OnDemandTargetCapacity: 2
+        LaunchSpecifications: [{ ImageId: ami, InstanceType: t3.micro, WeightedCapacity: 2 }]
+  Ip: { Type: AWS::EC2::EIP }
+  CheckOutside: { Type: AWS::Route53::HealthCheck, Properties: { HealthCheckConfig: { Type: HTTP, IPAddress: 192.0.2.10 } } }
+  CheckIp:
+    Type: AWS::Route53::HealthCheck
+    Properties:
+      HealthCheckConfig: { Type: HTTPS_STR_MATCH, IPAddress: !Ref Ip, SearchString: ok, RequestInterval: 10, MeasureLatency: true }
+  CheckCalc: { Type: AWS::Route53::HealthCheck, Properties: { HealthCheckConfig: { Type: CALCULATED, ChildHealthChecks: [!Ref CheckIp] } } }

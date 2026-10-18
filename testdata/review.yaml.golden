@@ -21,6 +21,6 @@ review                       $354/mo
   review  WinNodes  Windows node groups (WINDOWS_CORE_2022_x86_64) are not supported yet
 
 ! not counted yet: 1 (these cost money idle; cfn-idle-cost has no rule for them)
-  review  Flink  AWS::KinesisAnalyticsV2::Application
+  review  Kendra  AWS::Kendra::Index
 
 prices: test prices · on-demand list prices, 730 h/mo, USD, free tier ignored

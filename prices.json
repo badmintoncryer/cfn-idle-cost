@@ -1274,6 +1274,10 @@
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT1": 0.1333333,
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT2": 0.46666655,
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT3": 0.6666665,
+      "kda|KPU-Hour-Interactive": 0.146,
+      "kda|KPU-Hour-Java": 0.146,
+      "kda|RunningApplicationStorage": 0.105,
+      "kda|RunningApplicationStorage-Interactive": 0.105,
       "kinesis|EnhancedFanoutHour": 0.024,
       "kinesis|Extended-ShardHour": 0.032,
       "kinesis|OnDemand-StreamHour": 0.064,
@@ -3416,7 +3420,8 @@
       "vpc|VpcEndpoint-GWLBE-Hours": 0.01309,
       "vpc|VpcEndpoint-Hours": 0.01309,
       "waf|RuleV2": 1,
-      "waf|WebACLV2": 5
+      "waf|WebACLV2": 5,
+      "wan|CloudWAN-CoreNetworkEdge-Hours": 0.5
     },
     "ap-east-1": {
       "aoss|IndexingOCU": 0.33,
@@ -4731,6 +4736,10 @@
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT1": 0.1326,
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT2": 0.4641,
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT3": 0.6629,
+      "kda|KPU-Hour-Interactive": 0.151,
+      "kda|KPU-Hour-Java": 0.151,
+      "kda|RunningApplicationStorage": 0.132,
+      "kda|RunningApplicationStorage-Interactive": 0.132,
       "kinesis|EnhancedFanoutHour": 0.0202,
       "kinesis|Extended-ShardHour": 0.028,
       "kinesis|OnDemand-StreamHour": 0.054,
@@ -7741,6 +7750,8 @@
       "fsx|Windows|Storage:HDD": 0.015,
       "fsx|Windows|ThroughputCapacity": 2.39,
       "fsx|Windows|ThroughputCapacity.MultiAZ": 4.897,
+      "kda|KPU-Hour-Java": 0.134,
+      "kda|RunningApplicationStorage": 0.108,
       "kinesis|EnhancedFanoutHour": 0.01755,
       "kinesis|Extended-ShardHour": 0.0234,
       "kinesis|OnDemand-StreamHour": 0.0468,
@@ -9432,7 +9443,8 @@
       "vpc|VpcEndpoint-GWLBE-Hours": 0.0126,
       "vpc|VpcEndpoint-Hours": 0.0126,
       "waf|RuleV2": 1,
-      "waf|WebACLV2": 5
+      "waf|WebACLV2": 5,
+      "wan|CloudWAN-CoreNetworkEdge-Hours": 0.5
     },
     "ap-northeast-1": {
       "aoss|IndexingOCU": 0.334,
@@ -12055,6 +12067,10 @@
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT1": 0.12,
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT2": 0.42,
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT3": 0.6,
+      "kda|KPU-Hour-Interactive": 0.142,
+      "kda|KPU-Hour-Java": 0.142,
+      "kda|RunningApplicationStorage": 0.12,
+      "kda|RunningApplicationStorage-Interactive": 0.12,
       "kinesis|EnhancedFanoutHour": 0.0195,
       "kinesis|Extended-ShardHour": 0.026,
       "kinesis|OnDemand-StreamHour": 0.052,
@@ -16910,7 +16926,8 @@
       "vpc|VpcEndpoint-GWLBE-Hours": 0.014,
       "vpc|VpcEndpoint-Hours": 0.014,
       "waf|RuleV2": 1,
-      "waf|WebACLV2": 5
+      "waf|WebACLV2": 5,
+      "wan|CloudWAN-CoreNetworkEdge-Hours": 0.5
     },
     "ap-northeast-2": {
       "aoss|IndexingOCU": 0.293,
@@ -18951,6 +18968,10 @@
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT1": 0.1206,
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT2": 0.4222,
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT3": 0.6032,
+      "kda|KPU-Hour-Interactive": 0.135,
+      "kda|KPU-Hour-Java": 0.135,
+      "kda|RunningApplicationStorage": 0.114,
+      "kda|RunningApplicationStorage-Interactive": 0.114,
       "kinesis|EnhancedFanoutHour": 0.0185,
       "kinesis|Extended-ShardHour": 0.0247,
       "kinesis|OnDemand-StreamHour": 0.049,
@@ -22657,7 +22678,8 @@
       "vpc|VpcEndpoint-GWLBE-Hours": 0.013,
       "vpc|VpcEndpoint-Hours": 0.013,
       "waf|RuleV2": 1,
-      "waf|WebACLV2": 5
+      "waf|WebACLV2": 5,
+      "wan|CloudWAN-CoreNetworkEdge-Hours": 0.5
     },
     "ap-northeast-3": {
       "aoss|IndexingOCU": 0.29808,
@@ -24020,6 +24042,10 @@
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT1": 0.12064,
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT2": 0.42222,
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT3": 0.60318,
+      "kda|KPU-Hour-Interactive": 0.142,
+      "kda|KPU-Hour-Java": 0.142,
+      "kda|RunningApplicationStorage": 0.12,
+      "kda|RunningApplicationStorage-Interactive": 0.12,
       "kinesis|EnhancedFanoutHour": 0.0195,
       "kinesis|Extended-ShardHour": 0.026,
       "kinesis|OnDemand-StreamHour": 0.068,
@@ -26501,7 +26527,8 @@
       "vpc|VpcEndpoint-GWLBE-Hours": 0.014,
       "vpc|VpcEndpoint-Hours": 0.014,
       "waf|RuleV2": 1,
-      "waf|WebACLV2": 5
+      "waf|WebACLV2": 5,
+      "wan|CloudWAN-CoreNetworkEdge-Hours": 0.5
     },
     "ap-south-1": {
       "aoss|IndexingOCU": 0.2472,
@@ -28592,6 +28619,10 @@
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT1": 0.115,
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT2": 0.403,
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT3": 0.575,
+      "kda|KPU-Hour-Interactive": 0.128,
+      "kda|KPU-Hour-Java": 0.128,
+      "kda|RunningApplicationStorage": 0.114,
+      "kda|RunningApplicationStorage-Interactive": 0.114,
       "kinesis|EnhancedFanoutHour": 0.0175,
       "kinesis|Extended-ShardHour": 0.0238,
       "kinesis|OnDemand-StreamHour": 0.0517,
@@ -32281,7 +32312,8 @@
       "vpc|VpcEndpoint-GWLBE-Hours": 0.013,
       "vpc|VpcEndpoint-Hours": 0.013,
       "waf|RuleV2": 1,
-      "waf|WebACLV2": 5
+      "waf|WebACLV2": 5,
+      "wan|CloudWAN-CoreNetworkEdge-Hours": 0.5
     },
     "ap-south-2": {
       "aoss|IndexingOCU": 0.33,
@@ -33602,6 +33634,10 @@
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT1": 0.0701,
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT2": 0.2454,
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT3": 0.3506,
+      "kda|KPU-Hour-Interactive": 0.128,
+      "kda|KPU-Hour-Java": 0.128,
+      "kda|RunningApplicationStorage": 0.114,
+      "kda|RunningApplicationStorage-Interactive": 0.114,
       "kinesis|EnhancedFanoutHour": 0.0175,
       "kinesis|Extended-ShardHour": 0.0238,
       "kinesis|OnDemand-StreamHour": 0.0517,
@@ -35746,7 +35782,8 @@
       "vpc|VpcEndpoint-GWLBE-Hours": 0.013,
       "vpc|VpcEndpoint-Hours": 0.013,
       "waf|RuleV2": 1,
-      "waf|WebACLV2": 5
+      "waf|WebACLV2": 5,
+      "wan|CloudWAN-CoreNetworkEdge-Hours": 0.5
     },
     "ap-southeast-1": {
       "aoss|IndexingOCU": 0.283,
@@ -38064,6 +38101,10 @@
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT1": 0.12,
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT2": 0.42,
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT3": 0.6,
+      "kda|KPU-Hour-Interactive": 0.138,
+      "kda|KPU-Hour-Java": 0.138,
+      "kda|RunningApplicationStorage": 0.12,
+      "kda|RunningApplicationStorage-Interactive": 0.12,
       "kinesis|EnhancedFanoutHour": 0.0184,
       "kinesis|Extended-ShardHour": 0.025,
       "kinesis|OnDemand-StreamHour": 0.049,
@@ -41983,7 +42024,8 @@
       "vpc|VpcEndpoint-GWLBE-Hours": 0.013,
       "vpc|VpcEndpoint-Hours": 0.013,
       "waf|RuleV2": 1,
-      "waf|WebACLV2": 5
+      "waf|WebACLV2": 5,
+      "wan|CloudWAN-CoreNetworkEdge-Hours": 0.5
     },
     "ap-southeast-2": {
       "aoss|IndexingOCU": 0.281,
@@ -44363,6 +44405,10 @@
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT1": 0.12,
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT2": 0.42,
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT3": 0.6,
+      "kda|KPU-Hour-Interactive": 0.138,
+      "kda|KPU-Hour-Java": 0.138,
+      "kda|RunningApplicationStorage": 0.12,
+      "kda|RunningApplicationStorage-Interactive": 0.12,
       "kinesis|EnhancedFanoutHour": 0.0184,
       "kinesis|Extended-ShardHour": 0.025,
       "kinesis|OnDemand-StreamHour": 0.049,
@@ -48700,7 +48746,8 @@
       "vpc|VpcEndpoint-GWLBE-Hours": 0.0112,
       "vpc|VpcEndpoint-Hours": 0.013,
       "waf|RuleV2": 1,
-      "waf|WebACLV2": 5
+      "waf|WebACLV2": 5,
+      "wan|CloudWAN-CoreNetworkEdge-Hours": 0.5
     },
     "ap-southeast-3": {
       "aoss|IndexingOCU": 0.29808,
@@ -49972,6 +50019,10 @@
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT1": 0.119,
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT2": 0.415,
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT3": 0.593,
+      "kda|KPU-Hour-Interactive": 0.138,
+      "kda|KPU-Hour-Java": 0.138,
+      "kda|RunningApplicationStorage": 0.12,
+      "kda|RunningApplicationStorage-Interactive": 0.12,
       "kinesis|EnhancedFanoutHour": 0.0184,
       "kinesis|Extended-ShardHour": 0.025,
       "kinesis|OnDemand-StreamHour": 0.049,
@@ -52154,7 +52205,8 @@
       "vpc|VpcEndpoint-GWLBE-Hours": 0.013,
       "vpc|VpcEndpoint-Hours": 0.013,
       "waf|RuleV2": 1,
-      "waf|WebACLV2": 5
+      "waf|WebACLV2": 5,
+      "wan|CloudWAN-CoreNetworkEdge-Hours": 0.5
     },
     "ap-southeast-4": {
       "aoss|IndexingOCU": 0.29808,
@@ -53205,6 +53257,10 @@
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT1": 0.1199,
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT2": 0.4196,
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT3": 0.5994,
+      "kda|KPU-Hour-Interactive": 0.138,
+      "kda|KPU-Hour-Java": 0.138,
+      "kda|RunningApplicationStorage": 0.12,
+      "kda|RunningApplicationStorage-Interactive": 0.12,
       "kinesis|EnhancedFanoutHour": 0.0184,
       "kinesis|Extended-ShardHour": 0.025,
       "kinesis|OnDemand-StreamHour": 0.049,
@@ -54860,7 +54916,8 @@
       "vpc|VpcEndpoint-GWLBE-Hours": 0.0112,
       "vpc|VpcEndpoint-Hours": 0.013,
       "waf|RuleV2": 1,
-      "waf|WebACLV2": 5
+      "waf|WebACLV2": 5,
+      "wan|CloudWAN-CoreNetworkEdge-Hours": 0.5
     },
     "ap-southeast-5": {
       "aoss|IndexingOCU": 0.25344,
@@ -56157,6 +56214,10 @@
       "fsx|Windows|Storage:HDD": 0.0144,
       "fsx|Windows|ThroughputCapacity": 2.287,
       "fsx|Windows|ThroughputCapacity.MultiAZ": 4.692,
+      "kda|KPU-Hour-Interactive": 0.124,
+      "kda|KPU-Hour-Java": 0.124,
+      "kda|RunningApplicationStorage": 0.108,
+      "kda|RunningApplicationStorage-Interactive": 0.108,
       "kinesis|EnhancedFanoutHour": 0.0166,
       "kinesis|Extended-ShardHour": 0.0225,
       "kinesis|OnDemand-StreamHour": 0.0441,
@@ -58557,7 +58618,8 @@
       "vpc|VpcEndpoint-GWLBE-Hours": 0.0117,
       "vpc|VpcEndpoint-Hours": 0.0117,
       "waf|RuleV2": 1,
-      "waf|WebACLV2": 5
+      "waf|WebACLV2": 5,
+      "wan|CloudWAN-CoreNetworkEdge-Hours": 0.5
     },
     "ap-southeast-6": {
       "apigw|cache:0.5": 0.021,
@@ -59356,6 +59418,8 @@
       "fsx|Windows|Storage:HDD": 0.0168,
       "fsx|Windows|ThroughputCapacity": 2.657,
       "fsx|Windows|ThroughputCapacity.MultiAZ": 5.434,
+      "kda|KPU-Hour-Java": 0.1375,
+      "kda|RunningApplicationStorage": 0.228,
       "kinesis|EnhancedFanoutHour": 0.01932,
       "kinesis|Extended-ShardHour": 0.02625,
       "kinesis|OnDemand-StreamHour": 0.05145,
@@ -60857,7 +60921,8 @@
       "vpc|VpcEndpoint-GWLBE-Hours": 0.01176,
       "vpc|VpcEndpoint-Hours": 0.01365,
       "waf|RuleV2": 1,
-      "waf|WebACLV2": 5
+      "waf|WebACLV2": 5,
+      "wan|CloudWAN-CoreNetworkEdge-Hours": 0.5
     },
     "ap-southeast-7": {
       "apigw|cache:0.5": 0.0252,
@@ -61904,6 +61969,10 @@
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT1": 0.1025,
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT2": 0.3588,
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT3": 0.5126,
+      "kda|KPU-Hour-Interactive": 0.12276,
+      "kda|KPU-Hour-Java": 0.12276,
+      "kda|RunningApplicationStorage": 0.108,
+      "kda|RunningApplicationStorage-Interactive": 0.0978,
       "kinesis|EnhancedFanoutHour": 0.0166,
       "kinesis|Extended-ShardHour": 0.0225,
       "kinesis|OnDemand-StreamHour": 0.0441,
@@ -63441,7 +63510,8 @@
       "vpc|VpcEndpoint-GWLBE-Hours": 0.0117,
       "vpc|VpcEndpoint-Hours": 0.0117,
       "waf|RuleV2": 1,
-      "waf|WebACLV2": 5
+      "waf|WebACLV2": 5,
+      "wan|CloudWAN-CoreNetworkEdge-Hours": 0.5
     },
     "ca-central-1": {
       "aoss|IndexingOCU": 0.266,
@@ -65518,6 +65588,10 @@
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT1": 0.108,
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT2": 0.378,
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT3": 0.54,
+      "kda|KPU-Hour-Interactive": 0.123,
+      "kda|KPU-Hour-Java": 0.123,
+      "kda|RunningApplicationStorage": 0.11,
+      "kda|RunningApplicationStorage-Interactive": 0.11,
       "kinesis|EnhancedFanoutHour": 0.0165,
       "kinesis|Extended-ShardHour": 0.022,
       "kinesis|OnDemand-StreamHour": 0.048,
@@ -69262,7 +69336,8 @@
       "vpc|VpcEndpoint-GWLBE-Hours": 0.011,
       "vpc|VpcEndpoint-Hours": 0.011,
       "waf|RuleV2": 1,
-      "waf|WebACLV2": 5
+      "waf|WebACLV2": 5,
+      "wan|CloudWAN-CoreNetworkEdge-Hours": 0.5
     },
     "ca-west-1": {
       "aoss|IndexingOCU": 0.26712,
@@ -70264,6 +70339,10 @@
       "fsx|Windows|Storage:HDD": 0.022,
       "fsx|Windows|ThroughputCapacity": 2.299,
       "fsx|Windows|ThroughputCapacity.MultiAZ": 4.703,
+      "kda|KPU-Hour-Interactive": 0.123,
+      "kda|KPU-Hour-Java": 0.123,
+      "kda|RunningApplicationStorage": 0.11,
+      "kda|RunningApplicationStorage-Interactive": 0.11,
       "kinesis|EnhancedFanoutHour": 0.0165,
       "kinesis|Extended-ShardHour": 0.022,
       "kinesis|OnDemand-StreamHour": 0.048,
@@ -71864,7 +71943,8 @@
       "vpc|VpcEndpoint-GWLBE-Hours": 0.011,
       "vpc|VpcEndpoint-Hours": 0.011,
       "waf|RuleV2": 1,
-      "waf|WebACLV2": 5
+      "waf|WebACLV2": 5,
+      "wan|CloudWAN-CoreNetworkEdge-Hours": 0.5
     },
     "eu-central-1": {
       "aoss|IndexingOCU": 0.339,
@@ -74446,6 +74526,10 @@
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT1": 0.119,
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT2": 0.417,
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT3": 0.596,
+      "kda|KPU-Hour-Interactive": 0.132,
+      "kda|KPU-Hour-Java": 0.132,
+      "kda|RunningApplicationStorage": 0.119,
+      "kda|RunningApplicationStorage-Interactive": 0.119,
       "kinesis|EnhancedFanoutHour": 0.018,
       "kinesis|Extended-ShardHour": 0.024,
       "kinesis|OnDemand-StreamHour": 0.048,
@@ -79097,7 +79181,8 @@
       "vpc|VpcEndpoint-GWLBE-Hours": 0.012,
       "vpc|VpcEndpoint-Hours": 0.012,
       "waf|RuleV2": 1,
-      "waf|WebACLV2": 5
+      "waf|WebACLV2": 5,
+      "wan|CloudWAN-CoreNetworkEdge-Hours": 0.5
     },
     "eu-central-2": {
       "aoss|IndexingOCU": 0.304,
@@ -80301,6 +80386,10 @@
       "influx|MultiAZUsage-Db.influx.2xlarge": 2.5382,
       "influx|MultiAZUsage-Db.influx.8xlarge": 10.15,
       "influx|MultiAZUsage-Db.influx.medium": 0.3171,
+      "kda|KPU-Hour-Interactive": 0.146,
+      "kda|KPU-Hour-Java": 0.146,
+      "kda|RunningApplicationStorage": 0.143,
+      "kda|RunningApplicationStorage-Interactive": 0.143,
       "kinesis|EnhancedFanoutHour": 0.0198,
       "kinesis|Extended-ShardHour": 0.0264,
       "kinesis|OnDemand-StreamHour": 0.0528,
@@ -82008,7 +82097,8 @@
       "vpc|VpcEndpoint-GWLBE-Hours": 0.0132,
       "vpc|VpcEndpoint-Hours": 0.0132,
       "waf|RuleV2": 1,
-      "waf|WebACLV2": 5
+      "waf|WebACLV2": 5,
+      "wan|CloudWAN-CoreNetworkEdge-Hours": 0.5
     },
     "eu-north-1": {
       "aoss|IndexingOCU": 0.25512,
@@ -83829,6 +83919,10 @@
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT1": 0.104,
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT2": 0.364,
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT3": 0.52,
+      "kda|KPU-Hour-Interactive": 0.128,
+      "kda|KPU-Hour-Java": 0.128,
+      "kda|RunningApplicationStorage": 0.1045,
+      "kda|RunningApplicationStorage-Interactive": 0.1045,
       "kinesis|EnhancedFanoutHour": 0.0162,
       "kinesis|Extended-ShardHour": 0.0219,
       "kinesis|OnDemand-StreamHour": 0.043,
@@ -86796,7 +86890,8 @@
       "vpc|VpcEndpoint-GWLBE-Hours": 0.0105,
       "vpc|VpcEndpoint-Hours": 0.0105,
       "waf|RuleV2": 1,
-      "waf|WebACLV2": 5
+      "waf|WebACLV2": 5,
+      "wan|CloudWAN-CoreNetworkEdge-Hours": 0.5
     },
     "eu-south-1": {
       "aoss|IndexingOCU": 0.27936,
@@ -88144,6 +88239,10 @@
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT1": 0.115,
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT2": 0.404,
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT3": 0.577,
+      "kda|KPU-Hour-Interactive": 0.143,
+      "kda|KPU-Hour-Java": 0.143,
+      "kda|RunningApplicationStorage": 0.116,
+      "kda|RunningApplicationStorage-Interactive": 0.116,
       "kinesis|EnhancedFanoutHour": 0.02655,
       "kinesis|Extended-ShardHour": 0.0354,
       "kinesis|OnDemand-StreamHour": 0.071,
@@ -90467,7 +90566,8 @@
       "vpc|VpcEndpoint-GWLBE-Hours": 0.01155,
       "vpc|VpcEndpoint-Hours": 0.01155,
       "waf|RuleV2": 1,
-      "waf|WebACLV2": 5
+      "waf|WebACLV2": 5,
+      "wan|CloudWAN-CoreNetworkEdge-Hours": 0.5
     },
     "eu-south-2": {
       "aoss|IndexingOCU": 0.26808,
@@ -92260,6 +92360,10 @@
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT1": 0.112,
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT2": 0.392,
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT3": 0.56,
+      "kda|KPU-Hour-Interactive": 0.131,
+      "kda|KPU-Hour-Java": 0.131,
+      "kda|RunningApplicationStorage": 0.11,
+      "kda|RunningApplicationStorage-Interactive": 0.11,
       "kinesis|EnhancedFanoutHour": 0.017,
       "kinesis|Extended-ShardHour": 0.023,
       "kinesis|OnDemand-StreamHour": 0.045,
@@ -94998,7 +95102,8 @@
       "vpc|VpcEndpoint-GWLBE-Hours": 0.0112,
       "vpc|VpcEndpoint-Hours": 0.011,
       "waf|RuleV2": 1,
-      "waf|WebACLV2": 5
+      "waf|WebACLV2": 5,
+      "wan|CloudWAN-CoreNetworkEdge-Hours": 0.5
     },
     "eu-west-1": {
       "aoss|IndexingOCU": 0.251,
@@ -97619,6 +97724,10 @@
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT1": 0.11,
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT2": 0.385,
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT3": 0.55,
+      "kda|KPU-Hour-Interactive": 0.12,
+      "kda|KPU-Hour-Java": 0.12,
+      "kda|RunningApplicationStorage": 0.11,
+      "kda|RunningApplicationStorage-Interactive": 0.11,
       "kinesis|EnhancedFanoutHour": 0.017,
       "kinesis|Extended-ShardHour": 0.023,
       "kinesis|OnDemand-StreamHour": 0.045,
@@ -102445,7 +102554,8 @@
       "vpc|VpcEndpoint-GWLBE-Hours": 0.0112,
       "vpc|VpcEndpoint-Hours": 0.011,
       "waf|RuleV2": 1,
-      "waf|WebACLV2": 5
+      "waf|WebACLV2": 5,
+      "wan|CloudWAN-CoreNetworkEdge-Hours": 0.5
     },
     "eu-west-2": {
       "aoss|IndexingOCU": 0.27552,
@@ -104521,6 +104631,10 @@
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT1": 0.117,
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT2": 0.411,
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT3": 0.587,
+      "kda|KPU-Hour-Interactive": 0.127,
+      "kda|KPU-Hour-Java": 0.127,
+      "kda|RunningApplicationStorage": 0.116,
+      "kda|RunningApplicationStorage-Interactive": 0.116,
       "kinesis|EnhancedFanoutHour": 0.0179,
       "kinesis|Extended-ShardHour": 0.0242,
       "kinesis|OnDemand-StreamHour": 0.048,
@@ -108181,7 +108295,8 @@
       "vpc|VpcEndpoint-GWLBE-Hours": 0.011,
       "vpc|VpcEndpoint-Hours": 0.011,
       "waf|RuleV2": 1,
-      "waf|WebACLV2": 5
+      "waf|WebACLV2": 5,
+      "wan|CloudWAN-CoreNetworkEdge-Hours": 0.5
     },
     "eu-west-3": {
       "aoss|IndexingOCU": 0.281,
@@ -109951,6 +110066,10 @@
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT1": 0.116,
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT2": 0.407,
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT3": 0.581,
+      "kda|KPU-Hour-Interactive": 0.128,
+      "kda|KPU-Hour-Java": 0.128,
+      "kda|RunningApplicationStorage": 0.116,
+      "kda|RunningApplicationStorage-Interactive": 0.116,
       "kinesis|EnhancedFanoutHour": 0.0179,
       "kinesis|Extended-ShardHour": 0.0242,
       "kinesis|OnDemand-StreamHour": 0.048,
@@ -113131,12 +113250,17 @@
       "vpc|VpcEndpoint-GWLBE-Hours": 0.011,
       "vpc|VpcEndpoint-Hours": 0.011,
       "waf|RuleV2": 1,
-      "waf|WebACLV2": 5
+      "waf|WebACLV2": 5,
+      "wan|CloudWAN-CoreNetworkEdge-Hours": 0.5
     },
     "global": {
       "arc|Global-Cluster-Hours": 2.5,
       "arc|Global-ReadinessCheck-Hours": 0.045,
       "ga|Global-Accelerator-fixed-fee": 0.025,
+      "r53hc|Health-Check-AWS": 0.5,
+      "r53hc|Health-Check-Non-AWS": 0.75,
+      "r53hc|Health-Check-Option-AWS": 1,
+      "r53hc|Health-Check-Option-Non-AWS": 2,
       "r53|HostedZone": 0.5
     },
     "il-central-1": {
@@ -114160,6 +114284,10 @@
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT1": 0.1175,
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT2": 0.4111,
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT3": 0.5873,
+      "kda|KPU-Hour-Interactive": 0.128,
+      "kda|KPU-Hour-Java": 0.128,
+      "kda|RunningApplicationStorage": 0.132,
+      "kda|RunningApplicationStorage-Interactive": 0.132,
       "kinesis|EnhancedFanoutHour": 0.01785,
       "kinesis|Extended-ShardHour": 0.02415,
       "kinesis|OnDemand-StreamHour": 0.04725,
@@ -115774,7 +115902,8 @@
       "vpc|VpcEndpoint-GWLBE-Hours": 0.01176,
       "vpc|VpcEndpoint-Hours": 0.01155,
       "waf|RuleV2": 1,
-      "waf|WebACLV2": 5
+      "waf|WebACLV2": 5,
+      "wan|CloudWAN-CoreNetworkEdge-Hours": 0.5
     },
     "me-central-1": {
       "apigw|cache:0.5": 0.022,
@@ -116743,6 +116872,10 @@
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT1": 0.121,
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT2": 0.425,
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT3": 0.607,
+      "kda|KPU-Hour-Interactive": 0.135,
+      "kda|KPU-Hour-Java": 0.135,
+      "kda|RunningApplicationStorage": 0.121,
+      "kda|RunningApplicationStorage-Interactive": 0.121,
       "kinesis|EnhancedFanoutHour": 0.0187,
       "kinesis|Extended-ShardHour": 0.0253,
       "kinesis|OnDemand-StreamHour": 0.0495,
@@ -118202,7 +118335,8 @@
       "vpc|VpcEndpoint-GWLBE-Hours": 0.01232,
       "vpc|VpcEndpoint-Hours": 0.0121,
       "waf|RuleV2": 1,
-      "waf|WebACLV2": 5
+      "waf|WebACLV2": 5,
+      "wan|CloudWAN-CoreNetworkEdge-Hours": 0.5
     },
     "me-south-1": {
       "apigw|cache:0.5": 0.022,
@@ -119037,6 +119171,10 @@
       "fsx|Windows|Storage:HDD": 0.017,
       "fsx|Windows|ThroughputCapacity": 2.486,
       "fsx|Windows|ThroughputCapacity.MultiAZ": 5.085,
+      "kda|KPU-Hour-Interactive": 0.135,
+      "kda|KPU-Hour-Java": 0.135,
+      "kda|RunningApplicationStorage": 0.121,
+      "kda|RunningApplicationStorage-Interactive": 0.121,
       "kinesis|EnhancedFanoutHour": 0.0187,
       "kinesis|Extended-ShardHour": 0.0253,
       "kinesis|OnDemand-StreamHour": 0.05,
@@ -120839,7 +120977,8 @@
       "vpc|VpcEndpoint-GWLBE-Hours": 0.0121,
       "vpc|VpcEndpoint-Hours": 0.0121,
       "waf|RuleV2": 1,
-      "waf|WebACLV2": 5
+      "waf|WebACLV2": 5,
+      "wan|CloudWAN-CoreNetworkEdge-Hours": 0.5
     },
     "mx-central-1": {
       "apigw|cache:0.5": 0.021,
@@ -121738,6 +121877,10 @@
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT1": 0.105042,
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT2": 0.367647,
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT3": 0.52521,
+      "kda|KPU-Hour-Interactive": 0.12133,
+      "kda|KPU-Hour-Java": 0.12133,
+      "kda|RunningApplicationStorage": 0.105,
+      "kda|RunningApplicationStorage-Interactive": 0.105,
       "kinesis|EnhancedFanoutHour": 0.01575,
       "kinesis|Extended-ShardHour": 0.021,
       "kinesis|OnDemand-StreamHour": 0.042,
@@ -125447,6 +125590,10 @@
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT1": 0.15908734,
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT2": 0.55680569,
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT3": 0.7954367,
+      "kda|KPU-Hour-Interactive": 0.22,
+      "kda|KPU-Hour-Java": 0.22,
+      "kda|RunningApplicationStorage": 0.19,
+      "kda|RunningApplicationStorage-Interactive": 0.19,
       "kinesis|EnhancedFanoutHour": 0.03,
       "kinesis|Extended-ShardHour": 0.04,
       "kinesis|OnDemand-StreamHour": 0.08,
@@ -131946,6 +132093,10 @@
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT1": 0.1,
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT2": 0.35,
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT3": 0.5,
+      "kda|KPU-Hour-Interactive": 0.11,
+      "kda|KPU-Hour-Java": 0.11,
+      "kda|RunningApplicationStorage": 0.1,
+      "kda|RunningApplicationStorage-Interactive": 0.1,
       "kinesis|EnhancedFanoutHour": 0.015,
       "kinesis|Extended-ShardHour": 0.02,
       "kinesis|OnDemand-StreamHour": 0.04,
@@ -137140,7 +137291,8 @@
       "vpc|VpcEndpoint-GWLBE-Hours": 0.01,
       "vpc|VpcEndpoint-Hours": 0.01,
       "waf|RuleV2": 1,
-      "waf|WebACLV2": 5
+      "waf|WebACLV2": 5,
+      "wan|CloudWAN-CoreNetworkEdge-Hours": 0.5
     },
     "us-east-2": {
       "aoss|IndexingOCU": 0.24,
@@ -139869,6 +140021,10 @@
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT1": 0.1,
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT2": 0.35,
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT3": 0.5,
+      "kda|KPU-Hour-Interactive": 0.11,
+      "kda|KPU-Hour-Java": 0.11,
+      "kda|RunningApplicationStorage": 0.1,
+      "kda|RunningApplicationStorage-Interactive": 0.1,
       "kinesis|EnhancedFanoutHour": 0.015,
       "kinesis|Extended-ShardHour": 0.02,
       "kinesis|OnDemand-StreamHour": 0.04,
@@ -144901,7 +145057,8 @@
       "vpc|VpcEndpoint-GWLBE-Hours": 0.01,
       "vpc|VpcEndpoint-Hours": 0.01,
       "waf|RuleV2": 1,
-      "waf|WebACLV2": 5
+      "waf|WebACLV2": 5,
+      "wan|CloudWAN-CoreNetworkEdge-Hours": 0.5
     },
     "us-west-1": {
       "aoss|IndexingOCU": 0.27936,
@@ -146706,6 +146863,10 @@
       "fsx|Windows|Storage:HDD": 0.016,
       "fsx|Windows|ThroughputCapacity": 2.421,
       "fsx|Windows|ThroughputCapacity.MultiAZ": 4.95,
+      "kda|KPU-Hour-Interactive": 0.138,
+      "kda|KPU-Hour-Java": 0.138,
+      "kda|RunningApplicationStorage": 0.12,
+      "kda|RunningApplicationStorage-Interactive": 0.12,
       "kinesis|EnhancedFanoutHour": 0.0182,
       "kinesis|Extended-ShardHour": 0.025,
       "kinesis|OnDemand-StreamHour": 0.049,
@@ -150279,7 +150440,8 @@
       "vpc|VpcEndpoint-GWLBE-Hours": 0.011,
       "vpc|VpcEndpoint-Hours": 0.011,
       "waf|RuleV2": 1,
-      "waf|WebACLV2": 5
+      "waf|WebACLV2": 5,
+      "wan|CloudWAN-CoreNetworkEdge-Hours": 0.5
     },
     "us-west-2": {
       "aoss|IndexingOCU": 0.24,
@@ -153173,6 +153335,10 @@
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT1": 0.1,
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT2": 0.35,
       "influx|SingleAZ-InfluxDBStorage-InfluxIOIncludedT3": 0.5,
+      "kda|KPU-Hour-Interactive": 0.11,
+      "kda|KPU-Hour-Java": 0.11,
+      "kda|RunningApplicationStorage": 0.1,
+      "kda|RunningApplicationStorage-Interactive": 0.1,
       "kinesis|EnhancedFanoutHour": 0.015,
       "kinesis|Extended-ShardHour": 0.02,
       "kinesis|OnDemand-StreamHour": 0.04,
@@ -158360,7 +158526,8 @@
       "vpc|VpcEndpoint-GWLBE-Hours": 0.01,
       "vpc|VpcEndpoint-Hours": 0.01,
       "waf|RuleV2": 1,
-      "waf|WebACLV2": 5
+      "waf|WebACLV2": 5,
+      "wan|CloudWAN-CoreNetworkEdge-Hours": 0.5
     }
   }
 }
