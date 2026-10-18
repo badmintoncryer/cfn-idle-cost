@@ -107,7 +107,8 @@ var selectors = []selector{
 		}},
 	{name: "vpc", service: "AmazonVPC",
 		key: func(a map[string]string, u string) string {
-			return keep(u, "PublicIPv4:InUseAddress", "VpcEndpoint-Hours", "VpcEndpoint-GWLBE-Hours", "VPN-Usage-Hours:ipsec.1", "ClientVPN-EndpointHours", "VPCLattice-Service-Hourly")
+			return keep(u, "PublicIPv4:InUseAddress", "VpcEndpoint-Hours", "VpcEndpoint-GWLBE-Hours", "VPN-Usage-Hours:ipsec.1", "ClientVPN-EndpointHours", "VPCLattice-Service-Hourly",
+				"VerifiedAccess-App-Hours", "VerifiedAccess-non-HTTP-App-Hours")
 		}},
 	{name: "tgw", service: "AmazonVPC",
 		key: func(a map[string]string, u string) string {
@@ -230,9 +231,9 @@ var selectors = []selector{
 		key: func(a map[string]string, u string) string { return keep(u, "Endpoint-Hour") }},
 	{name: "waf", service: "awswaf", families: []string{"Web Application Firewall"},
 		key: func(a map[string]string, u string) string { return keep(u, "WebACLV2", "RuleV2") }},
-	{name: "cw", service: "AmazonCloudWatch", families: []string{"Alarm", "Canaries"},
+	{name: "cw", service: "AmazonCloudWatch", families: []string{"Alarm", "Canaries", "Contributor Insights"},
 		key: func(a map[string]string, u string) string {
-			return keep(u, "CW:AlarmMonitorUsage", "CW:HighResAlarmMonitorUsage", "CW:CompositeAlarmMonitorUsage", "CW:Canary-runs")
+			return keep(u, "CW:AlarmMonitorUsage", "CW:HighResAlarmMonitorUsage", "CW:CompositeAlarmMonitorUsage", "CW:Canary-runs", "CW:ContributorInsightRules")
 		}},
 	{name: "lambda", service: "AWSLambda", families: []string{"Serverless"},
 		key: func(a map[string]string, u string) string {
@@ -376,6 +377,39 @@ var selectors = []selector{
 	{name: "r53hc", service: "AmazonRoute53", global: true, families: []string{"DNS Health Check"},
 		key: func(a map[string]string, u string) string {
 			return keep(u, "Health-Check-AWS", "Health-Check-Non-AWS", "Health-Check-Option-AWS", "Health-Check-Option-Non-AWS")
+		}},
+	// KendraEnterpriseEdition ($7/h) is the retired price; Kendra-Enterprise-Edition is the current one.
+	{name: "kendra", service: "AmazonKendra",
+		key: func(a map[string]string, u string) string {
+			return keep(u, "KendraDeveloperEdition", "Kendra-Enterprise-Edition", "Kendra-Query-Capacity-Unit", "Kendra-Storage-Capacity-Unit",
+				"Kendra-GenAI-Ent-Base-Capacity", "Kendra-GenAI-Ent-Addl-QueryCap", "Kendra-GenAI-Ent-Addl-StorageCap")
+		}},
+	{name: "mlflow", service: "AmazonSageMaker", families: []string{"Amazon SageMaker"}, filters: map[string]string{"operation": "RunTrackingServer"},
+		key: func(a map[string]string, u string) string {
+			if v, ok := strings.CutPrefix(u, "MLflow:TrackingServerCompute-"); ok {
+				return v
+			}
+			return ""
+		}},
+	{name: "graph", service: "AmazonNeptune", families: []string{"Neptune Memory Optimized Graph"},
+		key: func(a map[string]string, u string) string {
+			if v, ok := strings.CutPrefix(u, "MemoryOptimizedGraphUsage:"); ok {
+				return strings.TrimSuffix(v, "-m-NCU")
+			}
+			return ""
+		}},
+	{name: "gamelift", service: "AmazonGameLift", families: []string{"GameLift EC2 Instance"},
+		key: func(a map[string]string, u string) string {
+			if os, ok := strings.CutPrefix(a["operation"], "Consume"); ok && strings.HasPrefix(u, "BoxUsage:") {
+				if os, ok := strings.CutSuffix(os, "GameLiftInstance"); ok { // not FleetIQ
+					return os + "|" + a["instanceType"]
+				}
+			}
+			return ""
+		},
+		liveFilter: func(d string) map[string]string {
+			_, t, _ := strings.Cut(d, "|")
+			return map[string]string{"instanceType": t}
 		}},
 	{name: "influx", service: "AmazonTimestream", families: []string{"Database Instance", "Influx Optimized Storage"},
 		key: func(a map[string]string, u string) string {

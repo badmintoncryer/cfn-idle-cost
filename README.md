@@ -227,6 +227,13 @@ and provisioned storage billed whether you use it or not.
 | `AWS::NetworkManager::CoreNetwork` | hourly per edge location in `PolicyDocument`, priced in the stack's region |
 | `AWS::EC2::EC2Fleet`, `AWS::EC2::SpotFleet` | instance hourly (Linux) × on-demand target capacity, and the EBS volumes of its launch template, when the fleet launches one instance type. Spot capacity is not counted |
 | `AWS::Route53::HealthCheck` | monthly fee and optional features (HTTPS, string matching, fast interval, latency measurement). An endpoint that is a resource in the template is priced as an AWS endpoint, any other as non-AWS. Calculated and CloudWatch metric checks are priced as AWS endpoints |
+| `AWS::Kendra::Index` | edition hourly (Developer, Enterprise, GenAI Enterprise) and additional query and storage capacity units |
+| `AWS::EC2::VerifiedAccessEndpoint` | hourly per endpoint, at the HTTP or the non-HTTP (TCP, RDS, CIDR) application price |
+| `AWS::CloudWatch::InsightRule` | monthly fee per enabled Contributor Insights rule (matched log events not counted) |
+| `AWS::SageMaker::MlflowTrackingServer` | tracking server hourly by size (Small, Medium, Large) |
+| `AWS::NeptuneGraph::Graph` | provisioned m-NCUs hourly × (1 + replicas) |
+| `AWS::GameLift::Fleet` | instance hourly × desired instances (1 if not set) in the home Region, Linux or Windows from the build. Anywhere fleets: $0 idle |
+| `AWS::Batch::ComputeEnvironment` | $0 idle for Fargate, unmanaged and `MinvCpus: 0` environments |
 
 Usage-only charges are left out on purpose: S3, Lambda, Aurora storage and
 I/O, CloudWatch Logs, data transfer, requests.
@@ -234,13 +241,15 @@ I/O, CloudWatch Logs, data transfer, requests.
 ### Not counted yet
 
 Common resource types that cost money with zero traffic but have no rule yet,
-such as WorkSpaces, Kendra, AppStream 2.0, Lightsail and CloudWatch
-dashboards, are listed under `! not counted yet`. Types missing from that list
-are skipped without a line, so the list grows as they are found. Partly
-supported types (Fargate Spot and other capacity providers, Spot and Windows
-node groups, EMR instance fleets, Aurora Serverless v1, instances in Local
-Zones, canaries on a cron schedule, Spot-only fleets and fleets of several
-instance types) are listed under `? could not estimate`.
+such as WorkSpaces, AppStream 2.0, Lightsail, Elastic Beanstalk and
+CloudWatch dashboards, are listed under `! not counted yet`. Types missing from
+that list are skipped without a line, so the list grows as they are found.
+Partly supported types (Fargate Spot and other capacity providers, Spot and
+Windows node groups, EMR instance fleets, Aurora Serverless v1, instances in
+Local Zones, canaries on a cron schedule, Spot-only fleets and fleets of several
+instance types, Batch compute environments with `MinvCpus` above 0, and
+GameLift fleets on Spot or in remote locations) are listed under
+`? could not estimate`.
 
 ## Assumptions
 

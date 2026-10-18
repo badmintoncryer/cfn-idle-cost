@@ -39,4 +39,4 @@ Resources:
   Docs: { Type: AWS::DocDB::DBCluster, Properties: { StorageType: iopt1, ServerlessV2ScalingConfiguration: { MinCapacity: 1, MaxCapacity: 4 } } }
   DocsWriter: { Type: AWS::DocDB::DBInstance, Properties: { DBClusterIdentifier: !Ref Docs, DBInstanceClass: db.serverless } }
   # Listed instead of left out.
-  Kendra: { Type: AWS::Kendra::Index, Properties: { Edition: DEVELOPER_EDITION, Name: k, RoleArn: arn } }
+  Desk: { Type: AWS::WorkSpaces::Workspace, Properties: { BundleId: wsb-1, DirectoryId: d-1, UserName: u } }

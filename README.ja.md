@@ -204,12 +204,19 @@ jobs:
 | `AWS::NetworkManager::CoreNetwork` | `PolicyDocument`にあるエッジロケーションごとの時間料金。スタックのリージョンの価格で計算する |
 | `AWS::EC2::EC2Fleet`、`AWS::EC2::SpotFleet` | インスタンスタイプが1つのフリートの、インスタンスの時間料金（Linux）×オンデマンドの目標容量と、起動テンプレートのEBSボリューム。Spotの分は数えない |
 | `AWS::Route53::HealthCheck` | 月額料金とオプション機能（HTTPS、文字列照合、高速間隔、レイテンシー測定）。テンプレート内のリソースを監視するものはAWSエンドポイント、それ以外はAWS以外のエンドポイントの価格で計算する。`CALCULATED`と`CLOUDWATCH_METRIC`のヘルスチェックは、AWSエンドポイントの価格で計算する |
+| `AWS::Kendra::Index` | エディション（Developer、Enterprise、GenAI Enterprise）の時間料金と、追加のクエリ・ストレージのキャパシティユニット |
+| `AWS::EC2::VerifiedAccessEndpoint` | エンドポイントごとの時間料金。HTTPのアプリケーションと、HTTP以外（TCP、RDS、CIDR）のアプリケーションで価格が違う |
+| `AWS::CloudWatch::InsightRule` | 有効なContributor Insightsルールごとの月額料金。一致したログイベントの料金は数えない |
+| `AWS::SageMaker::MlflowTrackingServer` | サイズ（Small、Medium、Large）ごとのトラッキングサーバーの時間料金 |
+| `AWS::NeptuneGraph::Graph` | プロビジョニングしたm-NCUの時間料金×（1＋レプリカ数） |
+| `AWS::GameLift::Fleet` | ホームリージョンのインスタンスの時間料金×希望するインスタンス数（指定がなければ1）。LinuxかWindowsかはビルドから読む。Anywhereフリートはアイドル時$0 |
+| `AWS::Batch::ComputeEnvironment` | Fargate、アンマネージド、`MinvCpus: 0`のコンピューティング環境はアイドル時$0 |
 
 使った分だけかかる費用は、意図して対象から外しています。S3、Lambda、AuroraのストレージとI/O、CloudWatch Logs、データ転送、リクエスト料金がこれに当たります。
 
 ### まだ見積もらないもの
 
-アクセスがゼロでも費用がかかるのに、まだルールのないリソースタイプのうち、よく使われるもの（WorkSpaces、Kendra、AppStream 2.0、Lightsail、CloudWatchダッシュボードなど）は、`! not counted yet`に載せます。この一覧にないタイプは行を出さずに飛ばすので、見つかりしだい一覧に足していきます。一部だけ対応しているリソース（Fargate Spotとほかのキャパシティプロバイダ、SpotとWindowsのノードグループ、EMRのインスタンスフリート、Aurora Serverless v1、Local Zonesのインスタンス、cronのスケジュールで動くカナリア、Spotだけのフリート、複数のインスタンスタイプを使うフリート）は、`? could not estimate`に載ります。
+アクセスがゼロでも費用がかかるのに、まだルールのないリソースタイプのうち、よく使われるもの（WorkSpaces、AppStream 2.0、Lightsail、Elastic Beanstalk、CloudWatchダッシュボードなど）は、`! not counted yet`に載せます。この一覧にないタイプは行を出さずに飛ばすので、見つかりしだい一覧に足していきます。一部だけ対応しているリソース（Fargate Spotとほかのキャパシティプロバイダ、SpotとWindowsのノードグループ、EMRのインスタンスフリート、Aurora Serverless v1、Local Zonesのインスタンス、cronのスケジュールで動くカナリア、Spotだけのフリート、複数のインスタンスタイプを使うフリート、`MinvCpus`が0より大きいBatchのコンピューティング環境、SpotやリモートロケーションのGameLiftフリート）は、`? could not estimate`に載ります。
 
 ## 前提
 
