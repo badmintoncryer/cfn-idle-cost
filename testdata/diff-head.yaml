@@ -1,7 +1,7 @@
 Conditions:
   IsProd: !Equals [!Ref "AWS::AccountId", "123456789012"]
 Resources:
-  Server: { Type: AWS::EC2::Instance, Properties: { InstanceType: t3.small } }
+  Server: { Type: AWS::EC2::Instance, Properties: { InstanceType: t3.small, BlockDeviceMappings: [{ DeviceName: /dev/xvda, Ebs: { VolumeSize: 8, VolumeType: gp3 } }] } }
   Secret: { Type: AWS::SecretsManager::Secret }
   Key: { Type: AWS::KMS::Key, Condition: IsProd }
   Eip: { Type: AWS::EC2::EIP }

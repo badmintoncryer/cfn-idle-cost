@@ -7,8 +7,8 @@ review                       $354/mo
   DocsWriter   ×1 DCU         $66  serverless minimum capacity
   Stream       ×2 shards      $29  extended retention (over 24 hours)
   Stream       ×2 shards      $22  provisioned shards
-  FargateOnly  ×1 vCPU        $30  Fargate vCPU (1 tasks)
-  FargateOnly  ×2 GB        $6.49  Fargate memory (1 tasks)
+  FargateOnly  ×1 vCPU        $30  Fargate vCPU (1 task)
+  FargateOnly  ×2 GB        $6.49  Fargate memory (1 task)
   Db           ×1             $12  db.t4g.micro postgres Single-AZ
   Db           ×20 GB gp3   $2.30  storage
   Secret       ×3           $1.20  secret and its replicas

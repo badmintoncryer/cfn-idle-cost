@@ -106,11 +106,7 @@ func (rep Report) WriteText(w io.Writer) {
 		if i > 0 {
 			fmt.Fprintln(w)
 		}
-		plural := "s"
-		if r.Stacks == 1 {
-			plural = ""
-		}
-		fmt.Fprintf(w, "%s · %d stack%s · idle ≈ %s/mo\n", r.Region, r.Stacks, plural, money(r.Monthly))
+		fmt.Fprintf(w, "%s · %s · idle ≈ %s/mo\n", r.Region, count(float64(r.Stacks), "stack"), money(r.Monthly))
 		pw, qw, mw := 0, 0, 0
 		for _, s := range r.Billed {
 			for _, it := range s.Items {
@@ -140,6 +136,14 @@ func (rep Report) WriteText(w io.Writer) {
 		}
 	}
 	fmt.Fprintf(w, "\nprices: %s · on-demand list prices, %d h/mo, USD, free tier ignored\n", rep.Prices, hoursPerMonth)
+}
+
+// count: "1 task", "2 tasks".
+func count(n float64, noun string) string {
+	if n == 1 {
+		return "1 " + noun
+	}
+	return fmt.Sprintf("%g %ss", n, noun)
 }
 
 func pad(s string, n int) string {

@@ -79,13 +79,13 @@ npx cfn-idle-cost --base cdk.out.main cdk.out
 ```
 ap-northeast-1 · idle ≈ $382 → $682/mo (+$300)
 
-  ~ DataStack     Db                              $42 →  $322   +$280  db.t4g.micro postgres Multi-AZ → db.t4g.large postgres Multi-AZ
+  ~ DataStack     Db                              $42 →  $322   +$280  db.t4g.micro postgres Multi-AZ + 1 more → db.t4g.large postgres Multi-AZ + 1 more
   + NetworkStack  Vpc/PublicSubnet2/NATGateway  $0.00 →   $45    +$45  NAT Gateway
   - DataStack     Stream                          $28 → $0.00    -$28  provisioned shards
   + NetworkStack  Vpc/PublicSubnet2/EIP         $0.00 → $3.65  +$3.65  public IPv4 address
 ```
 
-リソースは、スタック名と論理IDで対応づけます。見積もれない状態になったリソースや、見積もれるようになったリソースでは、金額の欄が`?`です。こうしたリソースは変更前と変更後の両方の合計から外すので、節約したように見えることはありません。そのときは、見積もれなかった変更の数を見出しに書きます。
+リソースは、スタック名と論理IDで対応づけます。1行は1リソース全体の金額で、説明にはいちばん高い料金を書きます。`+ 1 more`は、データベースのストレージのように、ほかの料金も金額に含まれていることを表します。見積もれない状態になったリソースや、見積もれるようになったリソースでは、金額の欄が`?`です。こうしたリソースは変更前と変更後の両方の合計から外すので、節約したように見えることはありません。そのときは、見積もれなかった変更の数を見出しに書きます。
 
 GitHub Actionsでは、変更前後の両方をsynthし、Markdownをコメントとして投稿します。増加額が予算を超えたら、チェックを失敗にします。
 
