@@ -1,0 +1,27 @@
+us-east-1 · 1 stack · idle ≈ $5851/mo
+
+rules5                   $5851/mo
+  KendraEnt    ×1        $1022  Enterprise Edition index
+  KendraEnt    ×2 units  $1022  additional query capacity
+  KendraEnt    ×1 units   $511  additional storage capacity
+  KendraDev    ×1         $821  Developer Edition index
+  Graph        ×2         $701  Neptune Analytics graph of 16 m-NCU, primary and 1 replicas
+  Mlflow       ×1         $469  Small MLflow tracking server
+  GraphSolo    ×1         $350  Neptune Analytics graph of 16 m-NCU, primary and 0 replicas
+  FleetWin     ×2         $293  c5.large GameLift instance (Windows)
+  Fleet        ×3         $239  c5.large GameLift instance (Linux)
+  VaAlb        ×1         $197  Verified Access load-balancer endpoint, HTTP application
+  VaRds        ×1         $146  Verified Access rds endpoint, non-HTTP application
+  FleetScript  ×1          $80  c5.large GameLift instance (Linux)
+  Rule         ×1        $0.50  Contributor Insights rule (matched log events not counted)
+
+? could not estimate: 7
+  rules5  BatchWarm  MinvCpus 4 keeps instances running, of types Batch chooses
+  rules5  FleetExternal  BuildId does not point to a resource in this template
+  rules5  FleetNoOs  OperatingSystem is not set
+  rules5  FleetRemote  remote location eu-west-1 is not supported
+  rules5  FleetSpot  Spot fleets are not supported
+  rules5  KendraGenAI  no price for Kendra-GenAI-Ent-Base-Capacity in us-east-1
+  rules5  VaEni  Protocol is not set
+
+prices: test prices · on-demand list prices, 730 h/mo, USD, free tier ignored

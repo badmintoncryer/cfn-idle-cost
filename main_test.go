@@ -62,7 +62,10 @@ var testPrices = &Prices{Source: "test prices", AsOf: "2026-10-16", Regions: map
 		"kinesis|Extended-ShardHour": 0.02, "vpc|VpcEndpoint-Hours": 0.01, "rds|InstanceUsage:db.t4g.micro|14": 0.016, "rds|RDS:GP3-Storage|14": 0.115,
 		"kda|KPU-Hour-Java": 0.11, "kda|KPU-Hour-Interactive": 0.11, "kda|RunningApplicationStorage": 0.1, "kda|RunningApplicationStorage-Interactive": 0.1,
 		"wan|CloudWAN-CoreNetworkEdge-Hours": 0.5,
-		"es|r6g.large.search":                0.167, "es|ES:GP3-Storage": 0.122, "es|ES:GP3-Provisioned-ThroughPut": 0.064, "docdb|DocumentDB:ServerlessIOOptimizedUsage": 0.0905},
+		"kendra|KendraDeveloperEdition":      1.125, "kendra|Kendra-Enterprise-Edition": 1.4, "kendra|Kendra-Query-Capacity-Unit": 0.7, "kendra|Kendra-Storage-Capacity-Unit": 0.7,
+		"vpc|VerifiedAccess-App-Hours": 0.27, "vpc|VerifiedAccess-non-HTTP-App-Hours": 0.2, "cw|CW:ContributorInsightRules": 0.5,
+		"mlflow|Small": 0.642, "graph|16": 0.48, "gamelift|Linux|c5.large": 0.109, "gamelift|Windows|c5.large": 0.201,
+		"es|r6g.large.search": 0.167, "es|ES:GP3-Storage": 0.122, "es|ES:GP3-Provisioned-ThroughPut": 0.064, "docdb|DocumentDB:ServerlessIOOptimizedUsage": 0.0905},
 	"ap-southeast-1": {"rds|InstanceUsage:db.t3.small|10": 0.044, "rds|MirrorUsage:db.m5.large|12": 1.954, "rds|RDS:Mirror-GP3-Storage|12": 0.23,
 		"rds|InstanceUsage:db.m5.large|20": 0.438, "rds|RDS:GP3-Storage|20": 0.115, "rds|RDS:GP3-Storage|10": 0.115,
 		"ec2|m5.xlarge": 0.192, "emr|m5.xlarge": 0.048, "ebs|EBS:VolumeUsage.gp2": 0.1,
@@ -147,6 +150,12 @@ func TestRules3(t *testing.T) {
 // The fourth batch: Managed Flink, Cloud WAN, EC2 Fleet, Spot Fleet and Route 53 health checks.
 func TestRules4(t *testing.T) {
 	golden(t, "rules4.yaml", report(t, "us-east-1", "testdata/rules4.yaml"))
+}
+
+// The fifth batch: Kendra, Verified Access, Contributor Insights, MLflow,
+// Neptune Analytics, GameLift and Batch.
+func TestRules5(t *testing.T) {
+	golden(t, "rules5.yaml", report(t, "us-east-1", "testdata/rules5.yaml"))
 }
 
 // Fixes from the 2026-10-17 review (see the comments in the template).

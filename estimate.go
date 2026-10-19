@@ -1150,10 +1150,9 @@ func ecsService(e *est, p map[string]any) {
 // notCounted are types that cost money with zero traffic but have no rule yet.
 // They are listed in the report instead of being skipped silently.
 var notCounted = []string{
-	"AWS::WorkSpaces::Workspace", "AWS::AppStream::Fleet", "AWS::Kendra::Index", "AWS::EC2::Host",
+	"AWS::WorkSpaces::Workspace", "AWS::AppStream::Fleet", "AWS::EC2::Host",
 	"AWS::ElasticBeanstalk::Environment", "AWS::Lightsail::Instance", "AWS::Lightsail::Database",
-	"AWS::GameLift::Fleet", "AWS::MediaLive::Channel",
-	"AWS::Shield::Protection", "AWS::Batch::ComputeEnvironment", "AWS::EC2::VerifiedAccessEndpoint",
+	"AWS::MediaLive::Channel", "AWS::Shield::Protection",
 	"AWS::CloudWatch::Dashboard", "AWS::Connect::PhoneNumber", // not in the Price List
 }
 
@@ -1988,4 +1987,99 @@ func healthCheck(e *est, p map[string]any) {
 	}
 	e.monthly(1, "", "r53hc|Health-Check"+sfx, t+" health check, "+where)
 	e.monthly(float64(len(opts)), "features", "r53hc|Health-Check-Option"+sfx, "optional features: "+strings.Join(opts, ", "))
+}
+
+func init() {
+	rules["AWS::Kendra::Index"] = kendraIndex
+	rules["AWS::EC2::VerifiedAccessEndpoint"] = func(e *est, p map[string]any) {
+		t, proto := e.mustStr(p, "EndpointType"), "tcp" // rds and cidr endpoints are TCP
+		switch t {
+		case "load-balancer":
+			proto = e.mustStr(asMap(p["LoadBalancerOptions"]), "Protocol")
+		case "network-interface":
+			proto = e.mustStr(asMap(p["NetworkInterfaceOptions"]), "Protocol")
+		}
+		if proto == "tcp" {
+			e.hourly(1, "", "vpc|VerifiedAccess-non-HTTP-App-Hours", "Verified Access "+t+" endpoint, non-HTTP application")
+			return
+		}
+		e.hourly(1, "", "vpc|VerifiedAccess-App-Hours", "Verified Access "+t+" endpoint, HTTP application")
+	}
+	rules["AWS::CloudWatch::InsightRule"] = func(e *est, p map[string]any) {
+		if e.str(p, "RuleState", "ENABLED") == "ENABLED" {
+			e.monthly(1, "", "cw|CW:ContributorInsightRules", "Contributor Insights rule (matched log events not counted)")
+		}
+	}
+	rules["AWS::SageMaker::MlflowTrackingServer"] = func(e *est, p map[string]any) {
+		size := e.str(p, "TrackingServerSize", "Small")
+		e.hourly(1, "", "mlflow|"+size, size+" MLflow tracking server")
+	}
+	rules["AWS::NeptuneGraph::Graph"] = func(e *est, p map[string]any) {
+		m, r := e.mustNum(p, "ProvisionedMemory"), e.num(p, "ReplicaCount", 1)
+		e.hourly(1+r, "", "graph|"+strconv.FormatFloat(m, 'f', -1, 64), fmt.Sprintf("Neptune Analytics graph of %g m-NCU, primary and %g replicas", m, r))
+	}
+	rules["AWS::GameLift::Fleet"] = gameLiftFleet
+	rules["AWS::Batch::ComputeEnvironment"] = func(e *est, p map[string]any) {
+		c := asMap(p["ComputeResources"])
+		if strings.EqualFold(e.str(p, "Type", "MANAGED"), "UNMANAGED") || strings.HasPrefix(e.str(c, "Type", ""), "FARGATE") {
+			return // your own instances, or Fargate tasks billed while jobs run
+		}
+		if v := e.num(c, "MinvCpus", 0); v > 0 {
+			panic(unresolved(fmt.Sprintf("MinvCpus %g keeps instances running, of types Batch chooses", v)))
+		}
+	}
+}
+
+// kendraIndex bills the base capacity of an index and its additional capacity units.
+func kendraIndex(e *est, p map[string]any) {
+	cu := asMap(p["CapacityUnits"])
+	q, s := e.num(cu, "QueryCapacityUnits", 0), e.num(cu, "StorageCapacityUnits", 0)
+	switch ed := e.mustStr(p, "Edition"); ed {
+	case "DEVELOPER_EDITION":
+		e.hourly(1, "", "kendra|KendraDeveloperEdition", "Developer Edition index")
+	case "ENTERPRISE_EDITION":
+		e.hourly(1, "", "kendra|Kendra-Enterprise-Edition", "Enterprise Edition index")
+		e.hourly(q, "units", "kendra|Kendra-Query-Capacity-Unit", "additional query capacity")
+		e.hourly(s, "units", "kendra|Kendra-Storage-Capacity-Unit", "additional storage capacity")
+	case "GEN_AI_ENTERPRISE_EDITION":
+		e.hourly(1, "", "kendra|Kendra-GenAI-Ent-Base-Capacity", "GenAI Enterprise Edition index")
+		e.hourly(q, "units", "kendra|Kendra-GenAI-Ent-Addl-QueryCap", "additional query capacity")
+		e.hourly(s, "units", "kendra|Kendra-GenAI-Ent-Addl-StorageCap", "additional storage capacity")
+	default:
+		panic(unresolved("Edition " + ed + " is not supported"))
+	}
+}
+
+// gameLiftFleet bills the on-demand instances of a managed EC2 fleet in its
+// home Region. The OS comes from the build (Realtime scripts run on Linux).
+func gameLiftFleet(e *est, p map[string]any) {
+	if e.str(p, "ComputeType", "EC2") == "ANYWHERE" {
+		return // your own compute
+	}
+	if e.str(p, "FleetType", "ON_DEMAND") == "SPOT" {
+		panic(unresolved("Spot fleets are not supported"))
+	}
+	t := e.mustStr(p, "EC2InstanceType")
+	n := e.num(p, "DesiredEC2Instances", -1)
+	locs, _ := p["Locations"].([]any)
+	for _, l := range locs {
+		l := asMap(l)
+		if loc := e.mustStr(l, "Location"); loc != e.st.Region {
+			panic(unresolved("remote location " + loc + " is not supported"))
+		}
+		if c := asMap(l["LocationCapacity"]); n < 0 && c["DesiredEC2Instances"] != nil {
+			n = e.num(c, "DesiredEC2Instances", 1)
+		}
+	}
+	if n < 0 {
+		n = 1 // GameLift starts one instance
+	}
+	os := "Linux"
+	if _, ok := p["ScriptId"]; !ok {
+		_, b := e.ref(p, "BuildId")
+		if strings.HasPrefix(e.mustStr(b.Properties, "OperatingSystem"), "WINDOWS") { // no default
+			os = "Windows"
+		}
+	}
+	e.hourly(n, "", "gamelift|"+os+"|"+t, t+" GameLift instance ("+os+")")
 }

@@ -1,0 +1,45 @@
+# Fifth batch: Kendra, Verified Access, Contributor Insights, MLflow, Neptune
+# Analytics, GameLift and Batch; priced with testPrices["us-east-1"].
+Resources:
+  KendraDev: { Type: AWS::Kendra::Index, Properties: { Edition: DEVELOPER_EDITION, Name: k, RoleArn: arn } }
+  KendraEnt:
+    Type: AWS::Kendra::Index
+    Properties: { Edition: ENTERPRISE_EDITION, Name: k, RoleArn: arn, CapacityUnits: { QueryCapacityUnits: 2, StorageCapacityUnits: 1 } }
+  # No GenAI price in testPrices: listed with the reason.
+  KendraGenAI: { Type: AWS::Kendra::Index, Properties: { Edition: GEN_AI_ENTERPRISE_EDITION, Name: k, RoleArn: arn } }
+  VaAlb:
+    Type: AWS::EC2::VerifiedAccessEndpoint
+    Properties: { AttachmentType: vpc, EndpointType: load-balancer, VerifiedAccessGroupId: g, LoadBalancerOptions: { Protocol: https, Port: 443 } }
+  VaRds: { Type: AWS::EC2::VerifiedAccessEndpoint, Properties: { AttachmentType: vpc, EndpointType: rds, VerifiedAccessGroupId: g } }
+  VaEni: { Type: AWS::EC2::VerifiedAccessEndpoint, Properties: { AttachmentType: vpc, EndpointType: network-interface, VerifiedAccessGroupId: g } }
+  Rule: { Type: AWS::CloudWatch::InsightRule, Properties: { RuleName: r, RuleState: ENABLED, RuleBody: "{}" } }
+  RuleOff: { Type: AWS::CloudWatch::InsightRule, Properties: { RuleName: r, RuleState: DISABLED, RuleBody: "{}" } }
+  Mlflow: { Type: AWS::SageMaker::MlflowTrackingServer, Properties: { ArtifactStoreUri: s3://b, RoleArn: arn, TrackingServerName: t } }
+  Graph: { Type: AWS::NeptuneGraph::Graph, Properties: { ProvisionedMemory: 16 } }
+  GraphSolo: { Type: AWS::NeptuneGraph::Graph, Properties: { ProvisionedMemory: 16, ReplicaCount: 0 } }
+  Build: { Type: AWS::GameLift::Build, Properties: { OperatingSystem: AMAZON_LINUX_2023 } }
+  WinBuild: { Type: AWS::GameLift::Build, Properties: { OperatingSystem: WINDOWS_2022 } }
+  NoOsBuild: { Type: AWS::GameLift::Build, Properties: {} }
+  Fleet: { Type: AWS::GameLift::Fleet, Properties: { Name: f, BuildId: !Ref Build, EC2InstanceType: c5.large, DesiredEC2Instances: 3 } }
+  FleetWin:
+    Type: AWS::GameLift::Fleet
+    Properties:
+      Name: f
+      BuildId: !Ref WinBuild
+      EC2InstanceType: c5.large
+      Locations: [{ Location: us-east-1, LocationCapacity: { DesiredEC2Instances: 2, MinSize: 0, MaxSize: 4 } }]
+  FleetScript: { Type: AWS::GameLift::Fleet, Properties: { Name: f, ScriptId: !GetAtt Script.Id, EC2InstanceType: c5.large } }
+  FleetRemote:
+    Type: AWS::GameLift::Fleet
+    Properties: { Name: f, BuildId: !Ref Build, EC2InstanceType: c5.large, Locations: [{ Location: us-east-1 }, { Location: eu-west-1 }] }
+  FleetSpot: { Type: AWS::GameLift::Fleet, Properties: { Name: f, BuildId: !Ref Build, EC2InstanceType: c5.large, FleetType: SPOT } }
+  FleetExternal: { Type: AWS::GameLift::Fleet, Properties: { Name: f, BuildId: build-1234, EC2InstanceType: c5.large } }
+  FleetNoOs: { Type: AWS::GameLift::Fleet, Properties: { Name: f, BuildId: !Ref NoOsBuild, EC2InstanceType: c5.large } }
+  FleetAnywhere: { Type: AWS::GameLift::Fleet, Properties: { Name: f, ComputeType: ANYWHERE } }
+  # $0 idle: no line.
+  BatchFargate: { Type: AWS::Batch::ComputeEnvironment, Properties: { Type: MANAGED, ComputeResources: { Type: FARGATE, MaxvCpus: 16, Subnets: [s] } } }
+  BatchEc2: { Type: AWS::Batch::ComputeEnvironment, Properties: { Type: MANAGED, ComputeResources: { Type: EC2, MaxvCpus: 16, Subnets: [s], InstanceTypes: [optimal] } } }
+  BatchUnmanaged: { Type: AWS::Batch::ComputeEnvironment, Properties: { Type: UNMANAGED } }
+  BatchWarm:
+    Type: AWS::Batch::ComputeEnvironment
+    Properties: { Type: MANAGED, ComputeResources: { Type: EC2, MinvCpus: 4, MaxvCpus: 16, Subnets: [s], InstanceTypes: [optimal] } }
