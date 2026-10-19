@@ -1,5 +1,5 @@
 Resources:
   Nat: { Type: AWS::EC2::NatGateway }
-  Server: { Type: AWS::EC2::Instance, Properties: { InstanceType: t3.micro } }
+  Server: { Type: AWS::EC2::Instance, Properties: { InstanceType: t3.micro, BlockDeviceMappings: [{ DeviceName: /dev/xvda, Ebs: { VolumeSize: 8, VolumeType: gp3 } }] } }
   Secret: { Type: AWS::SecretsManager::Secret }
   Key: { Type: AWS::KMS::Key }

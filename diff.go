@@ -46,13 +46,21 @@ type Diff struct {
 }
 
 // resourceState is a resource's idle cost in one report; reason is its most
-// expensive line.
+// expensive line, and says how many more lines its monthly cost includes.
 type resourceState struct {
 	item    Item
 	monthly float64
 	reason  string
 	top     float64
+	lines   int
 	unknown bool
+}
+
+func (s *resourceState) note() string {
+	if s.unknown || s.lines < 2 {
+		return s.reason
+	}
+	return fmt.Sprintf("%s + %d more", s.reason, s.lines-1)
 }
 
 func resourceStates(rep Report) (map[[3]string]*resourceState, map[string]float64) {
@@ -65,6 +73,7 @@ func resourceStates(rep Report) (map[[3]string]*resourceState, map[string]float6
 			states[k] = s
 		}
 		s.monthly += it.Monthly
+		s.lines++
 		s.unknown = s.unknown || unknown
 		if unknown || it.Monthly > s.top {
 			s.reason, s.top = it.Reason, it.Monthly
@@ -148,10 +157,10 @@ func NewDiff(base, head Report) *Diff {
 		}
 		c.Path, c.Type = src.item.Path, src.item.Type
 		if b != nil {
-			c.Before, c.BeforeReason, c.BeforeUnknown = b.monthly, b.reason, b.unknown
+			c.Before, c.BeforeReason, c.BeforeUnknown = b.monthly, b.note(), b.unknown
 		}
 		if h != nil {
-			c.After, c.AfterReason, c.AfterUnknown = h.monthly, h.reason, h.unknown
+			c.After, c.AfterReason, c.AfterUnknown = h.monthly, h.note(), h.unknown
 		}
 		rd.Changes = append(rd.Changes, c)
 	}

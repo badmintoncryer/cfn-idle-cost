@@ -92,13 +92,15 @@ npx cfn-idle-cost --base cdk.out.main cdk.out
 ```
 ap-northeast-1 · idle ≈ $382 → $682/mo (+$300)
 
-  ~ DataStack     Db                              $42 →  $322   +$280  db.t4g.micro postgres Multi-AZ → db.t4g.large postgres Multi-AZ
+  ~ DataStack     Db                              $42 →  $322   +$280  db.t4g.micro postgres Multi-AZ + 1 more → db.t4g.large postgres Multi-AZ + 1 more
   + NetworkStack  Vpc/PublicSubnet2/NATGateway  $0.00 →   $45    +$45  NAT Gateway
   - DataStack     Stream                          $28 → $0.00    -$28  provisioned shards
   + NetworkStack  Vpc/PublicSubnet2/EIP         $0.00 → $3.65  +$3.65  public IPv4 address
 ```
 
-Resources are matched by stack name and logical ID. A resource that becomes
+Resources are matched by stack name and logical ID. Each line is the whole
+resource, named by its most expensive charge; `+ 1 more` says the amount also
+includes other charges, such as the storage of a database. A resource that becomes
 (or stops being) unresolvable shows `?`, and is left out of both totals, so it
 never reads as a saving; the heading then says how many changes could not be
 estimated.

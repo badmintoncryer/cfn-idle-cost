@@ -16,9 +16,9 @@ rules2                       $5172/mo
   Ingest        ×1 OCU        $175  minimum Ingestion OCUs
   Connector     ×2 MCU        $161  connector MCUs (auto scaling minimum)
   Dms           ×1            $109  dms.t3.medium Multi-AZ (storage above the included amount not counted)
-  WinService    ×1 vCPU        $34  Fargate vCPU (1 tasks)
-  WinService    ×1 vCPU        $34  Fargate Windows OS license (1 tasks)
-  WinService    ×2 GB        $7.46  Fargate memory (1 tasks)
+  WinService    ×1 vCPU        $34  Fargate vCPU (1 task)
+  WinService    ×1 vCPU        $34  Fargate Windows OS license (1 task)
+  WinService    ×2 GB        $7.46  Fargate memory (1 task)
   ShortCa       ×1             $50  private CA (short-lived certificate mode)
   Notebook      ×1             $36  ml.t3.medium notebook instance
   Notebook      ×5 GB        $0.70  notebook storage

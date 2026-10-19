@@ -276,7 +276,7 @@ func TestDiff(t *testing.T) {
 	d.WriteMarkdown(&md)
 	golden(t, "diff.txt", text.String())
 	golden(t, "diff.md", md.String())
-	head := load("testdata/diff-head.yaml") // $24/mo, down $32 from base without the Key
+	head := load("testdata/diff-head.yaml") // $25/mo, down $32 from base without the Key
 	for _, c := range []struct {
 		max, maxIncrease float64
 		fail             bool

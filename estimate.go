@@ -1133,17 +1133,17 @@ func ecsService(e *est, p map[string]any) {
 	}
 	vcpu := e.mustNum(tp, "Cpu") / 1024
 	gb := e.mustNum(tp, "Memory") / 1024
-	e.hourly(n*vcpu, "vCPU", "fargate|Fargate-"+pre+"vCPU-Hours:perCPU", fmt.Sprintf("Fargate vCPU (%g tasks)", n))
+	e.hourly(n*vcpu, "vCPU", "fargate|Fargate-"+pre+"vCPU-Hours:perCPU", "Fargate vCPU ("+count(n, "task")+")")
 	if pre == "Windows-" {
-		e.hourly(n*vcpu, "vCPU", "fargate|Fargate-Windows-OS-Hours:perCPU", fmt.Sprintf("Fargate Windows OS license (%g tasks)", n))
+		e.hourly(n*vcpu, "vCPU", "fargate|Fargate-Windows-OS-Hours:perCPU", "Fargate Windows OS license ("+count(n, "task")+")")
 	}
-	e.hourly(n*gb, "GB", "fargate|Fargate-"+pre+"GB-Hours", fmt.Sprintf("Fargate memory (%g tasks)", n))
+	e.hourly(n*gb, "GB", "fargate|Fargate-"+pre+"GB-Hours", "Fargate memory ("+count(n, "task")+")")
 	if es := e.num(asMap(tp["EphemeralStorage"]), "SizeInGiB", 20); es > 20 && pre != "Windows-" {
 		e.hourly(n*(es-20), "GB", "fargate|Fargate-EphemeralStorage-GB-Hours", "Fargate ephemeral storage above 20 GB")
 	}
 	vpc := asMap(asMap(p["NetworkConfiguration"])["AwsvpcConfiguration"])
 	if e.maybe(func() bool { return e.str(vpc, "AssignPublicIp", "DISABLED") == "ENABLED" }) {
-		e.hourly(n, "IPv4", "vpc|PublicIPv4:InUseAddress", fmt.Sprintf("public IPv4 per task (%g tasks)", n))
+		e.hourly(n, "IPv4", "vpc|PublicIPv4:InUseAddress", "public IPv4 per task ("+count(n, "task")+")")
 	}
 }
 
@@ -1336,7 +1336,7 @@ func init() {
 				_, as := e.ref(p, "AutoScalingConfigurationArn")
 				min = e.num(as.Properties, "MinSize", 1)
 			}
-			e.hourly(min*gb, "GB", "apprunner|AppRunner-Provisioned-GB-hours", fmt.Sprintf("provisioned instance memory (%g instances)", min))
+			e.hourly(min*gb, "GB", "apprunner|AppRunner-Provisioned-GB-hours", "provisioned instance memory ("+count(min, "instance")+")")
 		},
 	}
 	for k, v := range more {
