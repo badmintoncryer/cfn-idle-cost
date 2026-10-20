@@ -20,6 +20,8 @@ type Stack struct {
 	Parameters map[string]Param
 	Conditions map[string]any
 	Resources  map[string]Resource
+	Outputs    map[string]string // output name -> logical ID its Value names with Ref or Fn::GetAtt
+	Exports    map[string]string // export name -> the same logical ID
 	paths      map[string]string // logical ID -> construct path, from the cloud assembly
 	cdkPath    string            // construct path of the stack (Stage/Stack), stripped from resource paths
 	parent     *Stack            // of a nested stack: the stack whose AWS::CloudFormation::Stack creates it
@@ -63,7 +65,32 @@ func ParseTemplate(path string, raw []byte) (*Stack, error) {
 		c, _ := rm["Condition"].(string)
 		s.Resources[id] = Resource{Type: t, Condition: c, Properties: asMap(rm["Properties"]), Metadata: asMap(rm["Metadata"])}
 	}
+	s.Outputs, s.Exports = map[string]string{}, map[string]string{}
+	for name, o := range asMap(doc["Outputs"]) {
+		om := asMap(o)
+		id := refID(om["Value"])
+		if id == "" {
+			continue
+		}
+		s.Outputs[name] = id
+		if export, _ := asMap(om["Export"])["Name"].(string); export != "" {
+			s.Exports[export] = id
+		}
+	}
 	return s, nil
+}
+
+// refID is the logical ID a {Ref} or {Fn::GetAtt} names, or "".
+func refID(v any) string {
+	m := asMap(v)
+	if id, ok := m["Ref"].(string); ok {
+		return id
+	}
+	if l, ok := m["Fn::GetAtt"].([]any); ok && len(l) > 0 {
+		id, _ := l[0].(string)
+		return id
+	}
+	return ""
 }
 
 func toAny(n *yaml.Node) any {

@@ -26,6 +26,8 @@ type Item struct {
 	Unknown   bool    `json:"-"`
 	// NotCounted marks a resource of a type that costs money idle but has no rule yet.
 	NotCounted bool `json:"-"`
+	// NoRule marks a resource of a type with no rule that is not known to be free.
+	NoRule bool `json:"-"`
 }
 
 // unresolved aborts the estimate of one resource; the message says why.
@@ -33,6 +35,7 @@ type unresolved string
 
 type est struct {
 	st     *Stack
+	all    []*Stack // every input stack, for references across stacks
 	prices *Prices
 	r      Resource
 	id     string
@@ -46,14 +49,14 @@ func Estimate(stacks []*Stack, prices *Prices) []Item {
 	var out []Item
 	for _, st := range stacks {
 		for _, id := range sortedIDs(st.Resources) {
-			out = append(out, estimateResource(st, prices, id)...)
+			out = append(out, estimateResource(stacks, st, prices, id)...)
 		}
 	}
 	return out
 }
 
-func estimateResource(st *Stack, prices *Prices, id string) (items []Item) {
-	e := &est{st: st, prices: prices, r: st.Resources[id], id: id}
+func estimateResource(all []*Stack, st *Stack, prices *Prices, id string) (items []Item) {
+	e := &est{st: st, all: all, prices: prices, r: st.Resources[id], id: id}
 	base := Item{Stack: st.Name, Region: st.Region, Path: st.DisplayPath(id), LogicalID: id, Type: e.r.Type}
 	defer func() {
 		if v := recover(); v != nil {
@@ -82,12 +85,16 @@ func estimateResource(st *Stack, prices *Prices, id string) (items []Item) {
 		}
 	}
 	if rule == nil {
-		if in(e.r.Type, notCounted...) {
-			nc := base
+		nc := base
+		switch {
+		case in(e.r.Type, notCounted...):
 			nc.NotCounted, nc.Reason = true, "not counted yet"
-			return []Item{nc}
+		case !freeType(e.r.Type):
+			nc.NoRule, nc.Reason = true, "no rule; assumed $0 idle"
+		default:
+			return nil
 		}
-		return nil
+		return []Item{nc}
 	}
 	rule(e, e.props(e.r))
 	for _, it := range e.items {
@@ -1153,7 +1160,60 @@ var notCounted = []string{
 	"AWS::WorkSpaces::Workspace", "AWS::AppStream::Fleet", "AWS::EC2::Host",
 	"AWS::ElasticBeanstalk::Environment", "AWS::Lightsail::Instance", "AWS::Lightsail::Database",
 	"AWS::MediaLive::Channel", "AWS::Shield::Protection",
-	"AWS::CloudWatch::Dashboard", "AWS::Connect::PhoneNumber", // not in the Price List
+	"AWS::Connect::PhoneNumber", // not in the Price List
+}
+
+// free are types (or whole services, ending in "::") known to cost nothing
+// with zero traffic. A type with no rule that is not here is listed as "no
+// rule", so a new type that costs money is never dropped without a line.
+var free = []string{
+	"Custom::", "AWS::CDK::", "AWS::CloudFormation::", "AWS::IAM::", "AWS::Logs::", "AWS::S3::", "AWS::SNS::", "AWS::SQS::",
+	"AWS::Events::", "AWS::Scheduler::", "AWS::StepFunctions::", "AWS::Pipes::", "AWS::ApiGateway::", "AWS::ApiGatewayV2::",
+	"AWS::AppSync::", "AWS::Cognito::", "AWS::CloudFront::", "AWS::CertificateManager::", "AWS::ECR::", "AWS::ECS::", "AWS::EKS::",
+	"AWS::ElasticLoadBalancingV2::", "AWS::KMS::", "AWS::SecretsManager::", "AWS::SSM::", "AWS::DynamoDB::", "AWS::RDS::",
+	"AWS::DocDB::", "AWS::Neptune::", "AWS::ElastiCache::", "AWS::MemoryDB::", "AWS::DAX::", "AWS::Cassandra::", "AWS::Redshift::",
+	"AWS::CloudWatch::", "AWS::Synthetics::", "AWS::AutoScaling::", "AWS::ApplicationAutoScaling::", "AWS::Kinesis::",
+	"AWS::KinesisFirehose::", "AWS::EFS::", "AWS::FSx::", "AWS::Route53::", "AWS::Route53Resolver::", "AWS::Batch::",
+	"AWS::CodeCommit::", "AWS::CodeDeploy::", "AWS::CodePipeline::", "AWS::CodeStarConnections::", "AWS::CodeStarNotifications::",
+	"AWS::Chatbot::", "AWS::Budgets::", "AWS::CloudTrail::", "AWS::Config::", "AWS::XRay::", "AWS::AppConfig::", "AWS::Backup::",
+	"AWS::GuardDuty::", "AWS::SecurityHub::", "AWS::IoT::", "AWS::Amplify::", "AWS::AppRunner::", "AWS::GlobalAccelerator::",
+	"AWS::NetworkFirewall::", "AWS::DirectoryService::", "AWS::ACMPCA::", "AWS::AmazonMQ::", "AWS::Transfer::", "AWS::GameLift::",
+	"AWS::OpenSearchService::", "AWS::Elasticsearch::", "AWS::ResourceGroups::", "AWS::Bedrock::",
+	"AWS::EC2::VPC", "AWS::EC2::Subnet", "AWS::EC2::RouteTable", "AWS::EC2::Route", "AWS::EC2::SubnetRouteTableAssociation",
+	"AWS::EC2::InternetGateway", "AWS::EC2::VPCGatewayAttachment", "AWS::EC2::EgressOnlyInternetGateway", "AWS::EC2::SecurityGroup",
+	"AWS::EC2::SecurityGroupIngress", "AWS::EC2::SecurityGroupEgress", "AWS::EC2::NetworkAcl", "AWS::EC2::NetworkAclEntry",
+	"AWS::EC2::SubnetNetworkAclAssociation", "AWS::EC2::LaunchTemplate", "AWS::EC2::KeyPair", "AWS::EC2::NetworkInterface",
+	"AWS::EC2::NetworkInterfaceAttachment", "AWS::EC2::EIPAssociation", "AWS::EC2::VolumeAttachment", "AWS::EC2::VPCCidrBlock",
+	"AWS::EC2::SubnetCidrBlock", "AWS::EC2::DHCPOptions", "AWS::EC2::VPCDHCPOptionsAssociation", "AWS::EC2::PrefixList",
+	"AWS::EC2::FlowLog", "AWS::EC2::TransitGateway", "AWS::EC2::TransitGatewayRouteTable", "AWS::EC2::TransitGatewayRoute",
+	"AWS::EC2::TransitGatewayRouteTableAssociation", "AWS::EC2::TransitGatewayRouteTablePropagation", "AWS::EC2::VPNGateway",
+	"AWS::EC2::VPNGatewayRoutePropagation", "AWS::EC2::CustomerGateway", "AWS::EC2::VPCEndpointService",
+	"AWS::EC2::VPCEndpointServicePermissions", "AWS::EC2::VPCPeeringConnection", "AWS::EC2::PlacementGroup",
+	"AWS::EC2::InstanceConnectEndpoint", "AWS::EC2::ClientVpnEndpoint", "AWS::EC2::ClientVpnRoute", "AWS::EC2::ClientVpnAuthorizationRule",
+	"AWS::Lambda::Function", "AWS::Lambda::Permission", "AWS::Lambda::LayerVersion", "AWS::Lambda::LayerVersionPermission",
+	"AWS::Lambda::Url", "AWS::Lambda::EventInvokeConfig", "AWS::Lambda::CodeSigningConfig",
+	"AWS::CodeBuild::Project", "AWS::CodeBuild::SourceCredential", "AWS::CodeBuild::ReportGroup",
+	"AWS::Glue::Database", "AWS::Glue::Table", "AWS::Glue::Crawler", "AWS::Glue::Job", "AWS::Glue::Trigger", "AWS::Glue::Connection",
+	"AWS::Glue::SecurityConfiguration", "AWS::Glue::Workflow", "AWS::Glue::Classifier",
+	"AWS::Athena::WorkGroup", "AWS::Athena::NamedQuery", "AWS::Athena::DataCatalog", "AWS::Athena::PreparedStatement",
+	"AWS::WAFv2::WebACLAssociation", "AWS::WAFv2::IPSet", "AWS::WAFv2::RegexPatternSet", "AWS::WAFv2::LoggingConfiguration",
+	"AWS::OpenSearchServerless::SecurityPolicy", "AWS::OpenSearchServerless::AccessPolicy", "AWS::OpenSearchServerless::LifecyclePolicy",
+	"AWS::OpenSearchServerless::SecurityConfig", "AWS::SageMaker::Model", "AWS::SageMaker::EndpointConfig", "AWS::SageMaker::Domain",
+	"AWS::SageMaker::UserProfile", "AWS::SageMaker::CodeRepository", "AWS::MSK::Configuration", "AWS::MSK::ClusterPolicy",
+	"AWS::MSK::BatchScramSecret", "AWS::ServiceDiscovery::Service", "AWS::ServiceDiscovery::HttpNamespace", "AWS::ServiceDiscovery::Instance",
+	"AWS::DMS::Endpoint", "AWS::DMS::ReplicationSubnetGroup", "AWS::DMS::ReplicationTask", "AWS::DMS::EventSubscription",
+	"AWS::EMR::SecurityConfiguration", "AWS::EMR::Step", "AWS::SES::ConfigurationSet", "AWS::SES::EmailIdentity",
+	"AWS::SES::ReceiptRule", "AWS::SES::ReceiptRuleSet", "AWS::SES::Template", "AWS::RedshiftServerless::Namespace",
+	"AWS::RedshiftServerless::Workgroup",
+}
+
+func freeType(t string) bool {
+	for _, f := range free {
+		if t == f || strings.HasSuffix(f, "::") && strings.HasPrefix(t, f) {
+			return true
+		}
+	}
+	return false
 }
 
 func init() {
@@ -2082,4 +2142,98 @@ func gameLiftFleet(e *est, p map[string]any) {
 		}
 	}
 	e.hourly(n, "", "gamelift|"+os+"|"+t, t+" GameLift instance ("+os+")")
+}
+
+func init() {
+	rules["AWS::Lambda::CapacityProvider"] = capacityProvider
+	rules["AWS::Lambda::EventSourceMapping"] = func(e *est, p map[string]any) {
+		if n := e.num(asMap(p["ProvisionedPollerConfig"]), "MinimumPollers", 0); n > 0 {
+			panic(unresolved(fmt.Sprintf("%g provisioned event pollers are not supported yet", n)))
+		}
+	}
+	rules["AWS::CloudWatch::Dashboard"] = func(e *est, p map[string]any) {
+		// ponytail: dashboards are not in the Price List; update by hand if the $3 list price changes.
+		e.add(1, "", 3, "dashboard ($3 list price, not in the Price List)")
+	}
+}
+
+// capacityProvider bills the instances Lambda Managed Instances keeps running:
+// enough for the minimum execution environments of the functions that use the
+// provider, in any input stack of its region, and at least one per environment
+// up to three (one per AZ). Each instance pays EC2 plus the management fee.
+// ponytail: a lower bound; Lambda also keeps headroom for traffic to double,
+// and packs environments onto instances in ways the template doesn't say.
+func capacityProvider(e *est, p map[string]any) {
+	l, _ := asMap(p["InstanceRequirements"])["AllowedInstanceTypes"].([]any)
+	if len(l) != 1 {
+		panic(unresolved("Lambda chooses the instance type; set AllowedInstanceTypes to one type to estimate it"))
+	}
+	t := e.str(map[string]any{"AllowedInstanceTypes": l[0]}, "AllowedInstanceTypes", "")
+	var gibPerVCPU float64
+	if t != "" {
+		gibPerVCPU = map[byte]float64{'c': 2, 'm': 4, 'r': 8}[t[0]]
+	}
+	if gibPerVCPU == 0 || strings.Contains(t, "*") {
+		panic(unresolved("instance type " + t + " is not supported yet"))
+	}
+	vcpu := dbVCPU(t)
+	var envs, needVCPU, needGiB float64
+	fns := 0
+	for _, s := range e.all {
+		if s.Region != e.st.Region {
+			continue
+		}
+		fe := &est{st: s, all: e.all, prices: e.prices}
+		for _, id := range sortedIDs(s.Resources) {
+			r := s.Resources[id]
+			if r.Type != "AWS::Lambda::Function" {
+				continue
+			}
+			if r.Condition != "" {
+				if on, ok := fe.tryCondition(r.Condition); ok && !on {
+					continue
+				}
+			}
+			fp := fe.props(r)
+			cfg := asMap(asMap(fp["CapacityProviderConfig"])["LambdaManagedInstancesCapacityProviderConfig"])
+			if !e.pointsHere(s, cfg["CapacityProviderArn"]) {
+				continue
+			}
+			fns++
+			n := fe.num(asMap(fp["FunctionScalingConfig"]), "MinExecutionEnvironments", 3)
+			gib := fe.num(fp, "MemorySize", 2048) / 1024
+			envs += n
+			needGiB += n * gib
+			needVCPU += n * gib / fe.num(cfg, "ExecutionEnvironmentMemoryGiBPerVCpu", 2)
+		}
+	}
+	why := ", one per AZ until a function uses it"
+	n := 3.0
+	if fns > 0 {
+		n = max(math.Ceil(needVCPU/vcpu), math.Ceil(needGiB/(vcpu*gibPerVCPU)), min(3, envs))
+		why = fmt.Sprintf(" for %s of %s", count(envs, "execution environment"), count(float64(fns), "function"))
+	}
+	e.hourly(n, "", "ec2|"+t, fmt.Sprintf("%s Lambda Managed Instances%s (minimum; headroom not counted)", t, why))
+	e.hourly(n, "", "lmi|"+t, "Lambda Managed Instances management fee")
+}
+
+// pointsHere says whether v, read in stack s, names this resource: with Ref or
+// Fn::GetAtt in its own stack, Fn::ImportValue of its export (a strong CDK
+// reference), Fn::GetStackOutput of its output (a weak one), or its ARN.
+func (e *est) pointsHere(s *Stack, v any) bool {
+	m := asMap(v)
+	if s == e.st && refID(v) == e.id {
+		return true
+	}
+	if name, ok := m["Fn::ImportValue"].(string); ok {
+		return e.st.Exports[name] == e.id
+	}
+	if o := asMap(m["Fn::GetStackOutput"]); o != nil {
+		region, _ := o["Region"].(string)
+		return o["StackName"] == e.st.Name && (region == "" || region == e.st.Region) &&
+			o["OutputName"] != nil && e.st.Outputs[fmt.Sprint(o["OutputName"])] == e.id
+	}
+	arn, _ := v.(string)
+	name, _ := e.r.Properties["CapacityProviderName"].(string)
+	return arn != "" && name != "" && strings.HasSuffix(arn, ":capacity-provider:"+name)
 }

@@ -22,6 +22,7 @@ type regionReport struct {
 	Billed  []stackReport `json:"stacks"`
 	Unknown []Item        `json:"couldNotEstimate"`
 	Skipped []Item        `json:"notCounted"`
+	NoRule  []Item        `json:"noRule"`
 }
 
 type Report struct {
@@ -36,7 +37,7 @@ func NewReport(stacks []*Stack, items []Item, prices *Prices) Report {
 	for _, s := range stacks {
 		r := byRegion[s.Region]
 		if r == nil {
-			r = &regionReport{Region: s.Region, Unknown: []Item{}, Skipped: []Item{}}
+			r = &regionReport{Region: s.Region, Unknown: []Item{}, Skipped: []Item{}, NoRule: []Item{}}
 			byRegion[s.Region] = r
 		}
 		if !seen[s.Region+"\x00"+s.Name] { // a nested stack belongs to its parent
@@ -52,6 +53,10 @@ func NewReport(stacks []*Stack, items []Item, prices *Prices) Report {
 		}
 		if it.NotCounted {
 			r.Skipped = append(r.Skipped, it)
+			continue
+		}
+		if it.NoRule {
+			r.NoRule = append(r.NoRule, it)
 			continue
 		}
 		r.Monthly += it.Monthly
@@ -134,6 +139,12 @@ func (rep Report) WriteText(w io.Writer) {
 				fmt.Fprintf(w, "  %s  %s  %s\n", it.Stack, it.Path, it.Type)
 			}
 		}
+		if len(r.NoRule) > 0 {
+			fmt.Fprintf(w, "\n? no rule: %d (assumed $0 idle; cfn-idle-cost doesn't know whether these cost money)\n", len(r.NoRule))
+			for _, it := range r.NoRule {
+				fmt.Fprintf(w, "  %s  %s  %s\n", it.Stack, it.Path, it.Type)
+			}
+		}
 	}
 	fmt.Fprintf(w, "\nprices: %s · on-demand list prices, %d h/mo, USD, free tier ignored\n", rep.Prices, hoursPerMonth)
 }
@@ -185,7 +196,7 @@ func (rep Report) Total() float64 {
 func (rep Report) unknownCount() int {
 	n := 0
 	for _, r := range rep.Regions {
-		n += len(r.Unknown) + len(r.Skipped)
+		n += len(r.Unknown) + len(r.Skipped) + len(r.NoRule)
 	}
 	return n
 }
@@ -218,10 +229,11 @@ func (rep Report) WriteMarkdown(w io.Writer) {
 }
 
 func writeMarkdownUnknown(w io.Writer, rep Report) {
-	var unknown, skipped []Item
+	var unknown, skipped, noRule []Item
 	for _, r := range rep.Regions {
 		unknown = append(unknown, r.Unknown...)
 		skipped = append(skipped, r.Skipped...)
+		noRule = append(noRule, r.NoRule...)
 	}
 	for _, g := range []struct {
 		title string
@@ -230,6 +242,7 @@ func writeMarkdownUnknown(w io.Writer, rep Report) {
 	}{
 		{"Could not estimate", unknown, func(it Item) string { return it.Reason }},
 		{"Not counted yet", skipped, func(it Item) string { return it.Type }},
+		{"No rule, assumed $0 idle", noRule, func(it Item) string { return it.Type }},
 	} {
 		if len(g.items) == 0 {
 			continue

@@ -1,0 +1,19 @@
+us-east-1 · 2 stacks · idle ≈ $985/mo
+
+lmi-provider     $985/mo
+  Provider  ×8   $477  m7g.large Lambda Managed Instances for 9 execution environments of 2 functions (minimum; headroom not counted)
+  Provider  ×8    $71  Lambda Managed Instances management fee
+  Unused    ×3   $318  c7g.xlarge Lambda Managed Instances, one per AZ until a function uses it (minimum; headroom not counted)
+  Unused    ×3    $48  Lambda Managed Instances management fee
+  Weak      ×1    $60  m7g.large Lambda Managed Instances for 1 execution environment of 1 function (minimum; headroom not counted)
+  Weak      ×1  $8.94  Lambda Managed Instances management fee
+  Board     ×1  $3.00  dashboard ($3 list price, not in the Price List)
+
+? could not estimate: 2
+  lmi-provider  AnyType  Lambda chooses the instance type; set AllowedInstanceTypes to one type to estimate it
+  lmi-consumer  Pollers  2 provisioned event pollers are not supported yet
+
+? no rule: 1 (assumed $0 idle; cfn-idle-cost doesn't know whether these cost money)
+  lmi-provider  Mystery  AWS::Example::Thing
+
+prices: test prices · on-demand list prices, 730 h/mo, USD, free tier ignored

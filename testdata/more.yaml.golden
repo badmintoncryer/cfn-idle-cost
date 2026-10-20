@@ -1,6 +1,6 @@
-eu-west-1 · 1 stack · idle ≈ $3836/mo
+eu-west-1 · 1 stack · idle ≈ $3839/mo
 
-more                             $3836/mo
+more                             $3839/mo
   Broker         ×1               $661  mq.m5.large RabbitMQ Multi-AZ
   Firewall       ×2 endpoints     $577  firewall endpoint per AZ
   Kafka          ×3 brokers       $495  kafka.m5.large brokers
@@ -27,6 +27,7 @@ more                             $3836/mo
   Live           ×2 concurrency    $18  provisioned concurrency (1024 MB)
   Acl            ×1              $5.00  web ACL
   Acl            ×3 rules        $3.00  rules (managed rule group fees not counted)
+  Board          ×1              $3.00  dashboard ($3 list price, not in the Price List)
   Pipeline       ×1              $1.00  active V1 pipeline
   MathAlarm      ×2 metrics      $0.60  high-resolution alarm per metric
   Alarm          ×1 metrics      $0.10  alarm per metric
@@ -34,8 +35,5 @@ more                             $3836/mo
 
 ? could not estimate: 1
   more  EdgeBox  Local Zone eu-west-1-lhr-1a prices are not supported yet
-
-! not counted yet: 1 (these cost money idle; cfn-idle-cost has no rule for them)
-  more  Board  AWS::CloudWatch::Dashboard
 
 prices: test prices · on-demand list prices, 730 h/mo, USD, free tier ignored

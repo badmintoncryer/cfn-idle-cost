@@ -65,6 +65,7 @@ var testPrices = &Prices{Source: "test prices", AsOf: "2026-10-16", Regions: map
 		"kendra|KendraDeveloperEdition":      1.125, "kendra|Kendra-Enterprise-Edition": 1.4, "kendra|Kendra-Query-Capacity-Unit": 0.7, "kendra|Kendra-Storage-Capacity-Unit": 0.7,
 		"vpc|VerifiedAccess-App-Hours": 0.27, "vpc|VerifiedAccess-non-HTTP-App-Hours": 0.2, "cw|CW:ContributorInsightRules": 0.5,
 		"mlflow|Small": 0.642, "graph|16": 0.48, "gamelift|Linux|c5.large": 0.109, "gamelift|Windows|c5.large": 0.201,
+		"ec2|m7g.large": 0.0816, "lmi|m7g.large": 0.01224, "ec2|c7g.xlarge": 0.145, "lmi|c7g.xlarge": 0.02175,
 		"es|r6g.large.search": 0.167, "es|ES:GP3-Storage": 0.122, "es|ES:GP3-Provisioned-ThroughPut": 0.064, "docdb|DocumentDB:ServerlessIOOptimizedUsage": 0.0905},
 	"ap-southeast-1": {"rds|InstanceUsage:db.t3.small|10": 0.044, "rds|MirrorUsage:db.m5.large|12": 1.954, "rds|RDS:Mirror-GP3-Storage|12": 0.23,
 		"rds|InstanceUsage:db.m5.large|20": 0.438, "rds|RDS:GP3-Storage|20": 0.115, "rds|RDS:GP3-Storage|10": 0.115,
@@ -159,6 +160,27 @@ func TestRules5(t *testing.T) {
 }
 
 // Fixes from the 2026-10-17 review (see the comments in the template).
+func TestHTML(t *testing.T) {
+	stacks, err := LoadInputs([]string{"testdata/lmi-provider.yaml", "testdata/lmi-consumer.yaml"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range stacks {
+		s.Region = "us-east-1"
+	}
+	var b bytes.Buffer
+	if err := NewReport(stacks, Estimate(stacks, testPrices), testPrices).WriteHTML(&b); err != nil {
+		t.Fatal(err)
+	}
+	golden(t, "lmi.html", b.String())
+}
+
+// Capacity providers sized by the functions that use them across stacks, a
+// dashboard, and a type with no rule next to a free one.
+func TestCapacityProvider(t *testing.T) {
+	golden(t, "lmi", report(t, "us-east-1", "testdata/lmi-provider.yaml", "testdata/lmi-consumer.yaml"))
+}
+
 func TestReview(t *testing.T) {
 	golden(t, "review.yaml", report(t, "us-east-1", "testdata/review.yaml"))
 }
