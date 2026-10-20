@@ -27,11 +27,12 @@ network                            $2903/mo
   CloudMapInstance   ×1            $0.10  Cloud Map registered instance
   Domains            ×3 domains    $0.00  domains in a custom list
 
-? could not estimate: 4
+? could not estimate: 5
   network  AssocOutside  FirewallRuleGroupId does not point to a resource in this template
   network  CertExport  exportable certificates bill $7 per name / $79 per wildcard at issuance and each renewal
   network  DomainsFile  the domains come from DomainFileUrl
   network  ServiceCrossRegion  cross-Region PrivateLink bills per active remote Region
+  network  VpcMaybe  depends on Condition IsProd
 
 ? no rule: 1 (assumed $0 idle; cfn-idle-cost doesn't know whether these cost money)
   network  RuleGroup  AWS::WAFv2::RuleGroup

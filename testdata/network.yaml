@@ -1,6 +1,12 @@
 # Network and edge types that cost money idle only in some configurations;
 # priced with networkPrices (rules_network_test.go).
+Parameters:
+  Env: { Type: String }
+Conditions:
+  IsProd: !Equals [!Ref Env, prod]
 Resources:
+  # A ruled type now reports a Condition that does not resolve, even when it would be $0.
+  VpcMaybe: { Type: AWS::EC2::VPC, Condition: IsProd, Properties: { CidrBlock: 10.3.0.0/16 } }
   Vpc: { Type: AWS::EC2::VPC, Properties: { CidrBlock: 10.0.0.0/16, VpcEncryptionControl: { Mode: monitor } } }
   VpcPlain: { Type: AWS::EC2::VPC, Properties: { CidrBlock: 10.1.0.0/16 } }
   VpcOther: { Type: AWS::EC2::VPC, Properties: { CidrBlock: 10.2.0.0/16 } }

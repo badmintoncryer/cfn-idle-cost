@@ -107,6 +107,7 @@ func init() {
 // transitGatewayEncryption bills VPC Encryption Controls for every VPC attached
 // to a transit gateway with encryption support, in this template, unless the
 // VPC already pays for its own encryption controls.
+// ponytail: attachments in other stacks (a CDK network stack) are missed; scan e.all with pointsHere if that matters.
 func transitGatewayEncryption(e *est, p map[string]any) {
 	if e.str(p, "EncryptionSupport", "disable") != "enable" {
 		return
