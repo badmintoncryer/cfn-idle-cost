@@ -1161,59 +1161,11 @@ var notCounted = []string{
 	"AWS::ElasticBeanstalk::Environment", "AWS::Lightsail::Instance", "AWS::Lightsail::Database",
 	"AWS::MediaLive::Channel", "AWS::Shield::Protection",
 	"AWS::Connect::PhoneNumber", // not in the Price List
-}
-
-// free are types (or whole services, ending in "::") known to cost nothing
-// with zero traffic. A type with no rule that is not here is listed as "no
-// rule", so a new type that costs money is never dropped without a line.
-var free = []string{
-	"Custom::", "AWS::CDK::", "AWS::CloudFormation::", "AWS::IAM::", "AWS::Logs::", "AWS::S3::", "AWS::SNS::", "AWS::SQS::",
-	"AWS::Events::", "AWS::Scheduler::", "AWS::StepFunctions::", "AWS::Pipes::", "AWS::ApiGateway::", "AWS::ApiGatewayV2::",
-	"AWS::AppSync::", "AWS::Cognito::", "AWS::CloudFront::", "AWS::CertificateManager::", "AWS::ECR::", "AWS::ECS::", "AWS::EKS::",
-	"AWS::ElasticLoadBalancingV2::", "AWS::KMS::", "AWS::SecretsManager::", "AWS::SSM::", "AWS::DynamoDB::", "AWS::RDS::",
-	"AWS::DocDB::", "AWS::Neptune::", "AWS::ElastiCache::", "AWS::MemoryDB::", "AWS::DAX::", "AWS::Cassandra::", "AWS::Redshift::",
-	"AWS::CloudWatch::", "AWS::Synthetics::", "AWS::AutoScaling::", "AWS::ApplicationAutoScaling::", "AWS::Kinesis::",
-	"AWS::KinesisFirehose::", "AWS::EFS::", "AWS::FSx::", "AWS::Route53::", "AWS::Route53Resolver::", "AWS::Batch::",
-	"AWS::CodeCommit::", "AWS::CodeDeploy::", "AWS::CodePipeline::", "AWS::CodeStarConnections::", "AWS::CodeStarNotifications::",
-	"AWS::Chatbot::", "AWS::Budgets::", "AWS::CloudTrail::", "AWS::Config::", "AWS::XRay::", "AWS::AppConfig::", "AWS::Backup::",
-	"AWS::GuardDuty::", "AWS::SecurityHub::", "AWS::IoT::", "AWS::Amplify::", "AWS::AppRunner::", "AWS::GlobalAccelerator::",
-	"AWS::NetworkFirewall::", "AWS::DirectoryService::", "AWS::ACMPCA::", "AWS::AmazonMQ::", "AWS::Transfer::", "AWS::GameLift::",
-	"AWS::OpenSearchService::", "AWS::Elasticsearch::", "AWS::ResourceGroups::", "AWS::Bedrock::",
-	"AWS::EC2::VPC", "AWS::EC2::Subnet", "AWS::EC2::RouteTable", "AWS::EC2::Route", "AWS::EC2::SubnetRouteTableAssociation",
-	"AWS::EC2::InternetGateway", "AWS::EC2::VPCGatewayAttachment", "AWS::EC2::EgressOnlyInternetGateway", "AWS::EC2::SecurityGroup",
-	"AWS::EC2::SecurityGroupIngress", "AWS::EC2::SecurityGroupEgress", "AWS::EC2::NetworkAcl", "AWS::EC2::NetworkAclEntry",
-	"AWS::EC2::SubnetNetworkAclAssociation", "AWS::EC2::LaunchTemplate", "AWS::EC2::KeyPair", "AWS::EC2::NetworkInterface",
-	"AWS::EC2::NetworkInterfaceAttachment", "AWS::EC2::EIPAssociation", "AWS::EC2::VolumeAttachment", "AWS::EC2::VPCCidrBlock",
-	"AWS::EC2::SubnetCidrBlock", "AWS::EC2::DHCPOptions", "AWS::EC2::VPCDHCPOptionsAssociation", "AWS::EC2::PrefixList",
-	"AWS::EC2::FlowLog", "AWS::EC2::TransitGateway", "AWS::EC2::TransitGatewayRouteTable", "AWS::EC2::TransitGatewayRoute",
-	"AWS::EC2::TransitGatewayRouteTableAssociation", "AWS::EC2::TransitGatewayRouteTablePropagation", "AWS::EC2::VPNGateway",
-	"AWS::EC2::VPNGatewayRoutePropagation", "AWS::EC2::CustomerGateway", "AWS::EC2::VPCEndpointService",
-	"AWS::EC2::VPCEndpointServicePermissions", "AWS::EC2::VPCPeeringConnection", "AWS::EC2::PlacementGroup",
-	"AWS::EC2::InstanceConnectEndpoint", "AWS::EC2::ClientVpnEndpoint", "AWS::EC2::ClientVpnRoute", "AWS::EC2::ClientVpnAuthorizationRule",
-	"AWS::Lambda::Function", "AWS::Lambda::Permission", "AWS::Lambda::LayerVersion", "AWS::Lambda::LayerVersionPermission",
-	"AWS::Lambda::Url", "AWS::Lambda::EventInvokeConfig", "AWS::Lambda::CodeSigningConfig",
-	"AWS::CodeBuild::Project", "AWS::CodeBuild::SourceCredential", "AWS::CodeBuild::ReportGroup",
-	"AWS::Glue::Database", "AWS::Glue::Table", "AWS::Glue::Crawler", "AWS::Glue::Job", "AWS::Glue::Trigger", "AWS::Glue::Connection",
-	"AWS::Glue::SecurityConfiguration", "AWS::Glue::Workflow", "AWS::Glue::Classifier",
-	"AWS::Athena::WorkGroup", "AWS::Athena::NamedQuery", "AWS::Athena::DataCatalog", "AWS::Athena::PreparedStatement",
-	"AWS::WAFv2::WebACLAssociation", "AWS::WAFv2::IPSet", "AWS::WAFv2::RegexPatternSet", "AWS::WAFv2::LoggingConfiguration",
-	"AWS::OpenSearchServerless::SecurityPolicy", "AWS::OpenSearchServerless::AccessPolicy", "AWS::OpenSearchServerless::LifecyclePolicy",
-	"AWS::OpenSearchServerless::SecurityConfig", "AWS::SageMaker::Model", "AWS::SageMaker::EndpointConfig", "AWS::SageMaker::Domain",
-	"AWS::SageMaker::UserProfile", "AWS::SageMaker::CodeRepository", "AWS::MSK::Configuration", "AWS::MSK::ClusterPolicy",
-	"AWS::MSK::BatchScramSecret", "AWS::ServiceDiscovery::Service", "AWS::ServiceDiscovery::HttpNamespace", "AWS::ServiceDiscovery::Instance",
-	"AWS::DMS::Endpoint", "AWS::DMS::ReplicationSubnetGroup", "AWS::DMS::ReplicationTask", "AWS::DMS::EventSubscription",
-	"AWS::EMR::SecurityConfiguration", "AWS::EMR::Step", "AWS::SES::ConfigurationSet", "AWS::SES::EmailIdentity",
-	"AWS::SES::ReceiptRule", "AWS::SES::ReceiptRuleSet", "AWS::SES::Template", "AWS::RedshiftServerless::Namespace",
-	"AWS::RedshiftServerless::Workgroup",
-}
-
-func freeType(t string) bool {
-	for _, f := range free {
-		if t == f || strings.HasSuffix(f, "::") && strings.HasPrefix(t, f) {
-			return true
-		}
-	}
-	return false
+	"AWS::Bedrock::ImportedModel", "AWS::CloudFront::DistributionTenant",
+	"AWS::Route53Resolver::OutpostResolver", // priced per model copy, plan or Outpost
+	"AWS::CloudWatch::OTelEnrichment", "AWS::GuardDuty::Detector", "AWS::SecurityHub::Hub", "AWS::SecurityHub::HubV2",
+	"AWS::Config::ConfigurationRecorder", "AWS::Logs::Integration", // priced by the rest of the account
+	"AWS::RDS::ReservedDBInstance", "AWS::ElastiCache::ReservedCacheNode", "AWS::MemoryDB::ReservedNode", // a commitment
 }
 
 func init() {
