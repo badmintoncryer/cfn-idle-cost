@@ -35,3 +35,19 @@ func TestServicesRules(t *testing.T) {
 	NewReport(stacks, Estimate(stacks, servicesPrices), servicesPrices).WriteText(&b)
 	golden(t, "services.yaml", b.String())
 }
+
+// A ruled type under a Condition that does not resolve has no line when it
+// would be $0, and says "depends on Condition" when it would bill.
+func TestUnresolvedCondition(t *testing.T) {
+	p := &Prices{Source: "test prices", AsOf: "2026-10-20", Regions: map[string]map[string]float64{
+		"us-east-1": {"vpc|VPCEncryptionControls-hours": 0.15},
+	}}
+	stacks, err := LoadInputs([]string{"testdata/conditions.yaml"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	stacks[0].Region = "us-east-1"
+	var b bytes.Buffer
+	NewReport(stacks, Estimate(stacks, p), p).WriteText(&b)
+	golden(t, "conditions.yaml", b.String())
+}

@@ -5,7 +5,7 @@ Parameters:
 Conditions:
   IsProd: !Equals [!Ref Env, prod]
 Resources:
-  # A ruled type now reports a Condition that does not resolve, even when it would be $0.
+  # A Condition that does not resolve: no line, since the VPC would be $0 anyway.
   VpcMaybe: { Type: AWS::EC2::VPC, Condition: IsProd, Properties: { CidrBlock: 10.3.0.0/16 } }
   Vpc: { Type: AWS::EC2::VPC, Properties: { CidrBlock: 10.0.0.0/16, VpcEncryptionControl: { Mode: monitor } } }
   VpcPlain: { Type: AWS::EC2::VPC, Properties: { CidrBlock: 10.1.0.0/16 } }

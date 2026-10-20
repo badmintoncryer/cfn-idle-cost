@@ -340,7 +340,7 @@ jobs:
 - Lambda Managed Instancesのキャパシティプロバイダは、関数が最低限必要とするインスタンス数で見積もります。関数ごとの実行環境は`MinExecutionEnvironments`（既定は3）個で、1つあたりのメモリは`MemorySize`、vCPUは`MemorySize`÷`ExecutionEnvironmentMemoryGiBPerVCpu`（既定はvCPUあたり2GiB）です。この実行環境をインスタンスタイプに詰め込んだ台数と、実行環境の数（上限3、AZごとに1台）の大きいほうを使います。トラフィックが倍になっても耐えられるようにLambdaが確保する余裕は数えないので、実際の費用はもっと高くなることがあります。どの関数も使っていないプロバイダは3台で見積もります。関数は同じリージョンのすべての入力スタックから探します。プロバイダを指す方法は`Ref`か`Fn::GetAtt`、エクスポートを読む`Fn::ImportValue`（CDKのstrong参照）、`Fn::GetStackOutput`（CDKのweak参照）、ARNのどれでもかまいません。`AWS::Lambda::Version`の`FunctionScalingConfig`は読みません。関数のインスタンスはキャパシティプロバイダの側で課金されるため、プロバイダがどの入力にもない関数（別のアプリのARNを指すものなど）は`? could not estimate`に載ります。
 - CloudWatchダッシュボードはPrice Listにないので、公開価格の$3を組み込んでいます。`--live`でもこの値を使います。
 - テンプレートから読み取れない値は推測しません。たとえば、Defaultのないパラメータや、別スタックへの参照です。こうしたリソースは、理由と一緒に`? could not estimate`に載ります。Defaultのあるパラメータは、そのDefaultで見積もり、そのことを行に書きます。別の値を使うときは`--parameter`で渡します。
-- `Conditions`（`Fn::Equals`、`Fn::And`、`Fn::Or`、`Fn::Not`）と`Fn::If`は、パラメータと`AWS::Region`だけで決まるときに評価します。`Condition`がfalseのリソースは作られないので、一覧に載せません。`AWS::AccountId`など、それ以外の値で決まる条件を持つリソースは`? could not estimate`に載ります。
+- `Conditions`（`Fn::Equals`、`Fn::And`、`Fn::Or`、`Fn::Not`）と`Fn::If`は、パラメータと`AWS::Region`だけで決まるときに評価します。`Condition`がfalseのリソースは作られないので、一覧に載せません。`AWS::AccountId`など、それ以外の値で決まる条件を持つリソースは`? could not estimate`に載ります。ただし、作られても$0のリソース（ふつうのLambda関数やVPCなど）は一覧に載せません。
 - Auto Scalingグループは、`DesiredCapacity`があればその値を、なければ`MinSize`を使います。DynamoDBは、Auto Scalingの最小値ではなく、テーブルに設定したプロビジョニング容量を使います。ただしグローバルテーブルは、書き込み容量をAuto Scalingの範囲でしか指定できないため、その最小値を使います。
 - 素のテンプレートにはコンストラクトのパスがないため、行には論理IDを表示します。
 

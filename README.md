@@ -415,7 +415,8 @@ and Timestream scheduled queries that run on a schedule) are listed under
   evaluated when they depend only on parameters and `AWS::Region`. A resource
   whose `Condition` is false is not created, so it is not listed. A condition
   on anything else, such as `AWS::AccountId`, makes the resource
-  `? could not estimate`.
+  `? could not estimate`, unless it would cost $0 even if created (a plain
+  Lambda function or VPC, for example): then it has no line.
 - An Auto Scaling group uses `DesiredCapacity` when set, otherwise `MinSize`.
   DynamoDB uses the table's provisioned capacity, not an auto scaling minimum.
   Global tables are the exception: their write capacity can only be set as

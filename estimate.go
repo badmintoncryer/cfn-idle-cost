@@ -70,18 +70,21 @@ func estimateResource(all []*Stack, st *Stack, prices *Prices, id string) (items
 		}
 	}()
 	rule := rules[e.r.Type]
+	cond := "" // why the resource may not be created, when that can't be resolved
 	if on, ok, c := stackCondition(st); ok && !on {
 		return nil // its nested stack is not created
-	} else if !ok && (rule != nil || in(e.r.Type, notCounted...)) {
+	} else if !ok && rule == nil && in(e.r.Type, notCounted...) {
 		panic(unresolved("its nested stack depends on Condition " + c))
+	} else if !ok {
+		cond = "its nested stack depends on Condition " + c
 	}
 	if c := e.r.Condition; c != "" {
 		on, ok := e.tryCondition(c)
 		if ok && !on {
 			return nil // not created
 		}
-		if !ok && rule != nil {
-			panic(unresolved("depends on Condition " + c))
+		if !ok && cond == "" {
+			cond = "depends on Condition " + c
 		}
 	}
 	if rule == nil {
@@ -96,6 +99,12 @@ func estimateResource(all []*Stack, st *Stack, prices *Prices, id string) (items
 		}
 		return []Item{nc}
 	}
+	if cond != "" {
+		if !e.billsIfCreated(rule) {
+			return nil // $0 whether it is created or not
+		}
+		panic(unresolved(cond))
+	}
 	rule(e, e.props(e.r))
 	for _, it := range e.items {
 		b := base
@@ -106,6 +115,21 @@ func estimateResource(all []*Stack, st *Stack, prices *Prices, id string) (items
 		items = append(items, b)
 	}
 	return items
+}
+
+// billsIfCreated runs the rule as if the resource were created and says
+// whether it would add a line or could not be estimated.
+func (e *est) billsIfCreated(rule func(e *est, p map[string]any)) (bills bool) {
+	defer func() {
+		if v := recover(); v != nil {
+			if _, ok := v.(unresolved); !ok {
+				panic(v)
+			}
+			bills = true
+		}
+	}()
+	rule(e, e.props(e.r))
+	return len(e.items) > 0
 }
 
 // stackCondition evaluates the Conditions of the AWS::CloudFormation::Stack
