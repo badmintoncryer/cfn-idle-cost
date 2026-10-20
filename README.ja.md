@@ -159,7 +159,7 @@ jobs:
 | `AWS::NetworkFirewall::Firewall` | エンドポイントの時間料金×サブネット数。同じテンプレートにあるファイアウォールポリシーがTLSインスペクションの設定を持つときは、Advanced Inspectionの時間料金×サブネット数も加える |
 | `AWS::WAFv2::WebACL` | Web ACLとルール。同じテンプレートのルールグループを参照していれば、そのグループのルールも数える（マネージドルールグループの追加料金は含みません） |
 | `AWS::CloudWatch::Alarm`、`CompositeAlarm` | アラームのメトリクスごとの料金（標準解像度・高解像度）、複合アラームごとの料金 |
-| `AWS::Lambda::Alias`、`AWS::Lambda::Version` | プロビジョニング済み同時実行数×関数のメモリ（x86とARM） |
+| `AWS::Lambda::Alias`、`AWS::Lambda::Version` | プロビジョニング済み同時実行数×関数のメモリ（x86とARM）。バージョンは、同じテンプレートにあるJava以外の関数のSnapStartキャッシュ（メモリ1GBあたり） |
 | `AWS::Lambda::CapacityProvider` | Lambda Managed Instances。EC2の時間料金（Linux）と管理料金×このプロバイダを使う関数に最低限必要なインスタンス数。[前提](#前提)を参照してください。`AllowedInstanceTypes`でタイプを1つに決めている必要があります |
 | `AWS::CloudWatch::Dashboard` | ダッシュボードごとに$3（公開価格。ダッシュボードはPrice Listにありません） |
 | `AWS::EC2::TransitGatewayAttachment`、`TransitGatewayVpcAttachment`、`TransitGatewayPeeringAttachment`、`TransitGatewayConnect` | アタッチメントの時間料金 |
@@ -228,12 +228,25 @@ jobs:
 | `AWS::CloudFront::AnycastIpList` | 時間料金×`IpCount`のIPv4アドレス数（BYOIPのリストとIPv6は$0） |
 | `AWS::WAFv2::WebACLAssociation` | 関連付ける先がAmplifyアプリのときの、Amplify Hostingのファイアウォールの月額料金 |
 | `AWS::CertificateManager::Certificate` | アイドル時$0。`CertificateExport: ENABLED`のときは、発行と更新のたびにドメイン名ごとの料金がかかるので見積もらない |
+| `AWS::RDS::DBShardGroup` | Aurora Limitlessの最小容量（`MinACU`。既定は`MaxACU`から決まるノード数×4 ACU）の時間料金と、`ComputeRedundancy`のスタンバイシャード |
+| `AWS::RDS::Deployment` | Blue/Greenデプロイのグリーン環境。同じテンプレートにある`Source`のインスタンスかクラスターに、`Target*`の設定を反映して見積もる |
+| `AWS::AutoScaling::WarmPool` | グループが準備しておくインスタンス。台数は`MaxGroupPreparedCapacity`（既定は`MaxSize`）から`DesiredCapacity`を引いた数で、`MinSize`を下回らない。停止中と休止中はEBSボリューム、実行中はインスタンスの時間料金も数える |
+| `AWS::GameLift::ContainerFleet` | ホームリージョンのLinuxインスタンスの時間料金×希望するインスタンス数（指定がなければ`MinSize`、ロケーションがなければ1）。ゼロまでスケールするフリートはアイドル時$0 |
+| `AWS::GameLift::GameServerGroup` | `ON_DEMAND_ONLY`のグループで、最初のインスタンスタイプの（EC2の時間料金＋FleetIQの料金）×`MinSize`。OSはLinuxとみなす |
+| `AWS::ECS::ExpressGatewayService` | FargateのvCPUとメモリ（既定は1 vCPUと2 GB）とパブリックIPv4×`MinTaskCount`。Express Modeのサービスが共有するApplication Load Balancerは、スタックごとに1台数える |
+| `AWS::EKS::Capability` | Argo CD、ACK、kroのケイパビリティごとの時間料金。管理するリソースの料金は数えない |
+| `AWS::FSx::FileCache` | ストレージ1GBあたり月$1.33（us-east-1の公開価格。File CacheはPrice Listにありません） |
+| `AWS::Transfer::WebApp` | ウェブアプリユニットごとの時間料金（指定がなければ1ユニット） |
+| `AWS::AppConfig::ExperimentRun` | 実験の実行中の時間料金。リソースを作ると実行が始まる |
+| `AWS::Budgets::BudgetsAction` | アクションを有効にした予算の日額料金。スタック内の予算ごとに1回だけ数える |
+| `AWS::CloudWatch::LogAlarm` | 標準アラームと同じアラームごとの料金。スキャンしたログの料金は数えない |
+| `AWS::Glue::Trigger`、`AWS::Glue::Crawler` | スケジュールで動くものと、ストリーミングジョブを開始するもの以外はアイドル時$0（後述） |
 
 使った分だけかかる費用は、意図して対象から外しています。S3、Lambda、AuroraのストレージとI/O、CloudWatch Logs、データ転送、リクエスト料金がこれに当たります。
 
 ### まだ見積もらないもの
 
-アクセスがゼロでも費用がかかるのに、まだルールのないリソースタイプのうち、よく使われるもの（WorkSpaces、AppStream 2.0、Lightsail、Elastic Beanstalkなど）は、`! not counted yet`に載せます。テンプレートから費用を見積もれないタイプも、ここに載せます。該当するのはアカウント単位のサービス（GuardDuty、Security Hub、Configのレコーダー、CloudWatchのOTelエンリッチメント、CloudWatch Logsのインテグレーション）、RDSのリザーブドインスタンスとElastiCacheやMemoryDBのリザーブドノード、Bedrockにインポートしたモデル、CloudFrontのディストリビューションテナント、OutpostsのRoute 53 Resolverです。アイドル時に費用がかからないとわかっているタイプ（IAM、S3、SQS、SNS、CloudWatch Logs、Lambda関数、サブネットやルートテーブルなど）は載せません。費用がかからないタイプは1つずつ名前で挙げていて、プレフィックスで判定するのは`Custom::`のリソースだけです。そのため、ほかのタイプが無料のサービスに新しいタイプが加わっても、そのタイプは`? no rule`に載ります。それ以外のルールのないタイプは、アイドル時$0とみなして`? no rule`に載せます。費用がかかるかもしれないリソースが、行を出さずに消えることはありません。一部だけ対応しているリソース（Fargate Spotとほかのキャパシティプロバイダ、SpotとWindowsのノードグループ、EMRのインスタンスフリート、Aurora Serverless v1、Local Zonesのインスタンス、cronのスケジュールで動くカナリア、Spotだけのフリート、複数のインスタンスタイプを使うフリート、`MinvCpus`が0より大きいBatchのコンピューティング環境、SpotやリモートロケーションのGameLiftフリート、プロビジョニングしたイベントポーラーを使うイベントソースマッピング）は、`? could not estimate`に載ります。
+アクセスがゼロでも費用がかかるのに、まだルールのないリソースタイプのうち、よく使われるもの（WorkSpaces、AppStream 2.0、Lightsail、Elastic Beanstalkなど）は、`! not counted yet`に載せます。テンプレートから費用を見積もれないタイプも、ここに載せます。該当するのはアカウント単位のサービス（GuardDuty、Security Hub、Configのレコーダー、CloudWatchのOTelエンリッチメント、CloudWatch Logsのインテグレーション）、RDSのリザーブドインスタンスとElastiCacheやMemoryDBのリザーブドノード、Bedrockにインポートしたモデル、CloudFrontのディストリビューションテナント、OutpostsのRoute 53 Resolverです。アイドル時に費用がかからないとわかっているタイプ（IAM、S3、SQS、SNS、CloudWatch Logs、Lambda関数、サブネットやルートテーブルなど）は載せません。費用がかからないタイプは1つずつ名前で挙げていて、プレフィックスで判定するのは`Custom::`のリソースだけです。そのため、ほかのタイプが無料のサービスに新しいタイプが加わっても、そのタイプは`? no rule`に載ります。それ以外のルールのないタイプは、アイドル時$0とみなして`? no rule`に載せます。費用がかかるかもしれないリソースが、行を出さずに消えることはありません。一部だけ対応しているリソース（Fargate Spotとほかのキャパシティプロバイダ、SpotとWindowsのノードグループ、EMRのインスタンスフリート、Aurora Serverless v1、Local Zonesのインスタンス、cronのスケジュールで動くカナリア、Spotだけのフリート、複数のインスタンスタイプを使うフリート、`MinvCpus`が0より大きいBatchのコンピューティング環境、SpotやリモートロケーションのGameLiftフリート、Spotを使うFleetIQのゲームサーバーグループ、プロビジョニングしたイベントポーラーを使うイベントソースマッピング、スケジュールで動くかストリーミングジョブを開始するGlueのトリガーとクローラー）は、`? could not estimate`に載ります。
 
 ## 前提
 
