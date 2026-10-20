@@ -433,7 +433,8 @@ var selectors = []selector{
 	{name: "kendra", service: "AmazonKendra",
 		key: func(a map[string]string, u string) string {
 			return keep(u, "KendraDeveloperEdition", "Kendra-Enterprise-Edition", "Kendra-Query-Capacity-Unit", "Kendra-Storage-Capacity-Unit",
-				"Kendra-GenAI-Ent-Base-Capacity", "Kendra-GenAI-Ent-Addl-QueryCap", "Kendra-GenAI-Ent-Addl-StorageCap")
+				"Kendra-GenAI-Ent-Base-Capacity", "Kendra-GenAI-Ent-Addl-QueryCap", "Kendra-GenAI-Ent-Addl-StorageCap",
+				"KendraIntelligentRanking-BaseCapacity", "KendraIntelligentRanking-CapacityUnits", "Kendra-Connector-MonthlyFee")
 		}},
 	{name: "mlflow", service: "AmazonSageMaker", families: []string{"Amazon SageMaker"}, filters: map[string]string{"operation": "RunTrackingServer"},
 		key: func(a map[string]string, u string) string {
@@ -507,6 +508,95 @@ var selectors = []selector{
 			}
 			return ""
 		}},
+	{name: "grafana", service: "AmazonGrafana", families: []string{"User Fees"},
+		key: func(a map[string]string, u string) string { return keep(u, "Grafana:EditorUser") }},
+	// Global-Inference-Hours-L4E is the free tier; keep only the regional row.
+	{name: "l4e", service: "AmazonLookoutEquipment", families: []string{"Machine Learning"},
+		key: func(a map[string]string, u string) string { return keep(u, "Inference-Hours-L4E") }},
+	{name: "blockchain", service: "AmazonManagedBlockchain", families: []string{"Blockchain Member", "Blockchain Instance"},
+		key: func(a map[string]string, u string) string {
+			if u == "Member" {
+				return u + "|" + a["operation"] // Fabric:Standard, Fabric:Starter
+			}
+			if strings.HasPrefix(u, "Node:") {
+				return u
+			}
+			return ""
+		}},
+	{name: "datapipeline", service: "datapipeline", families: []string{"Inactive Pipeline"},
+		key: func(a map[string]string, u string) string { return keep(u, "InactivePipelines") }},
+	{name: "healthimaging", service: "AmazonMedicalImaging", families: []string{"Storage"},
+		key: func(a map[string]string, u string) string { return keep(u, "DataStore-Hours") }},
+	{name: "comprehend", service: "comprehend", families: []string{"Custom Classification", "Custom Entities"},
+		key: func(a map[string]string, u string) string {
+			return keep(u, "Endpoint-Time", "DocClassifier-Storage", "EntityRecognizer-Storage")
+		}},
+	{name: "athena", service: "AmazonAthena", families: []string{"Athena Queries"},
+		key: func(a map[string]string, u string) string { return keep(u, "ReservedCapacityInDPUHours") }},
+	{name: "qbusiness", service: "AmazonQ", families: []string{"Amazon Q"},
+		key: func(a map[string]string, u string) string {
+			return keep(u, "Q-Business-Starter-Index", "Q-Business-Enterprise-Index")
+		}},
+	{name: "amp", service: "AmazonPrometheus", families: []string{"Metric"},
+		key: func(a map[string]string, u string) string { return keep(u, "AMP:CollectorHours") }},
+	{name: "glue", service: "AWSGlue", families: []string{"AWS Glue"},
+		key: func(a map[string]string, u string) string { return keep(u, "DEVED-DPU-Hour") }},
+	{name: "resiliencehub", service: "AWSResilienceHub", families: []string{"AWS Resilience Hub"},
+		key: func(a map[string]string, u string) string { return keep(u, "PaidTierApplication") }},
+	{name: "appsignals", service: "AmazonCloudWatch", families: []string{"Application Signals"},
+		key: func(a map[string]string, u string) string { return keep(u, "Application-Signals") }},
+	{name: "agentregistry", service: "awsagentregistry", families: []string{"Amazon Bedrock"},
+		key: func(a map[string]string, u string) string { return keep(u, "Registry:Consumption-based:Records") }},
+	{name: "agentcore", service: "AmazonBedrockAgentCore", families: []string{"Amazon Bedrock"},
+		key: func(a map[string]string, u string) string { return keep(u, "Gateway:Consumption-based:Tool-Indexing") }},
+	{name: "finspace", service: "AmazonFinSpace", families: []string{"FinSpace"},
+		key: func(a map[string]string, u string) string { return keep(u, "StandardUser") }},
+	{name: "accessanalyzer", service: "AWSIAMAccessAnalyzer", families: []string{"Findings"},
+		key: func(a map[string]string, u string) string { return keep(u, "AccessFinding-Monitored-AWS-Resources") }},
+	{name: "emrserverless", service: "ElasticMapReduce", families: []string{"EMR Serverless"},
+		key: func(a map[string]string, u string) string {
+			if strings.HasPrefix(u, "EMR-SERVERLESS-") {
+				return strings.TrimPrefix(u, "EMR-SERVERLESS-") // vCPUHours, ARM-vCPUHours, MemoryGBHours, ...
+			}
+			return ""
+		}},
+	// SageMaker Studio apps (Studio:KernelGateway-ml.t3.medium, RStudio:RSession-…,
+	// Canvas:Session-Hrs) and the EBS volume of a space (Studio:VolumeUsage.gp3).
+	{name: "studio", service: "AmazonSageMaker", families: []string{"ML Instance", "Storage", "AutoML Jobs"},
+		key: func(a map[string]string, u string) string {
+			if strings.HasPrefix(u, "Studio:KernelGateway-") || strings.HasPrefix(u, "RStudio:") || in(u, "Canvas:Session-Hrs", "Studio:VolumeUsage.gp3") {
+				return u
+			}
+			return ""
+		},
+		liveFilter: sageMakerUsage},
+	// HyperPod instances (Cluster:ml.m5.large; the -Reserved rows are training
+	// plans) and their extra EBS volumes (Cluster:VolumeUsage.gp2).
+	{name: "hyperpod", service: "AmazonSageMaker", families: []string{"ML Instance", "Storage"},
+		key: func(a map[string]string, u string) string {
+			if v, ok := strings.CutPrefix(u, "Cluster:"); ok && !strings.HasSuffix(v, "-Reserved") {
+				return v
+			}
+			return ""
+		},
+		liveFilter: func(d string) map[string]string { return sageMakerUsage("Cluster:" + d) }},
+	{name: "featurestore", service: "AmazonSageMaker", families: []string{"FeatureStore Storage", "FeatureStore PayPerRequestThroughput"},
+		key: func(a map[string]string, u string) string {
+			return keep(u, "FeatureStore:InMemoryStorage", "FeatureStore:ReadCapacityUnit-Hours", "FeatureStore:WriteCapacityUnit-Hours")
+		}},
+}
+
+// sageMakerUsage narrows a --live query of a SageMaker usagetype to the
+// products of its instance type (the instanceType attribute carries a suffix,
+// ml.m5.large-Cluster, so instanceName is used), or to its family.
+func sageMakerUsage(u string) map[string]string {
+	if i := strings.Index(u, "ml."); i >= 0 {
+		return map[string]string{"productFamily": "ML Instance", "instanceName": u[i:]}
+	}
+	if strings.HasPrefix(u, "Canvas:") {
+		return map[string]string{"productFamily": "AutoML Jobs"}
+	}
+	return map[string]string{"productFamily": "Storage"}
 }
 
 // dbInstanceKey keys RDS-like instance prices by instanceType (usagetype

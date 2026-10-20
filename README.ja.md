@@ -176,9 +176,9 @@ jobs:
 | `AWS::Transfer::Server` | プロトコルごとの時間料金 |
 | `AWS::AppRunner::Service` | 最小数のプロビジョニング済みインスタンスのメモリ |
 | `AWS::RDS::DBProxy` | ターゲットのインスタンスのvCPUごとの料金。Serverless v2のターゲットは最小ACUごとの料金（ターゲットが同じテンプレートにある場合だけ） |
-| `AWS::OpenSearchServerless::Collection` | インデックス作成と検索の最小OCU（スタンバイレプリカありで1 + 1、なしで0.5 + 0.5）。コレクションはOCUを共有するので、スタック内でコレクションのタイプごとに1回だけ数えます（同じKMSキーを使う前提です）。コレクショングループに属するコレクションは見積もりません |
+| `AWS::OpenSearchServerless::Collection` | インデックス作成と検索の最小OCU（スタンバイレプリカありで1 + 1、なしで0.5 + 0.5）。コレクションはOCUを共有するので、スタック内でコレクションのタイプごとに1回だけ数えます（同じKMSキーを使う前提です）。同じテンプレートにあるコレクショングループに属するコレクションは、グループの側で数えます。ほかのグループに属するコレクションは見積もりません |
 | `AWS::MemoryDB::Cluster` | ノードの時間単価 × シャード数 ×（1 + レプリカ数）（RedisとValkey） |
-| `AWS::SageMaker::Endpoint` | プロダクションバリアントごとに、インスタンスの時間単価 × `InitialInstanceCount`（サーバーレスのバリアントはアイドル時$0） |
+| `AWS::SageMaker::Endpoint` | プロダクションバリアントごとに、インスタンスの時間単価 × `InitialInstanceCount`。`InitialInstanceCount`がなければ、`ManagedInstanceScaling.MinInstanceCount`を使う（推論コンポーネントをホストするエンドポイント）。サーバーレスのバリアントはアイドル時$0 |
 | `AWS::CodePipeline::Pipeline` | アクティブなV1パイプラインごとの料金（V2は実行時間の分だけかかるので、アイドル時は$0） |
 | `AWS::ApiGateway::Stage` | `CacheClusterEnabled`のとき、`CacheClusterSize`に応じたキャッシュクラスターの時間料金 |
 | `AWS::DirectoryService::MicrosoftAD` | ドメインコントローラー2台の時間料金（StandardとEnterprise）。あとから追加したドメインコントローラーはテンプレートに現れないため含みません |
@@ -201,7 +201,7 @@ jobs:
 | `AWS::VpcLattice::Service` | サービスの時間料金（リクエストとデータの料金は含みません） |
 | `AWS::DocDBElastic::Cluster` | シャードのvCPU×シャード数×シャードごとのインスタンス数 |
 | `AWS::Timestream::InfluxDBInstance` | インスタンスの時間料金（シングルAZ・マルチAZ）と割り当てたストレージ |
-| `AWS::EMR::Cluster`、`AWS::EMR::InstanceGroupConfig` | オンデマンドのインスタンスグループの、EC2の時間料金（Linux）、EMRの料金、EBSボリューム。自動で終了するクラスターと、ステップが終わると終了するクラスターはアイドル時$0 |
+| `AWS::EMR::Cluster`、`AWS::EMR::InstanceGroupConfig`、`AWS::EMR::InstanceFleetConfig` | オンデマンドのインスタンスグループと、インスタンスタイプが1つのインスタンスフリート（`TargetOnDemandCapacity` / `WeightedCapacity`台）の、EC2の時間料金（Linux）、EMRの料金、EBSボリューム。自動で終了するクラスターと、ステップが終わると終了するクラスターはアイドル時$0 |
 | `AWS::KinesisAnalyticsV2::Application` | KPU（並列度÷KPUあたりの並列度）とオーケストレーション用の1KPU、KPUごとに50GBの実行時ストレージ。CloudFormationは停止した状態で作成するが、起動している前提で数える。StudioノートブックはKPUが2つ、ストレージが1KPU分多い。SQLアプリケーションは見積もらない |
 | `AWS::NetworkManager::CoreNetwork` | `PolicyDocument`にあるエッジロケーションごとの時間料金。スタックのリージョンの価格で計算する |
 | `AWS::EC2::EC2Fleet`、`AWS::EC2::SpotFleet` | インスタンスタイプが1つのフリートの、インスタンスの時間料金（Linux）×オンデマンドの目標容量と、起動テンプレートのEBSボリューム。Spotの分は数えない |
@@ -271,12 +271,45 @@ jobs:
 | `AWS::ARCRegionSwitch::Plan` | リージョン切り替えプランごとの月額料金 |
 | `AWS::RefactorSpaces::Environment` | 環境の時間料金。`NetworkFabricType: TRANSIT_GATEWAY`なら、同じテンプレートにあるアプリケーションとサービスのVPCごとに、Transit Gatewayアタッチメントの時間料金も数える |
 | `AWS::RefactorSpaces::Application` | プロキシのNetwork Load Balancerの時間料金 |
+| `AWS::Grafana::Workspace` | どのワークスペースにも最低限かかるEditorライセンス1つの月額料金。アクティブユーザーの料金は数えない |
+| `AWS::LookoutEquipment::InferenceScheduler` | スケジュール推論の時間料金 |
+| `AWS::ManagedBlockchain::Member` | ネットワークのエディションごとの、Hyperledger Fabricのメンバーの時間料金。既存のネットワークに参加するメンバーは見積もらない |
+| `AWS::ManagedBlockchain::Node` | ピアノードの時間料金。ストレージは数えない |
+| `AWS::DataPipeline::Pipeline` | `Activate: false`のときは、非アクティブなパイプラインの月額料金。アクティブなパイプラインは、アクティビティと前提条件ごとに実行頻度で料金が決まるので見積もらない |
+| `AWS::HealthImaging::Datastore` | データストアの月額料金 |
+| `AWS::OpenSearchServerless::CollectionGroup` | `MinIndexingCapacityInOcu`と`MinSearchCapacityInOcu`の時間料金。最小値を指定していなければ見積もらない |
+| `AWS::Comprehend::DocumentClassifierEndpoint`、`AWS::Comprehend::EntityRecognizerEndpoint` | 推論ユニットの料金×`DesiredInferenceUnits` |
+| `AWS::Comprehend::DocumentClassifier`、`AWS::Comprehend::EntityRecognizer` | カスタムモデルの管理料金（月額）。トレーニングの料金は数えない |
+| `AWS::KendraRanking::ExecutionPlan` | 基本容量の時間料金と、`RescoreCapacityUnits`で追加した容量の時間料金 |
+| `AWS::Kendra::DataSource` | 同じテンプレートにあるGenAI Enterpriseのインデックスでは、コネクタの月額料金をインデックスごとに1回だけ数える。ほかのエディションではアイドル時$0で、`Schedule`のあるデータソースは見積もらない |
+| `AWS::Athena::CapacityReservation` | DPUの時間料金×`TargetDpus` |
+| `AWS::QBusiness::Index` | `Type`ごとの、インデックスユニットの時間料金×ユニット数（指定がなければ1）。ユーザーのサブスクリプションは数えない |
+| `AWS::APS::Scraper` | コレクターの時間料金。収集したサンプルの料金は数えない |
+| `AWS::Glue::DevEndpoint` | DPUの時間料金×`NumberOfNodes`（指定がなければ5）。`NumberOfWorkers`があれば、ワーカー数×`WorkerType`のDPU数 |
+| `AWS::EMRServerless::Application` | アイドル時$0。アプリケーションは最初のジョブで起動する。自動停止をオフにして事前初期化した容量があれば、$0の行でそれを示す |
+| `AWS::EMRContainers::Endpoint` | Jupyter Enterprise GatewayのエンドポイントのApplication Load Balancerの時間料金。ゲートウェイのポッドにかかるEMR on EKSの料金は数えない |
+| `AWS::Timestream::InfluxDBCluster` | InfluxDB v2のノードの時間料金×2（プライマリとリードレプリカ1台）と、そのストレージ。InfluxDataのリードレプリカのライセンスは数えない |
+| `AWS::DMS::ReplicationConfig`、`AWS::DMS::DataMigration`、`AWS::ResilienceHubV2::Service` | CloudFormationの外で開始または評価するまではアイドル時$0。そのあとにかかる料金を$0の行で示す |
+| `AWS::ResilienceHub::App`、`AWS::ResilienceHub::AppAssessment` | 評価したアプリケーションの月額料金。`AppAssessmentSchedule: Daily`のときと、評価のリソースがあるときに数える（アプリケーションが同じテンプレートにあれば、アプリケーションの側で数える） |
+| `AWS::ApplicationSignals::ServiceLevelObjective` | SLIの期間（指定がなければ60秒）ごとにApplication Signals 2つ分。リクエストベースのSLOは見積もらない |
+| `AWS::AgentRegistry::RegistryRecord` | レコードの月額料金 |
+| `AWS::BedrockAgentCore::GatewayTarget` | 同じテンプレートにあるゲートウェイが`SearchType: SEMANTIC`のとき、インラインで並べたツールごとにかかるセマンティック検索のインデックス料金 |
+| `AWS::FinSpace::Environment` | `SuperuserParameters`で作るスーパーユーザーの月額料金 |
+| `AWS::AccessAnalyzer::Analyzer` | 内部アクセスの分析では、監視するリソースの月額料金×ARNで並べたリソース数。外部アクセスの分析は無料。未使用アクセスの分析は、アカウント内のIAMロールとユーザーの数で料金が決まるので見積もらない |
+| `AWS::SSMQuickSetup::ConfigurationManager` | DevOps GuruかAWS Configを有効にするもの以外はアイドル時$0。有効にするものは見積もらない |
+| `AWS::SageMaker::App` | `AppType`とインスタンスタイプごとの、Studioアプリの時間料金（Canvasはワークスペースの時間料金。JupyterServerは無料） |
+| `AWS::SageMaker::Space` | JupyterLabとCode EditorのスペースのEBSボリューム（指定がなければ5 GB） |
+| `AWS::SageMaker::Cluster` | HyperPodのインスタンスの時間料金×`InstanceCount`（自動スケーリングでは`MinInstanceCount`）と、追加のEBSボリューム |
+| `AWS::SageMaker::FeatureGroup` | インメモリのオンラインストアの最小容量（5 GiB）の時間料金と、プロビジョニングした読み込みと書き込みの容量 |
+| `AWS::SageMaker::InferenceExperiment` | 実験を実行しているあいだ（最長30日）、シャドウバリアントをホストする時間料金 |
+| `AWS::AppFlow::Flow`、`AWS::DataBrew::Schedule`、`AWS::DataSync::Task`、`AWS::ImageBuilder::ImagePipeline`、`AWS::Timestream::ScheduledQuery` | スケジュールで動くもの以外はアイドル時$0（後述） |
+| `AWS::Glue::Session`、`AWS::Personalize::Campaign` | 見積もらない。セッションの料金はタイムアウトするまでの1回だけかかる。キャンペーンの最小TPSの単価は、レシピによって変わる |
 
 使った分だけかかる費用は、意図して対象から外しています。S3、Lambda、AuroraのストレージとI/O、CloudWatch Logs、データ転送、リクエスト料金がこれに当たります。
 
 ### まだ見積もらないもの
 
-アクセスがゼロでも費用がかかるのに、まだルールのないリソースタイプのうち、よく使われるもの（WorkSpaces、AppStream 2.0、Lightsail、Elastic Beanstalkなど）は、`! not counted yet`に載せます。テンプレートから費用を見積もれないタイプも、ここに載せます。該当するのはアカウント単位のサービス（GuardDuty、Security Hub、Configのレコーダー、CloudWatchのOTelエンリッチメント、CloudWatch Logsのインテグレーション）、RDSのリザーブドインスタンスとElastiCacheやMemoryDBのリザーブドノード、Bedrockにインポートしたモデル、CloudFrontのディストリビューションテナント、OutpostsのRoute 53 Resolver、ECSのゲートウェイ（サービスをつなぐとECSがロードバランサーを追加します）と、テンプレートの外にあるリソースやプローブの数で決まる監視（EC2のアプリケーションステータスチェック、Network Synthetic Monitor、Network Flow Monitorのスコープ、Network Security Managerのデプロイ、ネットワークパフォーマンスのメトリクスのサブスクリプション）です。アイドル時に費用がかからないとわかっているタイプ（IAM、S3、SQS、SNS、CloudWatch Logs、Lambda関数、サブネットやルートテーブル、設定だけのタイプ、デプロイ時に一度だけ課金されるジョブ、提供が終わったサービスなど）は載せません。費用がかからないタイプは、すべてのCloudFormationタイプを調べた結果をもとに約1,700件を1つずつ名前で挙げていて、プレフィックスで判定するのは`Custom::`のリソースだけです。そのため、ほかのタイプが無料のサービスに新しいタイプが加わっても、そのタイプは`? no rule`に載ります。それ以外のルールのないタイプは、アイドル時$0とみなして`? no rule`に載せます。費用がかかるかもしれないリソースが、行を出さずに消えることはありません。一部だけ対応しているリソース（Fargate Spotとほかのキャパシティプロバイダ、SpotとWindowsのノードグループ、EMRのインスタンスフリート、Aurora Serverless v1、Local Zonesのインスタンス、cronのスケジュールで動くカナリア、Spotだけのフリート、複数のインスタンスタイプを使うフリート、`MinvCpus`が0より大きいBatchのコンピューティング環境、SpotやリモートロケーションのGameLiftフリート、Spotを使うFleetIQのゲームサーバーグループ、プロビジョニングしたイベントポーラーを使うイベントソースマッピング、スケジュールで動くかストリーミングジョブを開始するGlueのトリガーとクローラー）は、`? could not estimate`に載ります。
+アクセスがゼロでも費用がかかるのに、まだルールのないリソースタイプのうち、よく使われるもの（WorkSpaces、AppStream 2.0、Lightsail、Elastic Beanstalkなど）は、`! not counted yet`に載せます。テンプレートから費用を見積もれないタイプも、ここに載せます。該当するのはアカウント単位のサービス（GuardDuty、Security Hub、Configのレコーダー、CloudWatchのOTelエンリッチメント、CloudWatch Logsのインテグレーション、Macie、DevOps Guru、Audit Manager、InspectorのCISスキャンとコードリポジトリのスキャン、CodeGuru Reviewer、AppFabric、IoT TwinMakerのエンティティ）、RDSのリザーブドインスタンスとElastiCacheやMemoryDBのリザーブドノード、Bedrockにインポートしたモデル、CloudFrontのディストリビューションテナント、OutpostsのRoute 53 Resolver、ECSのゲートウェイ（サービスをつなぐとECSがロードバランサーを追加します）と、テンプレートの外にあるリソースやプローブの数で決まる監視（EC2のアプリケーションステータスチェック、Network Synthetic Monitor、Network Flow Monitorのスコープ、Network Security Managerのデプロイ、ネットワークパフォーマンスのメトリクスのサブスクリプション）、Elastic Disaster Recoveryの復旧計画の実行、SageMakerのパートナーAIアプリです。アイドル時に費用がかからないとわかっているタイプ（IAM、S3、SQS、SNS、CloudWatch Logs、Lambda関数、サブネットやルートテーブル、設定だけのタイプ、デプロイ時に一度だけ課金されるジョブ、提供が終わったサービスなど）は載せません。費用がかからないタイプは、すべてのCloudFormationタイプを調べた結果をもとに約1,700件を1つずつ名前で挙げていて、プレフィックスで判定するのは`Custom::`のリソースだけです。そのため、ほかのタイプが無料のサービスに新しいタイプが加わっても、そのタイプは`? no rule`に載ります。それ以外のルールのないタイプは、アイドル時$0とみなして`? no rule`に載せます。費用がかかるかもしれないリソースが、行を出さずに消えることはありません。一部だけ対応しているリソース（Fargate Spotとほかのキャパシティプロバイダ、SpotとWindowsのノードグループ、Spotの容量を使うか複数のインスタンスタイプを使うEMRのインスタンスフリート、Aurora Serverless v1、Local Zonesのインスタンス、cronのスケジュールで動くカナリア、Spotだけのフリート、複数のインスタンスタイプを使うフリート、`MinvCpus`が0より大きいBatchのコンピューティング環境、SpotやリモートロケーションのGameLiftフリート、Spotを使うFleetIQのゲームサーバーグループ、プロビジョニングしたイベントポーラーを使うイベントソースマッピング、スケジュールで動くかストリーミングジョブを開始するGlueのトリガーとクローラー、スケジュールで動くAppFlowのフロー、DataBrewのスケジュール、拡張モードのDataSyncタスク、Image Builderのパイプライン、Timestreamのスケジュールされたクエリ）は、`? could not estimate`に載ります。
 
 ## 前提
 
