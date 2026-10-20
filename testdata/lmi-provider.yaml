@@ -1,0 +1,48 @@
+# Lambda Managed Instances: capacity providers used by functions in this
+# stack (Fn::GetAtt), in lmi-consumer (Fn::ImportValue and the weak
+# Fn::GetStackOutput), by none, and one that lets Lambda choose the type.
+Resources:
+  Provider:
+    Type: AWS::Lambda::CapacityProvider
+    Properties:
+      InstanceRequirements: { AllowedInstanceTypes: [m7g.large] }
+      PermissionsConfig: { CapacityProviderOperatorRoleArn: arn }
+      VpcConfig: { SubnetIds: [a, b, c] }
+  Weak:
+    Type: AWS::Lambda::CapacityProvider
+    Properties:
+      InstanceRequirements: { AllowedInstanceTypes: [m7g.large] }
+      PermissionsConfig: { CapacityProviderOperatorRoleArn: arn }
+      VpcConfig: { SubnetIds: [a, b, c] }
+  Unused:
+    Type: AWS::Lambda::CapacityProvider
+    Properties:
+      InstanceRequirements: { AllowedInstanceTypes: [c7g.xlarge] }
+      PermissionsConfig: { CapacityProviderOperatorRoleArn: arn }
+      VpcConfig: { SubnetIds: [a, b, c] }
+  AnyType:
+    Type: AWS::Lambda::CapacityProvider
+    Properties:
+      PermissionsConfig: { CapacityProviderOperatorRoleArn: arn }
+      VpcConfig: { SubnetIds: [a, b, c] }
+  Big:
+    Type: AWS::Lambda::Function
+    Properties:
+      MemorySize: 4096
+      CapacityProviderConfig:
+        LambdaManagedInstancesCapacityProviderConfig: { CapacityProviderArn: !GetAtt Provider.Arn }
+      FunctionScalingConfig: { MinExecutionEnvironments: 6, MaxExecutionEnvironments: 20 }
+  Board:
+    Type: AWS::CloudWatch::Dashboard
+    Properties: { DashboardBody: "{}" }
+  Role:
+    Type: AWS::IAM::Role
+    Properties: { AssumeRolePolicyDocument: {} }
+  Mystery:
+    Type: AWS::Example::Thing
+Outputs:
+  ProviderArn:
+    Value: !GetAtt Provider.Arn
+    Export: { Name: "lmi-provider:ProviderArn" }
+  WeakArn:
+    Value: !GetAtt Weak.Arn

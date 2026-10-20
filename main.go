@@ -25,7 +25,8 @@ With --base, prints how the idle cost changes from the base to the inputs.
 
 Flags:
   --base path          compare against this cdk.out (or template), e.g. one synthesized from main
-  --format f           text (default), md (for a pull request comment) or json
+  --format f           text (default), md (for a pull request comment), json, or html
+                       (a page to open in a browser, without --base)
   --max usd            exit 3 if the total idle cost is over usd per month
   --max-increase usd   with --base: exit 3 if the idle cost grows by more than usd per month
   --region r           region for stacks without one (env-agnostic stacks, plain templates)
@@ -112,8 +113,11 @@ func run(args []string, stdout io.Writer) error {
 		fmt.Fprintln(stdout, version)
 		return nil
 	}
-	if !in(*format, "text", "md", "json") {
-		return usageError{"--format must be text, md or json"}
+	if !in(*format, "text", "md", "json", "html") {
+		return usageError{"--format must be text, md, json or html"}
+	}
+	if *format == "html" && *base != "" {
+		return usageError{"--format html does not support --base yet; use md or text"}
 	}
 	if *maxIncrease >= 0 && *base == "" {
 		return usageError{"--max-increase needs --base"}
@@ -160,6 +164,8 @@ func run(args []string, stdout io.Writer) error {
 		err = rep.WriteJSON(stdout)
 	case *format == "md":
 		rep.WriteMarkdown(stdout)
+	case *format == "html":
+		err = rep.WriteHTML(stdout)
 	default:
 		rep.WriteText(stdout)
 	}
@@ -175,7 +181,7 @@ func checkBudget(rep Report, d *Diff, maxTotal, maxIncrease float64) error {
 		return nil
 	}
 	if n := rep.unknownCount(); n > 0 {
-		fmt.Fprintf(os.Stderr, "warning: %d resources could not be estimated or are not counted; the real idle cost may be higher\n", n)
+		fmt.Fprintf(os.Stderr, "warning: %d resources could not be estimated, are not counted yet or have no rule; the real idle cost may be higher\n", n)
 	}
 	// Cents, not money(): "$10/mo is over --max $10" would read as a contradiction.
 	if total := rep.Total(); maxTotal >= 0 && total > maxTotal {

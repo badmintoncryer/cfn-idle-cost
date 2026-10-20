@@ -239,6 +239,14 @@ var selectors = []selector{
 		key: func(a map[string]string, u string) string {
 			return keep(u, "Lambda-Provisioned-Concurrency", "Lambda-Provisioned-Concurrency-ARM")
 		}},
+	{name: "lmi", service: "AWSLambda", families: []string{"Serverless"},
+		key: func(a map[string]string, u string) string {
+			if strings.HasPrefix(u, "Lambda-Managed-Instances-") && strings.HasSuffix(u, "-Management-Hours") {
+				return a["lambdaManagedInstanceType"]
+			}
+			return ""
+		},
+		liveFilter: func(detail string) map[string]string { return map[string]string{"lambdaManagedInstanceType": detail} }},
 	{name: "docdb", service: "AmazonDocDB", families: []string{"Database Instance", "Serverless", "Database Utilization"},
 		key: func(a map[string]string, u string) string {
 			return dbInstanceKey(a, u, "DocumentDB:ServerlessUsage", "DocumentDB:ServerlessIOOptimizedUsage", "ElasticCPUUsage")

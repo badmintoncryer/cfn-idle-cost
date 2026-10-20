@@ -1,0 +1,19 @@
+Resources:
+  Strong:
+    Type: AWS::Lambda::Function
+    Properties:
+      CapacityProviderConfig:
+        LambdaManagedInstancesCapacityProviderConfig: { CapacityProviderArn: !ImportValue "lmi-provider:ProviderArn" }
+  WeakFn:
+    Type: AWS::Lambda::Function
+    Properties:
+      CapacityProviderConfig:
+        LambdaManagedInstancesCapacityProviderConfig:
+          CapacityProviderArn: !GetStackOutput { StackName: lmi-provider, OutputName: WeakArn }
+      FunctionScalingConfig: { MinExecutionEnvironments: 1, MaxExecutionEnvironments: 1 }
+  Queue:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties: { FunctionName: !Ref WeakFn, EventSourceArn: arn }
+  Pollers:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties: { FunctionName: !Ref WeakFn, EventSourceArn: arn, ProvisionedPollerConfig: { MinimumPollers: 2 } }

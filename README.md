@@ -65,7 +65,7 @@ nested stacks) or CloudFormation templates (JSON or YAML).
 | Flag | What it does |
 |---|---|
 | `--base <path>` | Compare against another `cdk.out` (or template), e.g. one synthesized from `main`, and print only what changes. See [In pull requests](#in-pull-requests). |
-| `--format <f>` | `text` (default), `md` (a pull request comment) or `json`. |
+| `--format <f>` | `text` (default), `md` (a pull request comment), `json`, or `html`: a page to open in a browser, with the cost by category and a table you can sort and filter (`npx cfn-idle-cost --format html > idle-cost.html`). `html` does not support `--base` yet. |
 | `--max <usd>` | Exit `3` if the total idle cost is over `usd` per month. |
 | `--max-increase <usd>` | With `--base`: exit `3` if the idle cost grows by more than `usd` per month. |
 | `--region <r>` | Region for stacks that have none: env-agnostic CDK stacks and plain templates. Stacks with an `env` keep their own region. Without it, such stacks are an error. |
@@ -79,7 +79,7 @@ or `--max-increase`. When a budget flag is set and some resources could not be
 estimated, a warning says the real idle cost may be higher. `--max` does not
 fail on them, but `--max-increase` does when the pull request adds a resource
 that can't be estimated or makes one unresolvable, since its increase can't be
-checked.
+checked. Resources under `? no rule` are in the warning but never fail a budget.
 
 ## In pull requests
 
@@ -185,6 +185,8 @@ and provisioned storage billed whether you use it or not.
 | `AWS::WAFv2::WebACL` | web ACL and its rules (managed rule group fees not counted) |
 | `AWS::CloudWatch::Alarm`, `CompositeAlarm` | per alarm metric (standard or high resolution), per composite alarm |
 | `AWS::Lambda::Alias`, `AWS::Lambda::Version` | provisioned concurrency × function memory (x86 and ARM) |
+| `AWS::Lambda::CapacityProvider` | Lambda Managed Instances: EC2 hourly (Linux) plus the management fee × the instances the functions that use it need at least. See [Assumptions](#assumptions). Needs `AllowedInstanceTypes` with one type |
+| `AWS::CloudWatch::Dashboard` | $3 per dashboard (the list price; dashboards are not in the Price List) |
 | `AWS::EC2::TransitGatewayAttachment`, `TransitGatewayVpcAttachment`, `TransitGatewayPeeringAttachment`, `TransitGatewayConnect` | attachment hourly |
 | `AWS::EC2::VPNConnection` | connection hourly, plus the Transit Gateway VPN attachment |
 | `AWS::EC2::ClientVpnTargetNetworkAssociation` | association hourly |
@@ -243,14 +245,17 @@ I/O, CloudWatch Logs, data transfer, requests.
 ### Not counted yet
 
 Common resource types that cost money with zero traffic but have no rule yet,
-such as WorkSpaces, AppStream 2.0, Lightsail, Elastic Beanstalk and
-CloudWatch dashboards, are listed under `! not counted yet`. Types missing from
-that list are skipped without a line, so the list grows as they are found.
+such as WorkSpaces, AppStream 2.0, Lightsail and Elastic Beanstalk, are listed
+under `! not counted yet`. Types known to cost nothing idle (IAM, S3, SQS, SNS,
+CloudWatch Logs, Lambda functions, VPCs and subnets, and so on) are left out.
+Every other type with no rule is listed under `? no rule` and assumed $0 idle,
+so a resource that may cost money never disappears without a line.
 Partly supported types (Fargate Spot and other capacity providers, Spot and
 Windows node groups, EMR instance fleets, Aurora Serverless v1, instances in
 Local Zones, canaries on a cron schedule, Spot-only fleets and fleets of several
 instance types, Batch compute environments with `MinvCpus` above 0, and
-GameLift fleets on Spot or in remote locations) are listed under
+GameLift fleets on Spot or in remote locations, and event source mappings with
+provisioned pollers) are listed under
 `? could not estimate`.
 
 ## Assumptions
@@ -280,6 +285,19 @@ GameLift fleets on Spot or in remote locations) are listed under
   DynamoDB uses the table's provisioned capacity, not an auto scaling minimum.
   Global tables are the exception: their write capacity can only be set as
   an auto scaling range, so the minimum is used.
+- A Lambda Managed Instances capacity provider is priced at the instances its
+  functions need at least: each function's `MinExecutionEnvironments` (3 by
+  default) × its memory and vCPUs (`MemorySize` /
+  `ExecutionEnvironmentMemoryGiBPerVCpu`, 2 GiB per vCPU by default), packed
+  onto the instance type, and at least one instance per environment up to three
+  (one per AZ). The headroom Lambda keeps for traffic to double is not counted,
+  so the real cost can be higher. A provider no function uses is priced at three
+  instances. Functions are found in every input stack of the same region, by
+  `Ref` / `Fn::GetAtt`, `Fn::ImportValue` of its export (strong CDK references),
+  `Fn::GetStackOutput` (weak CDK references) or its ARN. The
+  `FunctionScalingConfig` of an `AWS::Lambda::Version` is not read.
+- CloudWatch dashboards are not in the Price List, so the $3 list price is
+  built in and also used with `--live`.
 - Plain templates have no construct paths, so lines show the logical ID.
 
 ## Install
