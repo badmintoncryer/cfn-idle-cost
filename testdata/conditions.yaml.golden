@@ -1,0 +1,7 @@
+us-east-1 · 1 stack · idle ≈ $0.00/mo
+
+? could not estimate: 2
+  conditions  EncryptedVpc  depends on Condition ByAccount
+  conditions  ForeignFn  depends on Condition ByAccount
+
+prices: test prices · on-demand list prices, 730 h/mo, USD, free tier ignored

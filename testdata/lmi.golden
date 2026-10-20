@@ -9,8 +9,9 @@ lmi-provider     $985/mo
   Weak      ×1  $8.94  Lambda Managed Instances management fee
   Board     ×1  $3.00  dashboard ($3 list price, not in the Price List)
 
-? could not estimate: 2
+? could not estimate: 3
   lmi-provider  AnyType  Lambda chooses the instance type; set AllowedInstanceTypes to one type to estimate it
+  lmi-consumer  Foreign  its capacity provider is not in the inputs
   lmi-consumer  Pollers  2 provisioned event pollers are not supported yet
 
 ? no rule: 1 (assumed $0 idle; cfn-idle-cost doesn't know whether these cost money)

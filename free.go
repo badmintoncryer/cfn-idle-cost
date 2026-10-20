@@ -404,7 +404,7 @@ var free = []string{
 	"AWS::LakeFormation::PrincipalPermissions", "AWS::LakeFormation::Resource", "AWS::LakeFormation::Tag",
 	"AWS::LakeFormation::TagAssociation",
 	"AWS::Lambda::CodeSigningConfig", "AWS::Lambda::DurableExecution", "AWS::Lambda::EventInvokeConfig",
-	"AWS::Lambda::Function", "AWS::Lambda::LayerVersion", "AWS::Lambda::LayerVersionPermission",
+	"AWS::Lambda::LayerVersion", "AWS::Lambda::LayerVersionPermission",
 	"AWS::Lambda::NetworkConnector", "AWS::Lambda::Permission", "AWS::Lambda::ResourcePolicy", "AWS::Lambda::Url",
 	"AWS::Lambda::WebFunction", "AWS::Lambda::WebFunctionEndpoint", "AWS::Lambda::WebFunctionRevision",
 	"AWS::Lex::Bot", "AWS::Lex::BotAlias", "AWS::Lex::BotVersion", "AWS::Lex::ResourcePolicy",

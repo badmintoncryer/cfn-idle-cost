@@ -93,7 +93,7 @@ var rdsEngines = []string{"2", "14", "16", "18", "21", // mysql, postgres, auror
 	"10", "11", "12", "15", "51", "52", "53"} // sqlserver ex, web, se, ee (license included); dev-ee, se, ee (bring your own media)
 
 var selectors = []selector{
-	{name: "ec2", service: "AmazonEC2", families: []string{"Compute Instance"},
+	{name: "ec2", service: "AmazonEC2", families: []string{"Compute Instance", "Compute Instance (bare metal)"},
 		filters: map[string]string{"operatingSystem": "Linux", "tenancy": "Shared", "preInstalledSw": "NA", "capacitystatus": "Used", "operation": "RunInstances"},
 		key: func(a map[string]string, u string) string {
 			if strings.HasPrefix(u, "BoxUsage:") {
@@ -376,7 +376,7 @@ var selectors = []selector{
 		key: func(a map[string]string, u string) string { return keep(u, "IngestionOCU") }},
 	{name: "ssm", service: "AWSSystemsManager", families: []string{"AWS Systems Manager"},
 		key: func(a map[string]string, u string) string {
-			return keep(u, "PS-Advanced-Param-Tier1", "AppConfig-ExperimentHours")
+			return keep(u, "PS-Advanced-Param-Tier1", "AppConfig-ExperimentHours", "IM-ResponsePlan-Months-Tier1")
 		}},
 	{name: "mcs", service: "AmazonMCS", families: []string{"Provisioned IOPS"},
 		key: func(a map[string]string, u string) string {
@@ -465,6 +465,68 @@ var selectors = []selector{
 		liveFilter: func(d string) map[string]string {
 			_, t, _ := strings.Cut(d, "|")
 			return map[string]string{"instanceType": t}
+		}},
+	// Reserved fleets of the predefined g1 (and Mac m2) sizes, priced per minute.
+	{name: "codebuild", service: "CodeBuild", families: []string{"Compute"},
+		key: func(a map[string]string, u string) string {
+			if strings.HasPrefix(u, "Build-Min:") && strings.Contains(u, ":Reserved:") && (strings.Contains(u, ".g1.") || strings.Contains(u, "arm.m2.")) {
+				return strings.TrimPrefix(u, "Build-Min:")
+			}
+			return ""
+		}},
+	// Windows image builders (the plain "-ib" usagetype), keyed by instance type.
+	{name: "appstream", service: "AmazonAppStream", families: []string{"Streaming Instance"},
+		key: func(a map[string]string, u string) string {
+			if a["instanceType"] != "" && u == a["instanceType"]+"-ib" {
+				return a["instanceType"]
+			}
+			return ""
+		},
+		liveFilter: byInstanceType},
+	// WorkSpaces Core managed instances, hourly, Linux on shared tenancy (EC2 included).
+	{name: "wsi", service: "AmazonWorkSpacesInstances", families: []string{"WorkSpaces Core"},
+		filters: map[string]string{"operation": "RunInstances", "billingoption": "Hourly", "tenancy": "Shared"},
+		key: func(a map[string]string, u string) string {
+			if strings.HasPrefix(u, "BoxUsage:") {
+				return a["instanceType"]
+			}
+			return ""
+		},
+		liveFilter: byInstanceType},
+	{name: "pcs", service: "AWSPCS",
+		key: func(a map[string]string, u string) string {
+			if strings.HasSuffix(u, ":RunningHours") {
+				return u
+			}
+			return ""
+		}},
+	{name: "evs", service: "AmazonEVS",
+		key: func(a map[string]string, u string) string { return keep(u, "EVSUsage") }},
+	{name: "m2", service: "AWSM2",
+		key: func(a map[string]string, u string) string {
+			if strings.HasSuffix(u, "BluAgeRuntime") || strings.HasSuffix(u, "EnterpriseServer") {
+				return u
+			}
+			return ""
+		}},
+	// Idle charges; usagetypes carry two prefixes (EML2-USE1-IN-IDLE), so key by operation.
+	{name: "medialive", service: "AWSElementalMediaLive",
+		key: func(a map[string]string, u string) string {
+			return keep(a["operation"], "INACTIVE_INPUT", "INACTIVE_MULTIPLEX")
+		}},
+	{name: "paycrypto", service: "PaymentCryptography", families: []string{"Encryption Key"},
+		key: func(a map[string]string, u string) string { return keep(u, "ActiveKeys") }},
+	{name: "b2bi", service: "AWSB2Bi",
+		key: func(a map[string]string, u string) string { return keep(u, "PartnershipMonths") }},
+	{name: "billingconductor", service: "AWSBillingConductor",
+		key: func(a map[string]string, u string) string { return keep(u, "Proforma-Accounts") }},
+	{name: "lightsail", service: "AmazonLightsail",
+		key: func(a map[string]string, u string) string {
+			if strings.HasPrefix(u, "ContainerSvcUsage:") && !strings.HasSuffix(u, "-Free") {
+				return u
+			}
+			return keep(u, "LoadBalancerUsage", "DiskUsage", "UnusedStaticIP", "Storage-BundleUsage:5GB", "Storage-BundleUsage:100GB",
+				"Storage-BundleUsage:250GB", "CDN-BundleUsage:50GB", "CDN-BundleUsage:200GB", "CDN-BundleUsage:500GB")
 		}},
 	// Budgets has one offer, for the "aws-other" location.
 	{name: "budgets", service: "AWSBudgets", global: true, families: []string{"AWS Budgets"},

@@ -1,0 +1,19 @@
+# Resources under a Condition that does not resolve (it depends on the account):
+# $0 ones have no line, ones that would bill or can't be estimated say so.
+Conditions:
+  ByAccount: !Equals [!Ref "AWS::AccountId", "123456789012"]
+Resources:
+  PlainFn: { Type: AWS::Lambda::Function, Condition: ByAccount, Properties: { Runtime: nodejs22.x } }
+  PlainVpc: { Type: AWS::EC2::VPC, Condition: ByAccount, Properties: { CidrBlock: 10.0.0.0/16 } }
+  PlainCert: { Type: AWS::CertificateManager::Certificate, Condition: ByAccount, Properties: { DomainName: example.com } }
+  PlainCdn:
+    Type: AWS::CloudFront::Distribution
+    Condition: ByAccount
+    Properties: { DistributionConfig: { Enabled: true, DefaultCacheBehavior: { TargetOriginId: o, ViewerProtocolPolicy: allow-all } } }
+  ForeignFn:
+    Type: AWS::Lambda::Function
+    Condition: ByAccount
+    Properties:
+      CapacityProviderConfig:
+        LambdaManagedInstancesCapacityProviderConfig: { CapacityProviderArn: "arn:aws:lambda:us-east-1:111111111111:capacity-provider:other-app" }
+  EncryptedVpc: { Type: AWS::EC2::VPC, Condition: ByAccount, Properties: { CidrBlock: 10.1.0.0/16, VpcEncryptionControl: { Mode: monitor } } }

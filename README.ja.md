@@ -304,22 +304,43 @@ jobs:
 | `AWS::SageMaker::InferenceExperiment` | 実験を実行しているあいだ（最長30日）、シャドウバリアントをホストする時間料金 |
 | `AWS::AppFlow::Flow`、`AWS::DataBrew::Schedule`、`AWS::DataSync::Task`、`AWS::ImageBuilder::ImagePipeline`、`AWS::Timestream::ScheduledQuery` | スケジュールで動くもの以外はアイドル時$0（後述） |
 | `AWS::Glue::Session`、`AWS::Personalize::Campaign` | 見積もらない。セッションの料金はタイムアウトするまでの1回だけかかる。キャンペーンの最小TPSの単価は、レシピによって変わる |
+| `AWS::CodeBuild::Fleet` | リザーブドキャパシティ×`BaseCapacity`。ビルドの有無にかかわらず分単位で課金される（`BUILD_GENERAL1_*`のサイズのみ。`ATTRIBUTE_BASED_COMPUTE`と`CUSTOM_INSTANCE_TYPE`は見積もらない） |
+| `AWS::AppStream::ImageBuilder` | Windowsのイメージビルダーとしての時間料金（作成した時点で動き出す）。Linuxのイメージは見積もらない |
+| `AWS::WorkspacesInstances::WorkspaceInstance` | WorkSpaces Coreのマネージドインスタンスの時間料金（Linux・BYOLの料金）と、`BlockDeviceMappings`のEBSボリューム |
+| `AWS::WorkspacesInstances::Volume` | `AWS::EC2::Volume`と同じく、EBSボリューム |
+| `AWS::Cloud9::EnvironmentEC2` | 10 GiBのgp3ルートボリューム。`AutomaticStopTimeMinutes`が0（停止しない）ならインスタンスの時間料金も数える。指定がなければ見積もらない |
+| `AWS::Deadline::Fleet` | カスタマーマネージドのフリートと、`MinWorkerCount: 0`のサービスマネージドのフリートはアイドル時$0。それ以外はインスタンスタイプをDeadlineが選ぶので見積もらない |
+| `AWS::PCS::Cluster` | `Size`ごとのSlurmコントローラーの時間料金。`Accounting.Mode`が`STANDARD`ならSlurmアカウンティングの時間料金も数える（アカウンティングのストレージは数えない） |
+| `AWS::PCS::ComputeNodeGroup` | オンデマンドでインスタンスタイプが1つのグループで、`MinInstanceCount`×（EC2の時間料金＋PCSのノード管理料金）。PとTrnのインスタンスはadvancedの料金 |
+| `AWS::EVS::Environment` | `Hosts`のホストごとのEC2の時間料金とEVSの料金（VCFのライセンスとVPC Route Serverのエンドポイントは数えない） |
+| `AWS::M2::Environment` | Blu AgeかRocket Enterprise Server（`microfocus`）のランタイムの時間料金×`HighAvailabilityConfig.DesiredCapacity`（指定がなければ1） |
+| `AWS::MediaLive::Input` | プッシュ型の入力（RTP、RTMP、UDPのプッシュ、MediaConnect、Elemental Link、CDI、SRTリスナー）のアイドル時の時間料金。プル型の入力は$0。それ以外のタイプは見積もらない |
+| `AWS::MediaLive::Multiplex` | アイドル状態のマルチプレックスの時間料金（作成時はアイドル状態） |
+| `AWS::SSMIncidents::ResponsePlan` | Incident Managerのレスポンスプランの月額料金 |
+| `AWS::PaymentCryptography::Key` | 有効なキーごとの月額料金 |
+| `AWS::B2BI::Partnership` | パートナーシップごとの月額料金 |
+| `AWS::BillingConductor::BillingGroup` | 月額料金×`LinkedAccountIds`のアカウント数。`AutoAssociate`を使うグループと、請求を移管するグループは見積もらない |
+| `AWS::PricingPlanManager::Subscription` | Freeプランは$0。CloudFrontの有料の定額プランは見積もらない（料金はサブスクリプションが承認されてからかかり、CloudFormationは承認待ちのまま作る） |
+| `AWS::SMSVOICE::PhoneNumber` | 番号の月額リース料金（Price Listにないので公開価格を組み込んでいる）。米国の10DLCは$1、米国のトールフリーは$2、シミュレーター番号は$1、ロングコードは料金ページにある15か国の料金 |
+| `AWS::SMSVOICE::Registration` | アイドル時$0。10DLCのキャンペーン登録は見積もらない（月額料金はキャンペーンが承認されてからかかる） |
+| `AWS::Lightsail::LoadBalancer`、`Disk`、`Container`、`StaticIp` | ロードバランサーの時間料金、ディスクのGB月額、コンテナサービスのノードの時間料金×`Scale`（無効にしていても課金される）、インスタンスにアタッチしていない静的IPの時間料金 |
+| `AWS::Lightsail::Bucket`、`Distribution` | `BundleId`のサイズ（`small_*`、`medium_*`、`large_*`）ごとの月額バンドル料金 |
 
 使った分だけかかる費用は、意図して対象から外しています。S3、Lambda、AuroraのストレージとI/O、CloudWatch Logs、データ転送、リクエスト料金がこれに当たります。
 
 ### まだ見積もらないもの
 
-アクセスがゼロでも費用がかかるのに、まだルールのないリソースタイプのうち、よく使われるもの（WorkSpaces、AppStream 2.0、Lightsail、Elastic Beanstalkなど）は、`! not counted yet`に載せます。テンプレートから費用を見積もれないタイプも、ここに載せます。該当するのはアカウント単位のサービス（GuardDuty、Security Hub、Configのレコーダー、CloudWatchのOTelエンリッチメント、CloudWatch Logsのインテグレーション、Macie、DevOps Guru、Audit Manager、InspectorのCISスキャンとコードリポジトリのスキャン、CodeGuru Reviewer、AppFabric、IoT TwinMakerのエンティティ）、RDSのリザーブドインスタンスとElastiCacheやMemoryDBのリザーブドノード、Bedrockにインポートしたモデル、CloudFrontのディストリビューションテナント、OutpostsのRoute 53 Resolver、ECSのゲートウェイ（サービスをつなぐとECSがロードバランサーを追加します）と、テンプレートの外にあるリソースやプローブの数で決まる監視（EC2のアプリケーションステータスチェック、Network Synthetic Monitor、Network Flow Monitorのスコープ、Network Security Managerのデプロイ、ネットワークパフォーマンスのメトリクスのサブスクリプション）、Elastic Disaster Recoveryの復旧計画の実行、SageMakerのパートナーAIアプリです。アイドル時に費用がかからないとわかっているタイプ（IAM、S3、SQS、SNS、CloudWatch Logs、Lambda関数、サブネットやルートテーブル、設定だけのタイプ、デプロイ時に一度だけ課金されるジョブ、提供が終わったサービスなど）は載せません。費用がかからないタイプは、すべてのCloudFormationタイプを調べた結果をもとに約1,700件を1つずつ名前で挙げていて、プレフィックスで判定するのは`Custom::`のリソースだけです。そのため、ほかのタイプが無料のサービスに新しいタイプが加わっても、そのタイプは`? no rule`に載ります。それ以外のルールのないタイプは、アイドル時$0とみなして`? no rule`に載せます。費用がかかるかもしれないリソースが、行を出さずに消えることはありません。一部だけ対応しているリソース（Fargate Spotとほかのキャパシティプロバイダ、SpotとWindowsのノードグループ、Spotの容量を使うか複数のインスタンスタイプを使うEMRのインスタンスフリート、Aurora Serverless v1、Local Zonesのインスタンス、cronのスケジュールで動くカナリア、Spotだけのフリート、複数のインスタンスタイプを使うフリート、`MinvCpus`が0より大きいBatchのコンピューティング環境、SpotやリモートロケーションのGameLiftフリート、Spotを使うFleetIQのゲームサーバーグループ、プロビジョニングしたイベントポーラーを使うイベントソースマッピング、スケジュールで動くかストリーミングジョブを開始するGlueのトリガーとクローラー、スケジュールで動くAppFlowのフロー、DataBrewのスケジュール、拡張モードのDataSyncタスク、Image Builderのパイプライン、Timestreamのスケジュールされたクエリ）は、`? could not estimate`に載ります。
+アクセスがゼロでも費用がかかるのに、まだルールのないリソースタイプのうち、よく使われるもの（WorkSpaces、AppStream 2.0、Lightsail、Elastic Beanstalkなど）は、`! not counted yet`に載せます。テンプレートから費用を見積もれないタイプも、ここに載せます。該当するのはアカウント単位のサービス（GuardDuty、Security Hub、Configのレコーダー、CloudWatchのOTelエンリッチメント、CloudWatch Logsのインテグレーション、Macie、DevOps Guru、Audit Manager、InspectorのCISスキャンとコードリポジトリのスキャン、CodeGuru Reviewer、AppFabric、IoT TwinMakerのエンティティ）、RDSのリザーブドインスタンスとElastiCacheやMemoryDBのリザーブドノード、Bedrockにインポートしたモデル、CloudFrontのディストリビューションテナント、OutpostsのRoute 53 Resolver、ECSのゲートウェイ（サービスをつなぐとECSがロードバランサーを追加します）と、テンプレートの外にあるリソースやプローブの数で決まる監視（EC2のアプリケーションステータスチェック、Network Synthetic Monitor、Network Flow Monitorのスコープ、Network Security Managerのデプロイ、ネットワークパフォーマンスのメトリクスのサブスクリプション）、Elastic Disaster Recoveryの復旧計画の実行、SageMakerのパートナーAIアプリ、Oracle Database@AWS、WorkSpaces Pools、Launch Wizardのデプロイ、Service Catalogでプロビジョニングした製品、LambdaのMicroVMイメージ、Lightsailのスナップショットです。MediaConnectのフローとルーターの入出力、MediaTailorのチャネルもここに載せます。CloudFormationはこれらを停止した状態で作り、開始すると課金が始まります。アイドル時に費用がかからないとわかっているタイプ（IAM、S3、SQS、SNS、CloudWatch Logs、Lambda関数、サブネットやルートテーブル、設定だけのタイプ、デプロイ時に一度だけ課金されるジョブ、提供が終わったサービスなど）は載せません。費用がかからないタイプは、すべてのCloudFormationタイプを調べた結果をもとに約1,700件を1つずつ名前で挙げていて、プレフィックスで判定するのは`Custom::`のリソースだけです。そのため、ほかのタイプが無料のサービスに新しいタイプが加わっても、そのタイプは`? no rule`に載ります。それ以外のルールのないタイプは、アイドル時$0とみなして`? no rule`に載せます。費用がかかるかもしれないリソースが、行を出さずに消えることはありません。一部だけ対応しているリソース（Fargate Spotとほかのキャパシティプロバイダ、SpotとWindowsのノードグループ、Spotの容量を使うか複数のインスタンスタイプを使うEMRのインスタンスフリート、Aurora Serverless v1、Local Zonesのインスタンス、cronのスケジュールで動くカナリア、Spotだけのフリート、複数のインスタンスタイプを使うフリート、`MinvCpus`が0より大きいBatchのコンピューティング環境、SpotやリモートロケーションのGameLiftフリート、Spotを使うFleetIQのゲームサーバーグループ、プロビジョニングしたイベントポーラーを使うイベントソースマッピング、スケジュールで動くかストリーミングジョブを開始するGlueのトリガーとクローラー、スケジュールで動くAppFlowのフロー、DataBrewのスケジュール、拡張モードのDataSyncタスク、Image Builderのパイプライン、Timestreamのスケジュールされたクエリ）は、`? could not estimate`に載ります。
 
 ## 前提
 
 - オンデマンドの定価（USD）で、1か月を730時間として計算します。Savings Plans、リザーブドインスタンス、無料利用枠は考慮しません。
 - EC2インスタンスは、Linux・共有テナンシーの料金で見積もります（AMIは読みません）。AMIから決まるルートボリューム（`BlockDeviceMappings`に`VolumeSize`がないもの）は数えません。
 - インスタンス、Auto Scalingグループ、Fargateのタスクに起動時に割り当てられるパブリックIPv4は、`AssociatePublicIpAddress`（Fargateは`AssignPublicIp`）で割り当てると指定しているときに数えます。指定がなければ、すべてのサブネットが同じテンプレートにあり、`MapPublicIpOnLaunch`がtrueのときに数えます。サブネットが別のスタックなどにあって決まらないときは、IPの行を出さず、リソースのほかの費用だけを見積もります。同じテンプレートでElastic IPを関連付けたインスタンスは、IPを二重に数えません。
-- Lambda Managed Instancesのキャパシティプロバイダは、関数が最低限必要とするインスタンス数で見積もります。関数ごとの実行環境は`MinExecutionEnvironments`（既定は3）個で、1つあたりのメモリは`MemorySize`、vCPUは`MemorySize`÷`ExecutionEnvironmentMemoryGiBPerVCpu`（既定はvCPUあたり2GiB）です。この実行環境をインスタンスタイプに詰め込んだ台数と、実行環境の数（上限3、AZごとに1台）の大きいほうを使います。トラフィックが倍になっても耐えられるようにLambdaが確保する余裕は数えないので、実際の費用はもっと高くなることがあります。どの関数も使っていないプロバイダは3台で見積もります。関数は同じリージョンのすべての入力スタックから探します。プロバイダを指す方法は`Ref`か`Fn::GetAtt`、エクスポートを読む`Fn::ImportValue`（CDKのstrong参照）、`Fn::GetStackOutput`（CDKのweak参照）、ARNのどれでもかまいません。`AWS::Lambda::Version`の`FunctionScalingConfig`は読みません。
+- Lambda Managed Instancesのキャパシティプロバイダは、関数が最低限必要とするインスタンス数で見積もります。関数ごとの実行環境は`MinExecutionEnvironments`（既定は3）個で、1つあたりのメモリは`MemorySize`、vCPUは`MemorySize`÷`ExecutionEnvironmentMemoryGiBPerVCpu`（既定はvCPUあたり2GiB）です。この実行環境をインスタンスタイプに詰め込んだ台数と、実行環境の数（上限3、AZごとに1台）の大きいほうを使います。トラフィックが倍になっても耐えられるようにLambdaが確保する余裕は数えないので、実際の費用はもっと高くなることがあります。どの関数も使っていないプロバイダは3台で見積もります。関数は同じリージョンのすべての入力スタックから探します。プロバイダを指す方法は`Ref`か`Fn::GetAtt`、エクスポートを読む`Fn::ImportValue`（CDKのstrong参照）、`Fn::GetStackOutput`（CDKのweak参照）、ARNのどれでもかまいません。`AWS::Lambda::Version`の`FunctionScalingConfig`は読みません。関数のインスタンスはキャパシティプロバイダの側で課金されるため、プロバイダがどの入力にもない関数（別のアプリのARNを指すものなど）は`? could not estimate`に載ります。
 - CloudWatchダッシュボードはPrice Listにないので、公開価格の$3を組み込んでいます。`--live`でもこの値を使います。
 - テンプレートから読み取れない値は推測しません。たとえば、Defaultのないパラメータや、別スタックへの参照です。こうしたリソースは、理由と一緒に`? could not estimate`に載ります。Defaultのあるパラメータは、そのDefaultで見積もり、そのことを行に書きます。別の値を使うときは`--parameter`で渡します。
-- `Conditions`（`Fn::Equals`、`Fn::And`、`Fn::Or`、`Fn::Not`）と`Fn::If`は、パラメータと`AWS::Region`だけで決まるときに評価します。`Condition`がfalseのリソースは作られないので、一覧に載せません。`AWS::AccountId`など、それ以外の値で決まる条件を持つリソースは`? could not estimate`に載ります。
+- `Conditions`（`Fn::Equals`、`Fn::And`、`Fn::Or`、`Fn::Not`）と`Fn::If`は、パラメータと`AWS::Region`だけで決まるときに評価します。`Condition`がfalseのリソースは作られないので、一覧に載せません。`AWS::AccountId`など、それ以外の値で決まる条件を持つリソースは`? could not estimate`に載ります。ただし、作られても$0のリソース（ふつうのLambda関数やVPCなど）は一覧に載せません。
 - Auto Scalingグループは、`DesiredCapacity`があればその値を、なければ`MinSize`を使います。DynamoDBは、Auto Scalingの最小値ではなく、テーブルに設定したプロビジョニング容量を使います。ただしグローバルテーブルは、書き込み容量をAuto Scalingの範囲でしか指定できないため、その最小値を使います。
 - 素のテンプレートにはコンストラクトのパスがないため、行には論理IDを表示します。
 

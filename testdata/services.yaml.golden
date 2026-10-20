@@ -1,0 +1,55 @@
+us-east-1 · 1 stack · idle ≈ $81253/mo
+
+services                       $81253/mo
+  PcsGpu          ×1           $40179  p5.48xlarge static compute nodes (MinInstanceCount; root volumes not counted)
+  PcsGpu          ×1             $467  PCS node management fee
+  Evs             ×4 hosts     $32067  i4i.metal hosts
+  Evs             ×4 hosts      $2686  EVS fee per host (VCF licenses and route servers not counted)
+  M2Rocket        ×1            $4052  M2.m5.large microfocus runtime
+  Pcs             ×1             $425  Slurm controller (Small)
+  Pcs             ×1             $124  Slurm accounting (accounting storage not counted)
+  M2              ×2             $453  M2.m5.large bluage runtime
+  Fleet           ×2             $263  BUILD_GENERAL1_SMALL LINUX_CONTAINER reserved capacity (billed per minute, used or not)
+  PcsNodes        ×2             $124  c5.large static compute nodes (MinInstanceCount; root volumes not counted)
+  PcsNodes        ×2             $117  PCS node management fee
+  CoreInstance    ×1              $85  m5.large WorkSpaces Core managed instance (Linux or BYOL rate; license-included OSes cost more)
+  CoreInstance    ×50 GB gp3    $4.00  EBS gp3 storage
+  ImageBuilder    ×1              $73  stream.standard.medium image builder (runs from creation; Windows assumed)
+  BillingGroup    ×3 accounts     $25  pro forma billing per account (first-500 rate)
+  LsContainer     ×2 nodes        $20  micro container service nodes (billed while disabled too)
+  LsLb            ×1              $18  load balancer
+  Cloud9AlwaysOn  ×1              $15  t3.small instance (AutomaticStopTimeMinutes 0: never stops)
+  Cloud9AlwaysOn  ×10 GB gp3    $0.80  EBS gp3 storage
+  CoreVolume      ×100 GB gp3   $8.00  EBS gp3 storage
+  Partnership     ×1            $8.00  partnership
+  Multiplex       ×1            $7.30  idle multiplex (created idle; a running one costs more)
+  PushInput       ×1            $7.30  idle push input (until a running channel uses it)
+  ResponsePlan    ×1            $7.00  Incident Manager response plan
+  LsIp            ×1            $3.65  static IP not attached to an instance
+  LsDisk          ×32 GB        $3.20  block storage
+  LsBucket        ×1            $3.00  100GB object storage bundle
+  LsCdn           ×1            $2.50  50GB distribution plan
+  LongCodeUk      ×1            $2.00  GB LONG_CODE number lease ($2 list price, not in the Price List)
+  TollFree        ×1            $2.00  US TOLL_FREE number lease ($2 list price, not in the Price List)
+  PaymentKey      ×1            $1.00  active key
+  Cloud9          ×10 GB gp3    $0.80  EBS gp3 storage
+
+? could not estimate: 12
+  services  BillingGroupAuto  AutoAssociate adds accounts the template doesn't list
+  services  Campaign  US_TEN_DLC_CAMPAIGN_REGISTRATION: $10/month per campaign ($2 low-volume) once it is approved
+  services  Cloud9Default  AutomaticStopTimeMinutes is not set; whether the instance then stops when idle is not documented
+  services  CoreVolumeSnap  SizeInGB is not set (the size comes from SnapshotId)
+  services  DeadlineSmf  keeps 2 workers running; Deadline picks their instance type from InstanceCapabilities
+  services  FleetCustom  ComputeType CUSTOM_INSTANCE_TYPE is not supported yet
+  services  ImageBuilderLinux  Linux image builders are not supported yet
+  services  LongCodeJp  no list price for a LONG_CODE number in JP
+  services  LsBucketOdd  BundleId huge_9_0 is not known
+  services  OtherInput  not known whether a SMPTE_2110_RECEIVER_GROUP input has an idle charge
+  services  PcsSpot  PurchaseOption SPOT is not supported yet
+  services  PlanPro  the PRO plan's monthly fee starts once the subscription is approved; CloudFormation leaves it pending
+
+! not counted yet: 2 (these cost money idle; cfn-idle-cost has no rule for them)
+  services  Flow  AWS::MediaConnect::Flow
+  services  LsSnapshot  AWS::Lightsail::DiskSnapshot
+
+prices: test prices · on-demand list prices, 730 h/mo, USD, free tier ignored
