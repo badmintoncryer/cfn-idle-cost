@@ -1167,7 +1167,7 @@ func ecsService(e *est, p map[string]any) {
 	}
 }
 
-// notCounted are types that cost money with zero traffic but have no rule yet.
+// notCounted are types that may cost money with zero traffic but have no rule yet.
 // They are listed in the report instead of being skipped silently.
 var notCounted = []string{
 	"AWS::WorkSpaces::Workspace", "AWS::AppStream::Fleet", "AWS::EC2::Host",
@@ -1196,6 +1196,14 @@ var notCounted = []string{
 	"AWS::ODB::CloudAutonomousVmCluster", // Oracle prices, not in the Price List
 	"AWS::Lambda::MicrovmImage", "AWS::Lightsail::InstanceSnapshot",
 	"AWS::Lightsail::DiskSnapshot", "AWS::Lightsail::DatabaseSnapshot", // sized by the data
+	"AWS::SecurityAgent::PentestJob", "AWS::DataSync::TaskExecution", // charged once at creation, per task-hour or GB copied
+	"AWS::DataZone::Environment", "AWS::DataZone::Project", "AWS::SageMaker::InferenceComponent",
+	"AWS::SageMaker::MonitoringSchedule", "AWS::SMSVOICE::SenderId", "AWS::Timestream::Table",
+	"AWS::LicenseManagerUserSubscriptions::LicenseServerEndpoint", "AWS::MediaLive::SignalMap",
+	"AWS::APS::AnomalyDetector", "AWS::QuickSight::Topic", "AWS::QuickSight::TopicV2", "AWS::IoTSiteWise::Dataset",
+	"AWS::DevOpsAgent::AgentSpace", "AWS::DevOpsAgent::PrivateConnection", "AWS::CustomerProfiles::Recommender",
+	"AWS::ODB::OdbNetwork", "AWS::CodeBuild::Sandbox", "AWS::SCN::Instance", "AWS::SCN::Namespace",
+	"AWS::SCN::Dataset", "AWS::SCN::DataIntegrationFlow", // priced outside the template, or the price isn't published
 }
 
 func init() {

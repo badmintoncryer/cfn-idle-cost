@@ -48,7 +48,7 @@ services                       $81253/mo
   services  PcsSpot  PurchaseOption SPOT is not supported yet
   services  PlanPro  the PRO plan's monthly fee starts once the subscription is approved; CloudFormation leaves it pending
 
-! not counted yet: 2 (these cost money idle; cfn-idle-cost has no rule for them)
+! not counted yet: 2 (these may cost money idle; cfn-idle-cost has no rule for them)
   services  Flow  AWS::MediaConnect::Flow
   services  LsSnapshot  AWS::Lightsail::DiskSnapshot
 

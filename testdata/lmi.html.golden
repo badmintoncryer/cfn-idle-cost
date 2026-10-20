@@ -213,7 +213,7 @@ function renderRows() {
 
 const groups = [
   ["err", "Could not estimate", "Their idle cost is not in the total: a value the template doesn't say, or a case not supported yet.", D.unknown, it => it.reason],
-  ["warn", "Not counted yet", "These types cost money idle, but cfn-idle-cost has no rule for them.", D.notCounted, it => it.type],
+  ["warn", "Not counted yet", "These types may cost money idle, but cfn-idle-cost has no rule for them.", D.notCounted, it => it.type],
   ["info", "No rule, assumed $0 idle", "cfn-idle-cost doesn't know whether these types cost money with zero traffic.", D.noRule, it => it.type],
 ].filter(g => g[3].length);
 $("notes").innerHTML = groups.map(([cls, title, about, items, what]) =>

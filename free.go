@@ -705,6 +705,20 @@ var free = []string{
 	"AWS::WorkspacesInstances::VolumeAssociation",
 	"AWS::XRay::Group", "AWS::XRay::ResourcePolicy", "AWS::XRay::SamplingRule", "AWS::XRay::TransactionSearchConfig",
 	"Alexa::ASK::Skill",
+	// The service ended (SageMaker Edge Manager, Panorama, OpsWorks Stacks, SimSpaceWeaver), or the
+	// type has no writable properties, so a template can't buy the reservation.
+	"AWS::SageMaker::Device", "AWS::SageMaker::DeviceFleet", "AWS::SageMaker::TrainingPlan",
+	"AWS::SageMaker::ReservedCapacity", "AWS::MediaLive::Reservation", "AWS::Panorama::Package",
+	"AWS::Panorama::PackageVersion", "AWS::Panorama::ApplicationInstance", "AWS::OpsWorks::Instance",
+	"AWS::SimSpaceWeaver::Simulation",
+	// Billed per user, task-hour or use, cents a month at most, or ended on idle timeout; a Route 53
+	// profile's fee is counted on its ProfileAssociation.
+	"AWS::SupportAuthZ::SupportPermit", "AWS::IoTSiteWise::Pipeline", "AWS::IoTSiteWise::Task",
+	"AWS::IoTSiteWise::Workspace", "AWS::IoTSiteWise::Application", "AWS::EC2::SecondaryNetwork",
+	"AWS::Wickr::Network", "AWS::Athena::Session", "AWS::MWAAServerless::Workflow", "AWS::Omics::Reference",
+	"AWS::Deadline::Worker", "AWS::Deadline::Volume", "AWS::Comprehend::Flywheel",
+	"AWS::MGN::NetworkMigrationDefinition", "AWS::CustomerProfiles::Integration",
+	"AWS::HealthLake::DataTransformationProfile", "AWS::Route53Profiles::Profile",
 }
 
 func freeType(t string) bool {

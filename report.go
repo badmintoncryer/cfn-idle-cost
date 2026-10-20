@@ -134,7 +134,7 @@ func (rep Report) WriteText(w io.Writer) {
 			}
 		}
 		if len(r.Skipped) > 0 {
-			fmt.Fprintf(w, "\n! not counted yet: %d (these cost money idle; cfn-idle-cost has no rule for them)\n", len(r.Skipped))
+			fmt.Fprintf(w, "\n! not counted yet: %d (these may cost money idle; cfn-idle-cost has no rule for them)\n", len(r.Skipped))
 			for _, it := range r.Skipped {
 				fmt.Fprintf(w, "  %s  %s  %s\n", it.Stack, it.Path, it.Type)
 			}

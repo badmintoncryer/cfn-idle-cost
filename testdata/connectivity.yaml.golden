@@ -44,7 +44,7 @@ connectivity                        $11801/mo
   connectivity  AppInsights  the alarms and metrics it creates depend on the resources it finds
   connectivity  IpamAdvanced  the Advanced Tier bills per active IP address in the operating Regions
 
-! not counted yet: 1 (these cost money idle; cfn-idle-cost has no rule for them)
+! not counted yet: 1 (these may cost money idle; cfn-idle-cost has no rule for them)
   connectivity  StatusCheck  AWS::EC2::ApplicationStatusCheck
 
 prices: test prices · on-demand list prices, 730 h/mo, USD, free tier ignored
