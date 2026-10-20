@@ -1,0 +1,72 @@
+# Connectivity, DNS, firewall, monitoring and email types; priced with
+# connectivityPrices (rules_connectivity_test.go).
+Resources:
+  RouteServerEndpoint: { Type: AWS::EC2::RouteServerEndpoint, Properties: { RouteServerId: rs-1, SubnetId: subnet-1 } }
+  Concentrator: { Type: AWS::EC2::VPNConcentrator, Properties: { Type: ipsec.1, TransitGatewayId: tgw-1 } }
+  SiteVpn: { Type: AWS::EC2::VPNConnection, Properties: { Type: ipsec.1, CustomerGatewayId: cgw-1, VpnConcentratorId: !Ref Concentrator } }
+  # Two sessions on one ENI pay once.
+  Mirror1: { Type: AWS::EC2::TrafficMirrorSession, Properties: { NetworkInterfaceId: eni-1, TrafficMirrorTargetId: t, TrafficMirrorFilterId: f, SessionNumber: 1 } }
+  Mirror2: { Type: AWS::EC2::TrafficMirrorSession, Properties: { NetworkInterfaceId: eni-1, TrafficMirrorTargetId: t2, TrafficMirrorFilterId: f, SessionNumber: 2 } }
+  EncryptionControl: { Type: AWS::EC2::VPCEncryptionControl, Properties: { VpcId: vpc-1, Mode: enforce } }
+  IpamFree: { Type: AWS::EC2::IPAM, Properties: { Tier: free } }
+  IpamAdvanced: { Type: AWS::EC2::IPAM, Properties: { Tier: advanced } }
+  PublicPool: { Type: AWS::EC2::IPAMPool, Properties: { AddressFamily: ipv4, IpamScopeId: s, PublicIpSource: amazon, Locale: us-east-1 } }
+  PrivatePool: { Type: AWS::EC2::IPAMPool, Properties: { AddressFamily: ipv4, IpamScopeId: s } }
+  PublicBlock: { Type: AWS::EC2::IPAMPoolCidr, Properties: { IpamPoolId: !Ref PublicPool, NetmaskLength: 29 } }
+  PrivateBlock: { Type: AWS::EC2::IPAMPoolCidr, Properties: { IpamPoolId: !Ref PrivatePool, Cidr: 10.0.0.0/8 } }
+  CrFleet:
+    Type: AWS::EC2::CapacityReservationFleet
+    Properties:
+      TotalTargetCapacity: 5
+      AllocationStrategy: prioritized
+      InstanceTypeSpecifications:
+        - { InstanceType: m5.xlarge, InstancePlatform: Linux/UNIX, Weight: 2, Priority: 2, AvailabilityZone: us-east-1a }
+        - { InstanceType: m5.large, InstancePlatform: Linux/UNIX, Weight: 1, Priority: 1, AvailabilityZone: us-east-1a }
+  Dx: { Type: AWS::DirectConnect::Connection, Properties: { Bandwidth: 10Gbps, ConnectionName: dx, Location: EqDC2 } }
+  SiteLinkVif:
+    Type: AWS::DirectConnect::PrivateVirtualInterface
+    Properties: { ConnectionId: !Ref Dx, EnableSiteLink: true, Vlan: 1, VirtualInterfaceName: v, BgpPeers: [] }
+  PlainVif:
+    Type: AWS::DirectConnect::TransitVirtualInterface
+    Properties: { ConnectionId: !Ref Dx, DirectConnectGatewayId: g, Vlan: 2, VirtualInterfaceName: v, BgpPeers: [] }
+  Tgw: { Type: AWS::EC2::TransitGateway, Properties: {} }
+  DxTgw: { Type: AWS::DirectConnect::DirectConnectGatewayAssociation, Properties: { DirectConnectGatewayId: g, AssociatedGatewayId: !Ref Tgw } }
+  DxVgw: { Type: AWS::DirectConnect::DirectConnectGatewayAssociation, Properties: { DirectConnectGatewayId: g, AssociatedGatewayId: vgw-1 } }
+  Interconnect: { Type: AWS::Interconnect::Connection, Properties: { Bandwidth: 1Gbps, AttachPoint: { DirectConnectGateway: g } } }
+  WanVpc: { Type: AWS::NetworkManager::VpcAttachment, Properties: { CoreNetworkId: c, VpcArn: a, SubnetArns: [s] } }
+  WanDx: { Type: AWS::NetworkManager::DirectConnectGatewayAttachment, Properties: { CoreNetworkId: c, DirectConnectGatewayArn: a, EdgeLocations: [us-east-1] } }
+  WanPeering: { Type: AWS::NetworkManager::TransitGatewayPeering, Properties: { CoreNetworkId: c, TransitGatewayArn: a } }
+  LatticeResource: { Type: AWS::VpcLattice::ServiceNetworkResourceAssociation, Properties: { ResourceConfigurationId: rcfg-1, ServiceNetworkId: sn-1 } }
+  ResourceEndpoint: { Type: AWS::EC2::VPCEndpoint, Properties: { VpcId: vpc-1, VpcEndpointType: Resource, ResourceConfigurationArn: arn } }
+  ServiceNetworkEndpoint: { Type: AWS::EC2::VPCEndpoint, Properties: { VpcId: vpc-1, VpcEndpointType: ServiceNetwork, ServiceNetworkArn: arn } }
+  GraphEndpoint: { Type: AWS::NeptuneGraph::PrivateGraphEndpoint, Properties: { GraphIdentifier: g, VpcId: vpc-1, SubnetIds: [a, b] } }
+  MskClient: { Type: AWS::MSK::VpcConnection, Properties: { Authentication: SASL_IAM, TargetClusterArn: a, VpcId: vpc-1, SecurityGroups: [sg], ClientSubnets: [a, b, c] } }
+  SearchEndpoint: { Type: AWS::OpenSearchServerless::VpcEndpoint, Properties: { Name: n, VpcId: vpc-1, SubnetIds: [a] } }
+  # The base fee is billed once, on the first association.
+  Profile1: { Type: AWS::Route53Profiles::ProfileAssociation, Properties: { Name: a, ProfileId: p, ResourceId: vpc-1 } }
+  Profile2: { Type: AWS::Route53Profiles::ProfileAssociation, Properties: { Name: b, ProfileId: p, ResourceId: vpc-2 } }
+  # Three Regions with a firewall rule: the filtering rate.
+  Resolver: { Type: AWS::Route53GlobalResolver::GlobalResolver, Properties: { Name: r, Regions: [us-east-1, us-west-2, eu-west-1] } }
+  View: { Type: AWS::Route53GlobalResolver::DnsView, Properties: { Name: v, GlobalResolverId: !Ref Resolver } }
+  Rule: { Type: AWS::Route53GlobalResolver::FirewallRule, Properties: { Name: r, Action: BLOCK, DnsViewId: !Ref View } }
+  Namespace: { Type: AWS::ServiceDiscovery::PrivateDnsNamespace, Properties: { Name: local, Vpc: vpc-1 } }
+  ClassicRule: { Type: AWS::WAFRegional::Rule, Properties: { Name: r, MetricName: r } }
+  ClassicAcl:
+    Type: AWS::WAFRegional::WebACL
+    Properties: { Name: a, MetricName: a, DefaultAction: { Type: ALLOW }, Rules: [{ Action: { Type: BLOCK }, Priority: 1, RuleId: !Ref ClassicRule }] }
+  FmsWaf: { Type: AWS::FMS::Policy, Properties: { PolicyName: w, ExcludeResourceTags: false, RemediationEnabled: true, SecurityServicePolicyData: { Type: WAFV2 } } }
+  FmsShield: { Type: AWS::FMS::Policy, Properties: { PolicyName: s, ExcludeResourceTags: false, RemediationEnabled: true, SecurityServicePolicyData: { Type: SHIELD_ADVANCED } } }
+  NsmPolicy: { Type: AWS::NetworkSecurityManager::Policy, Properties: { PolicyName: n, Priority: 1, FirewallType: WAF, PolicyConfiguration: {} } }
+  IngressOpen: { Type: AWS::SES::MailManagerIngressPoint, Properties: { Type: OPEN, TrafficPolicyId: t, RuleSetId: r } }
+  IngressAuth: { Type: AWS::SES::MailManagerIngressPoint, Properties: { Type: AUTH, TrafficPolicyId: t, RuleSetId: r } }
+  PoolStandard: { Type: AWS::SES::DedicatedIpPool, Properties: { PoolName: a } }
+  PoolManaged1: { Type: AWS::SES::DedicatedIpPool, Properties: { PoolName: b, ScalingMode: MANAGED } }
+  PoolManaged2: { Type: AWS::SES::DedicatedIpPool, Properties: { PoolName: c, ScalingMode: MANAGED } }
+  Tenant: { Type: AWS::SES::Tenant, Properties: { TenantName: t } }
+  InternetMonitor: { Type: AWS::InternetMonitor::Monitor, Properties: { MonitorName: m, Resources: [arn1, arn2] } }
+  AppInsights: { Type: AWS::ApplicationInsights::Application, Properties: { ResourceGroupName: g, AutoConfigurationEnabled: true } }
+  SwitchPlan: { Type: AWS::ARCRegionSwitch::Plan, Properties: { Name: p, ExecutionRole: r, RecoveryApproach: activePassive, Regions: [us-east-1, us-west-2], Workflows: [] } }
+  RefactorEnv: { Type: AWS::RefactorSpaces::Environment, Properties: { Name: e, NetworkFabricType: TRANSIT_GATEWAY } }
+  RefactorApp: { Type: AWS::RefactorSpaces::Application, Properties: { EnvironmentIdentifier: !Ref RefactorEnv, Name: a, ProxyType: API_GATEWAY, VpcId: vpc-1 } }
+  RefactorSvc: { Type: AWS::RefactorSpaces::Service, Properties: { EnvironmentIdentifier: !Ref RefactorEnv, ApplicationIdentifier: !Ref RefactorApp, EndpointType: URL, Name: s, VpcId: vpc-2 } }
+  StatusCheck: { Type: AWS::EC2::ApplicationStatusCheck, Properties: { Protocol: http, Port: 80 } }

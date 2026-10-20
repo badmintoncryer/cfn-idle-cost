@@ -114,7 +114,9 @@ var selectors = []selector{
 	{name: "vpc", service: "AmazonVPC",
 		key: func(a map[string]string, u string) string {
 			return keep(u, "PublicIPv4:InUseAddress", "VpcEndpoint-Hours", "VpcEndpoint-GWLBE-Hours", "VPN-Usage-Hours:ipsec.1", "ClientVPN-EndpointHours", "VPCLattice-Service-Hourly",
-				"VerifiedAccess-App-Hours", "VerifiedAccess-non-HTTP-App-Hours", "VPCEncryptionControls-hours")
+				"VerifiedAccess-App-Hours", "VerifiedAccess-non-HTTP-App-Hours", "VPCEncryptionControls-hours",
+				"ENI-Mirror", "RouteServer-EndpointHours", "VPN-concentrator-Usage-Hours:ipsec.1", "VPN-concentrator-site-Usage-Hours:ipsec.1",
+				"PublicIPv4:ContiguousBlock", "VpcEndpoint-Resource-Hours", "VpcLattice-Service-Network-Resource-Hours")
 		}},
 	{name: "tgw", service: "AmazonVPC",
 		key: func(a map[string]string, u string) string {
@@ -229,11 +231,17 @@ var selectors = []selector{
 	// Resolver endpoints are priced per region inside the global Route 53 offer.
 	{name: "resolver", service: "AmazonRoute53", global: true, families: []string{"DNS Query", "DNS Domain Names"},
 		key: func(a map[string]string, u string) string {
-			return keep(u, "ResolverNetworkInterface", "AdvancedDNS-ThreatProtectionsVPCAssociationHours", "DNS-FirewallDomainName")
+			return keep(u, "ResolverNetworkInterface", "AdvancedDNS-ThreatProtectionsVPCAssociationHours", "DNS-FirewallDomainName", "DNS-ProfileBasePackage")
 		}},
 	// Traffic Flow records and the CloudFront fees have no productFamily.
 	{name: "r53tf", service: "AmazonRoute53", global: true,
 		key:        func(a map[string]string, u string) string { return keep(u, "Traffic-Flow-Policy-Records") },
+		liveFilter: byUsagetype},
+	{name: "gr", service: "AmazonRoute53", global: true,
+		key: func(a map[string]string, u string) string {
+			return keep(u, "GlobalResolver-BaseRegionsWithFiltering", "GlobalResolver-BaseRegionsWithoutFiltering",
+				"GlobalResolver-AdditionalRegionsWithFiltering", "GlobalResolver-AdditionalRegionsWithoutFiltering")
+		},
 		liveFilter: byUsagetype},
 	{name: "cf", service: "AmazonCloudFront", global: true,
 		key: func(a map[string]string, u string) string {
@@ -258,7 +266,7 @@ var selectors = []selector{
 			return keep(u, "Endpoint-Hour", "Secondary-Endpoint-Hour", "Advanced-Inspection-Endpoint-Hour")
 		}},
 	{name: "waf", service: "awswaf", families: []string{"Web Application Firewall"},
-		key: func(a map[string]string, u string) string { return keep(u, "WebACLV2", "RuleV2") }},
+		key: func(a map[string]string, u string) string { return keep(u, "WebACLV2", "RuleV2", "WebACL", "Rule") }},
 	{name: "cw", service: "AmazonCloudWatch", families: []string{"Alarm", "Canaries", "Contributor Insights", "Metric"},
 		key: func(a map[string]string, u string) string {
 			return keep(u, "CW:AlarmMonitorUsage", "CW:HighResAlarmMonitorUsage", "CW:CompositeAlarmMonitorUsage", "CW:Canary-runs", "CW:ContributorInsightRules", "CW:MetricMonitorUsage")
@@ -403,7 +411,7 @@ var selectors = []selector{
 	// Application Recovery Controller has one offer, for the "aws-other" location.
 	{name: "arc", service: "AWSR53AppRecoveryController", global: true, families: []string{"Application Recovery Controller"},
 		key: func(a map[string]string, u string) string {
-			return keep(u, "Global-Cluster-Hours", "Global-ReadinessCheck-Hours")
+			return keep(u, "Global-Cluster-Hours", "Global-ReadinessCheck-Hours", "Global-AmazonARCRegionSwitchPlan")
 		}},
 	{name: "kda", service: "AmazonKinesisAnalytics", families: []string{"Kinesis Analytics"},
 		key: func(a map[string]string, u string) string {
@@ -411,7 +419,12 @@ var selectors = []selector{
 		}},
 	// Core network edges are priced per region inside one global offer.
 	{name: "wan", service: "AWSCloudWAN", global: true,
-		key: func(a map[string]string, u string) string { return keep(u, "CloudWAN-CoreNetworkEdge-Hours") }},
+		key: func(a map[string]string, u string) string {
+			if in(u, "CloudWAN-Attachment-Hours", "CloudWAN-Peering-Hours") {
+				return a["operation"] // CloudWANVPC, CloudWANConnect, CloudWANTGWPeering, ...
+			}
+			return keep(u, "CloudWAN-CoreNetworkEdge-Hours")
+		}},
 	{name: "r53hc", service: "AmazonRoute53", global: true, families: []string{"DNS Health Check"},
 		key: func(a map[string]string, u string) string {
 			return keep(u, "Health-Check-AWS", "Health-Check-Non-AWS", "Health-Check-Option-AWS", "Health-Check-Option-Non-AWS")
@@ -455,6 +468,38 @@ var selectors = []selector{
 	// Budgets has one offer, for the "aws-other" location.
 	{name: "budgets", service: "AWSBudgets", global: true, families: []string{"AWS Budgets"},
 		key: func(a map[string]string, u string) string { return keep(u, "ActionEnabledBudgetsUsage") }},
+	{name: "fms", service: "AWSFMS", families: []string{"Firewall Manager Policy"},
+		key: func(a map[string]string, u string) string { return keep(u, "Policy") }},
+	{name: "nsm", service: "AWSNSM",
+		key: func(a map[string]string, u string) string { return keep(u, "Usage-Trigger-Policy") }},
+	// The Pro- and Enterprise- plan variants are separate usagetypes.
+	{name: "ses", service: "AmazonSES",
+		key: func(a map[string]string, u string) string {
+			return keep(u, "IngressPoint-Subscription", "DIP-Managed-Acc-Sub-Hours", "Tenant-Count")
+		}},
+	{name: "refactor", service: "AWSMigrationHubRefactorSpaces", families: []string{"AWS Migration Hub"},
+		key: func(a map[string]string, u string) string { return keep(u, "EnvironmentHours") }},
+	// Ports carry their location code (TLXA1-PortUsage:1G); the locations of a
+	// region share one price.
+	{name: "dx", service: "AWSDirectConnect", families: []string{"Direct Connect"},
+		key: func(a map[string]string, u string) string {
+			_, u, _ = strings.Cut(u, "-")
+			if strings.HasPrefix(u, "PortUsage:") || u == "SiteLinkVifHour" {
+				return u
+			}
+			return ""
+		}},
+	// Usagetypes carry the partner (GCP-MgdConUsage:1G-Tier1); partners share one price.
+	{name: "interconnect", service: "AWSInterconnect",
+		key: func(a map[string]string, u string) string {
+			if _, u, ok := strings.Cut(u, "-MgdConUsage:"); ok {
+				return u
+			}
+			return ""
+		}},
+	// Internet Monitor has no productFamily.
+	{name: "im", service: "AmazonCloudWatch",
+		key: func(a map[string]string, u string) string { return keep(u, "CW:InternetMonitor-MonitoredResource") }},
 	{name: "influx", service: "AmazonTimestream", families: []string{"Database Instance", "Influx Optimized Storage"},
 		key: func(a map[string]string, u string) string {
 			if strings.Contains(u, "Db.influx") || strings.Contains(u, "InfluxDBStorage") {

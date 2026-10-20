@@ -159,7 +159,7 @@ and provisioned storage billed whether you use it or not.
 |---|---|
 | `AWS::EC2::NatGateway` | hourly |
 | `AWS::EC2::EIP` | public IPv4 address |
-| `AWS::EC2::VPCEndpoint` | Interface: hourly × subnets (AZs). Gateway Load Balancer: hourly. Gateway: free |
+| `AWS::EC2::VPCEndpoint` | Interface: hourly × subnets (AZs). Gateway Load Balancer and Resource: hourly. Gateway and ServiceNetwork: free (VPC Lattice bills the services and resources in the network) |
 | `AWS::ElasticLoadBalancingV2::LoadBalancer` | ALB / NLB / GWLB hourly, plus one public IPv4 per subnet when internet-facing (none for `dualstack-without-public-ipv4`) |
 | `AWS::ElasticLoadBalancing::LoadBalancer` | Classic Load Balancer hourly |
 | `AWS::EC2::Instance` | instance hourly (Linux), EBS volumes in `BlockDeviceMappings`, the public IPv4 it gets at launch |
@@ -188,7 +188,7 @@ and provisioned storage billed whether you use it or not.
 | `AWS::Lambda::CapacityProvider` | Lambda Managed Instances: EC2 hourly (Linux) plus the management fee × the instances the functions that use it need at least. See [Assumptions](#assumptions). Needs `AllowedInstanceTypes` with one type |
 | `AWS::CloudWatch::Dashboard` | $3 per dashboard (the list price; dashboards are not in the Price List) |
 | `AWS::EC2::TransitGatewayAttachment`, `TransitGatewayVpcAttachment`, `TransitGatewayPeeringAttachment`, `TransitGatewayConnect` | attachment hourly |
-| `AWS::EC2::VPNConnection` | connection hourly, plus the Transit Gateway VPN attachment |
+| `AWS::EC2::VPNConnection` | connection hourly (the lower site rate on a VPN concentrator), plus the Transit Gateway VPN attachment |
 | `AWS::EC2::ClientVpnTargetNetworkAssociation` | association hourly |
 | `AWS::Route53Resolver::ResolverEndpoint` | hourly × IP addresses |
 | `AWS::GlobalAccelerator::Accelerator` | fixed hourly fee |
@@ -266,6 +266,36 @@ and provisioned storage billed whether you use it or not.
 | `AWS::Budgets::BudgetsAction` | daily fee of an action-enabled budget, once per budget in the stack |
 | `AWS::CloudWatch::LogAlarm` | per alarm, as a standard alarm (scanned log data not counted) |
 | `AWS::Glue::Trigger`, `AWS::Glue::Crawler` | $0 idle unless they run on a schedule or start a streaming job (see below) |
+| `AWS::EC2::RouteServerEndpoint` | endpoint hourly |
+| `AWS::EC2::VPNConcentrator` | concentrator hourly, plus its Transit Gateway attachment |
+| `AWS::EC2::TrafficMirrorSession` | hourly per mirrored network interface (sessions on the same ENI in the stack are counted once) |
+| `AWS::EC2::VPCEncryptionControl` | VPC Encryption Controls hourly |
+| `AWS::EC2::IPAM` | $0 with `Tier: free`. The Advanced Tier (per active IP address) and a missing `Tier` are not estimated |
+| `AWS::EC2::IPAMPoolCidr` | hourly × the IPv4 addresses of the block when its pool (in the same template) is Amazon-provided public IPv4. BYOIP and private pools: $0 |
+| `AWS::EC2::CapacityReservationFleet` | instance hourly (Linux) × `TotalTargetCapacity` ÷ `Weight` of the highest-priority instance type |
+| `AWS::DirectConnect::Connection` | dedicated port hourly by `Bandwidth` (billed from activation, or 90 days after the LOA) |
+| `AWS::DirectConnect::PrivateVirtualInterface`, `AWS::DirectConnect::TransitVirtualInterface` | SiteLink hourly when `EnableSiteLink` is true |
+| `AWS::DirectConnect::DirectConnectGatewayAssociation` | Transit Gateway Direct Connect attachment hourly when the gateway is a transit gateway. Virtual private gateways: $0 |
+| `AWS::Interconnect::Connection` | managed connection hourly by `Bandwidth`, at the Tier 1 rate (AWS assigns the tier, so this is the lowest) |
+| `AWS::NetworkManager::VpcAttachment`, `SiteToSiteVpnAttachment`, `ConnectAttachment`, `DirectConnectGatewayAttachment` | Cloud WAN attachment hourly |
+| `AWS::NetworkManager::TransitGatewayPeering` | Cloud WAN peering hourly, plus the Transit Gateway peering attachment |
+| `AWS::VpcLattice::ServiceNetworkResourceAssociation` | hourly per resource in a service network |
+| `AWS::NeptuneGraph::PrivateGraphEndpoint`, `AWS::Deadline::LicenseEndpoint`, `AWS::MSK::VpcConnection` | interface endpoint hourly × subnets |
+| `AWS::OpenSearchServerless::VpcEndpoint` | interface endpoint hourly × subnets, plus one private hosted zone |
+| `AWS::Route53Profiles::ProfileAssociation` | Route 53 Profiles hourly fee, once per stack (it is billed per account and Region and covers 100 associations) |
+| `AWS::Route53GlobalResolver::GlobalResolver` | hourly fee of the first two Regions and of each additional one in `Regions`, at the DNS filtering rate when a firewall rule in the same template uses one of its DNS views |
+| `AWS::ServiceDiscovery::PrivateDnsNamespace`, `AWS::ServiceDiscovery::PublicDnsNamespace` | monthly fee of the namespace's hosted zone |
+| `AWS::WAF::WebACL`, `AWS::WAFRegional::WebACL` | WAF Classic web ACL and the rules added to it (`WAF::Rule`, `WAFRegional::Rule` and `RateBasedRule` are counted here) |
+| `AWS::FMS::Policy` | monthly fee per policy (Shield Advanced policies: $0; the resources a policy deploys are not counted) |
+| `AWS::NetworkSecurityManager::Policy` | Network Security Manager hourly fee, once per stack (billed per account and Region) |
+| `AWS::SES::MailManagerIngressPoint` | monthly fee of an `OPEN` or `MTLS` ingress endpoint. `AUTH`: $0 |
+| `AWS::SES::DedicatedIpPool` | Dedicated IPs (managed) monthly fee for `ScalingMode: MANAGED`, once per stack (billed per account) |
+| `AWS::SES::Tenant` | monthly fee per tenant |
+| `AWS::InternetMonitor::Monitor` | hourly × `Resources` (inactive monitors: $0; city-networks not counted) |
+| `AWS::ApplicationInsights::Application` | $0 idle, unless it sets up monitoring (`AutoConfigurationEnabled`, components): its alarms and metrics are not estimated |
+| `AWS::ARCRegionSwitch::Plan` | monthly fee per Region switch plan |
+| `AWS::RefactorSpaces::Environment` | environment hourly, plus a Transit Gateway attachment per VPC of its applications and services in the same template (`NetworkFabricType: TRANSIT_GATEWAY`) |
+| `AWS::RefactorSpaces::Application` | the proxy Network Load Balancer hourly |
 
 Usage-only charges are left out on purpose: S3, Lambda, Aurora storage and
 I/O, CloudWatch Logs, data transfer, requests.
@@ -278,8 +308,11 @@ under `! not counted yet`. So are types whose cost the template can't size:
 account-level services (GuardDuty, Security Hub, Config recorders, CloudWatch
 OTel enrichment, CloudWatch Logs integrations), reservations (RDS, ElastiCache,
 MemoryDB), Bedrock imported models, CloudFront distribution tenants, Route 53
-Resolver on Outposts and ECS gateways (ECS adds load balancers as services
-attach). Types known to cost nothing idle (IAM, S3, SQS, SNS, CloudWatch Logs,
+Resolver on Outposts, ECS gateways (ECS adds load balancers as services
+attach), and monitoring billed per resource or probe outside the template (EC2
+application status checks, Network Synthetic Monitor, Network Flow Monitor
+scopes, Network Security Manager deployments, network performance metric
+subscriptions). Types known to cost nothing idle (IAM, S3, SQS, SNS, CloudWatch Logs,
 Lambda functions, subnets and route tables, configuration-only types, one-off
 jobs billed once on deploy, retired services, and so on) are left out. That list names each type
 (about 1,700, from a check of every CloudFormation type); only `Custom::`
