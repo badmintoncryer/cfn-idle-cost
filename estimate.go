@@ -415,6 +415,10 @@ func init() {
 				e.hourly(float64(n), "AZ", "vpc|VpcEndpoint-Hours", "interface endpoint")
 			case "GatewayLoadBalancer":
 				e.hourly(1, "", "vpc|VpcEndpoint-GWLBE-Hours", "Gateway Load Balancer endpoint")
+			case "Resource":
+				e.hourly(1, "", "vpc|VpcEndpoint-Resource-Hours", "resource endpoint")
+			case "ServiceNetwork":
+				// free; VPC Lattice bills the services and resources in the network
 			default:
 				panic(unresolved("VpcEndpointType " + t + " is not supported yet"))
 			}
@@ -1152,6 +1156,9 @@ var notCounted = []string{
 	"AWS::Config::ConfigurationRecorder", "AWS::Logs::Integration", // priced by the rest of the account
 	"AWS::RDS::ReservedDBInstance", "AWS::ElastiCache::ReservedCacheNode", "AWS::MemoryDB::ReservedNode", // a commitment
 	"AWS::ECS::Gateway", // ECS adds ALBs as services attach; the count isn't in the template
+	"AWS::EC2::ApplicationStatusCheck", "AWS::NetworkMonitor::Monitor", "AWS::NetworkFlowMonitor::Scope",
+	"AWS::NetworkSecurityManager::Deployment",        // billed per resource or probe outside the template
+	"AWS::EC2::NetworkPerformanceMetricSubscription", // a CloudWatch metric charge whose rate AWS doesn't state
 }
 
 func init() {
@@ -1242,6 +1249,10 @@ func init() {
 			e.hourly(1, "", "tgw|TransitGatewayConnect", "Transit Gateway Connect attachment")
 		},
 		"AWS::EC2::VPNConnection": func(e *est, p map[string]any) {
+			if p["VpnConcentratorId"] != nil {
+				e.hourly(1, "", "vpc|VPN-concentrator-site-Usage-Hours:ipsec.1", "VPN concentrator site connection")
+				return
+			}
 			e.hourly(1, "", "vpc|VPN-Usage-Hours:ipsec.1", "Site-to-Site VPN connection")
 			if _, ok := p["TransitGatewayId"]; ok {
 				e.hourly(1, "", "tgw|TransitGatewayVPN", "Transit Gateway VPN attachment")

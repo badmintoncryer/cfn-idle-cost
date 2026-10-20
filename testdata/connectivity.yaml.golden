@@ -1,0 +1,50 @@
+us-east-1 · 1 stack · idle ≈ $11801/mo
+
+connectivity                        $11801/mo
+  Resolver             ×2 Regions    $3650  first two Regions
+  Resolver             ×1 Regions    $1095  additional Regions
+  Dx                   ×1            $1642  10Gbps dedicated port (billed from activation or 90 days after the LOA)
+  Concentrator         ×1            $1424  VPN concentrator (site connections are counted on each VPNConnection)
+  Concentrator         ×1              $36  Transit Gateway attachment
+  Interconnect         ×1            $1000  1Gbps managed connection (Tier 1, the lowest)
+  Profile1             ×1             $548  Profiles fee, once per account and Region (up to 100 VPC associations)
+  RouteServerEndpoint  ×1             $548  route server endpoint
+  SiteLinkVif          ×1             $365  SiteLink
+  CrFleet              ×5             $350  m5.large reserved capacity (Linux)
+  NsmPolicy            ×1             $255  Network Security Manager fee, once per account and Region
+  EncryptionControl    ×1             $110  VPC Encryption Controls
+  FmsWaf               ×1             $100  Firewall Manager policy (resources it deploys are not counted)
+  RefactorEnv          ×2 VPCs         $73  Transit Gateway attachment per VPC in this template
+  RefactorEnv          ×1              $20  Refactor Spaces environment
+  WanPeering           ×1              $47  Cloud WAN peering
+  WanPeering           ×1              $36  Transit Gateway peering attachment
+  LatticeResource      ×1              $73  resource in a service network
+  SwitchPlan           ×1              $70  Region switch plan
+  IngressOpen          ×1              $50  OPEN ingress endpoint (billed while closed too)
+  WanDx                ×1              $47  Cloud WAN attachment
+  WanVpc               ×1              $47  Cloud WAN attachment
+  PublicBlock          ×8 IPv4         $47  Amazon-provided contiguous IPv4 block (/29)
+  DxTgw                ×1              $36  Transit Gateway Direct Connect attachment
+  MskClient            ×3 AZ           $22  MSK-managed interface endpoint
+  RefactorApp          ×1              $16  proxy Network Load Balancer
+  PoolManaged1         ×1              $15  Dedicated IPs (managed), once per account
+  GraphEndpoint        ×2 AZ           $15  interface endpoint
+  InternetMonitor      ×2 resources    $15  monitored resources
+  ResourceEndpoint     ×1              $15  resource endpoint
+  Mirror1              ×1              $11  mirrored network interface (one fee per ENI)
+  SearchEndpoint       ×1 AZ         $7.30  interface endpoint
+  SearchEndpoint       ×1            $0.50  private hosted zone
+  SiteVpn              ×1            $7.30  VPN concentrator site connection
+  ClassicAcl           ×1            $5.00  web ACL (WAF Classic)
+  ClassicAcl           ×1 rules      $1.00  rules (WAF Classic)
+  Namespace            ×1            $0.50  hosted zone of the namespace
+  Tenant               ×1            $0.01  tenant
+
+? could not estimate: 2
+  connectivity  AppInsights  the alarms and metrics it creates depend on the resources it finds
+  connectivity  IpamAdvanced  the Advanced Tier bills per active IP address in the operating Regions
+
+! not counted yet: 1 (these cost money idle; cfn-idle-cost has no rule for them)
+  connectivity  StatusCheck  AWS::EC2::ApplicationStatusCheck
+
+prices: test prices · on-demand list prices, 730 h/mo, USD, free tier ignored

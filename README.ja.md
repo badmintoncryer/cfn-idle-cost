@@ -134,7 +134,7 @@ jobs:
 |---|---|
 | `AWS::EC2::NatGateway` | 時間料金 |
 | `AWS::EC2::EIP` | パブリックIPv4アドレス |
-| `AWS::EC2::VPCEndpoint` | Interface型は時間料金×サブネット数（AZ数）。Gateway Load Balancer型は時間料金。Gateway型は無料 |
+| `AWS::EC2::VPCEndpoint` | Interface型は時間料金×サブネット数（AZ数）。Gateway Load Balancer型とResource型は時間料金。Gateway型とServiceNetwork型は無料（ネットワーク内のサービスとリソースの料金はVPC Latticeにかかる） |
 | `AWS::ElasticLoadBalancingV2::LoadBalancer` | ALB、NLB、GWLBの時間料金。internet-facingなら、サブネットごとにパブリックIPv4を1つ（`dualstack-without-public-ipv4`なら数えません） |
 | `AWS::ElasticLoadBalancing::LoadBalancer` | Classic Load Balancerの時間料金 |
 | `AWS::EC2::Instance` | インスタンスの時間料金（Linux）、`BlockDeviceMappings`のEBSボリューム、起動時に割り当てられるパブリックIPv4 |
@@ -163,7 +163,7 @@ jobs:
 | `AWS::Lambda::CapacityProvider` | Lambda Managed Instances。EC2の時間料金（Linux）と管理料金×このプロバイダを使う関数に最低限必要なインスタンス数。[前提](#前提)を参照してください。`AllowedInstanceTypes`でタイプを1つに決めている必要があります |
 | `AWS::CloudWatch::Dashboard` | ダッシュボードごとに$3（公開価格。ダッシュボードはPrice Listにありません） |
 | `AWS::EC2::TransitGatewayAttachment`、`TransitGatewayVpcAttachment`、`TransitGatewayPeeringAttachment`、`TransitGatewayConnect` | アタッチメントの時間料金 |
-| `AWS::EC2::VPNConnection` | 接続の時間料金。Transit Gatewayにつなぐ場合は、VPNアタッチメントの時間料金も加えます |
+| `AWS::EC2::VPNConnection` | 接続の時間料金（VPNコンセントレーターにつなぐ場合は、安いサイト接続の料金）。Transit Gatewayにつなぐ場合は、VPNアタッチメントの時間料金も加えます |
 | `AWS::EC2::ClientVpnTargetNetworkAssociation` | 関連付けの時間料金 |
 | `AWS::Route53Resolver::ResolverEndpoint` | 時間料金×IPアドレス数 |
 | `AWS::GlobalAccelerator::Accelerator` | 固定の時間料金 |
@@ -241,12 +241,42 @@ jobs:
 | `AWS::Budgets::BudgetsAction` | アクションを有効にした予算の日額料金。スタック内の予算ごとに1回だけ数える |
 | `AWS::CloudWatch::LogAlarm` | 標準アラームと同じアラームごとの料金。スキャンしたログの料金は数えない |
 | `AWS::Glue::Trigger`、`AWS::Glue::Crawler` | スケジュールで動くものと、ストリーミングジョブを開始するもの以外はアイドル時$0（後述） |
+| `AWS::EC2::RouteServerEndpoint` | エンドポイントの時間料金 |
+| `AWS::EC2::VPNConcentrator` | コンセントレーターの時間料金と、Transit Gatewayアタッチメントの時間料金 |
+| `AWS::EC2::TrafficMirrorSession` | ミラーリングするネットワークインターフェイスごとの時間料金。スタック内で同じENIを使うセッションは1回だけ数える |
+| `AWS::EC2::VPCEncryptionControl` | VPC暗号化コントロールの時間料金 |
+| `AWS::EC2::IPAM` | `Tier: free`なら$0。Advancedティア（アクティブなIPアドレスごとの料金）と、`Tier`を指定しないものは見積もらない |
+| `AWS::EC2::IPAMPoolCidr` | 同じテンプレートにあるプールがAmazon提供のパブリックIPv4のとき、時間料金×ブロックのIPv4アドレス数。BYOIPとプライベートのプールは$0 |
+| `AWS::EC2::CapacityReservationFleet` | 優先度がいちばん高いインスタンスタイプの時間料金（Linux）×`TotalTargetCapacity`÷`Weight` |
+| `AWS::DirectConnect::Connection` | `Bandwidth`ごとの専用ポートの時間料金。課金は接続が使えるようになったときか、LOAの発行から90日後に始まる |
+| `AWS::DirectConnect::PrivateVirtualInterface`、`AWS::DirectConnect::TransitVirtualInterface` | `EnableSiteLink`がtrueのときの、SiteLinkの時間料金 |
+| `AWS::DirectConnect::DirectConnectGatewayAssociation` | 関連付ける先がTransit Gatewayのときの、Direct Connectアタッチメントの時間料金。仮想プライベートゲートウェイなら$0 |
+| `AWS::Interconnect::Connection` | `Bandwidth`ごとのマネージド接続の時間料金。ティアはAWSが決めるので、いちばん安いTier 1の料金で数える |
+| `AWS::NetworkManager::VpcAttachment`、`SiteToSiteVpnAttachment`、`ConnectAttachment`、`DirectConnectGatewayAttachment` | Cloud WANのアタッチメントの時間料金 |
+| `AWS::NetworkManager::TransitGatewayPeering` | Cloud WANのピアリングの時間料金と、Transit Gatewayのピアリングアタッチメントの時間料金 |
+| `AWS::VpcLattice::ServiceNetworkResourceAssociation` | サービスネットワークに加えたリソースごとの時間料金 |
+| `AWS::NeptuneGraph::PrivateGraphEndpoint`、`AWS::Deadline::LicenseEndpoint`、`AWS::MSK::VpcConnection` | インターフェイスエンドポイントの時間料金×サブネット数 |
+| `AWS::OpenSearchServerless::VpcEndpoint` | インターフェイスエンドポイントの時間料金×サブネット数と、プライベートホストゾーン1つ分の料金 |
+| `AWS::Route53Profiles::ProfileAssociation` | Route 53 Profilesの時間料金。アカウントとリージョンごとの料金で関連付け100件までを含むので、スタックごとに1回だけ数える |
+| `AWS::Route53GlobalResolver::GlobalResolver` | 最初の2リージョン分の時間料金と、`Regions`のそれ以外のリージョンごとの時間料金。同じテンプレートのファイアウォールルールがDNSビューを使っていれば、DNSフィルタリングありの料金で数える |
+| `AWS::ServiceDiscovery::PrivateDnsNamespace`、`AWS::ServiceDiscovery::PublicDnsNamespace` | 名前空間が作るホストゾーンの月額料金 |
+| `AWS::WAF::WebACL`、`AWS::WAFRegional::WebACL` | WAF ClassicのWeb ACLと、そこに加えたルールの月額料金。`WAF::Rule`、`WAFRegional::Rule`、`RateBasedRule`はここで数える |
+| `AWS::FMS::Policy` | ポリシーごとの月額料金。Shield Advancedのポリシーは$0。ポリシーがデプロイするリソースの料金は数えない |
+| `AWS::NetworkSecurityManager::Policy` | Network Security Managerの時間料金。アカウントとリージョンごとの料金なので、スタックごとに1回だけ数える |
+| `AWS::SES::MailManagerIngressPoint` | `OPEN`か`MTLS`のイングレスエンドポイントの月額料金。`AUTH`は$0 |
+| `AWS::SES::DedicatedIpPool` | `ScalingMode: MANAGED`のときの、専用IP（マネージド）の月額料金。アカウントごとの料金なので、スタックごとに1回だけ数える |
+| `AWS::SES::Tenant` | テナントごとの月額料金 |
+| `AWS::InternetMonitor::Monitor` | 時間料金×`Resources`のリソース数。無効にしたモニターは$0。都市ネットワークの料金は数えない |
+| `AWS::ApplicationInsights::Application` | アイドル時$0。`AutoConfigurationEnabled`やコンポーネントで監視を設定したときは、作られるアラームとメトリクスの料金を見積もらない |
+| `AWS::ARCRegionSwitch::Plan` | リージョン切り替えプランごとの月額料金 |
+| `AWS::RefactorSpaces::Environment` | 環境の時間料金。`NetworkFabricType: TRANSIT_GATEWAY`なら、同じテンプレートにあるアプリケーションとサービスのVPCごとに、Transit Gatewayアタッチメントの時間料金も数える |
+| `AWS::RefactorSpaces::Application` | プロキシのNetwork Load Balancerの時間料金 |
 
 使った分だけかかる費用は、意図して対象から外しています。S3、Lambda、AuroraのストレージとI/O、CloudWatch Logs、データ転送、リクエスト料金がこれに当たります。
 
 ### まだ見積もらないもの
 
-アクセスがゼロでも費用がかかるのに、まだルールのないリソースタイプのうち、よく使われるもの（WorkSpaces、AppStream 2.0、Lightsail、Elastic Beanstalkなど）は、`! not counted yet`に載せます。テンプレートから費用を見積もれないタイプも、ここに載せます。該当するのはアカウント単位のサービス（GuardDuty、Security Hub、Configのレコーダー、CloudWatchのOTelエンリッチメント、CloudWatch Logsのインテグレーション）、RDSのリザーブドインスタンスとElastiCacheやMemoryDBのリザーブドノード、Bedrockにインポートしたモデル、CloudFrontのディストリビューションテナント、OutpostsのRoute 53 Resolver、ECSのゲートウェイ（サービスをつなぐとECSがロードバランサーを追加します）です。アイドル時に費用がかからないとわかっているタイプ（IAM、S3、SQS、SNS、CloudWatch Logs、Lambda関数、サブネットやルートテーブル、設定だけのタイプ、デプロイ時に一度だけ課金されるジョブ、提供が終わったサービスなど）は載せません。費用がかからないタイプは、すべてのCloudFormationタイプを調べた結果をもとに約1,700件を1つずつ名前で挙げていて、プレフィックスで判定するのは`Custom::`のリソースだけです。そのため、ほかのタイプが無料のサービスに新しいタイプが加わっても、そのタイプは`? no rule`に載ります。それ以外のルールのないタイプは、アイドル時$0とみなして`? no rule`に載せます。費用がかかるかもしれないリソースが、行を出さずに消えることはありません。一部だけ対応しているリソース（Fargate Spotとほかのキャパシティプロバイダ、SpotとWindowsのノードグループ、EMRのインスタンスフリート、Aurora Serverless v1、Local Zonesのインスタンス、cronのスケジュールで動くカナリア、Spotだけのフリート、複数のインスタンスタイプを使うフリート、`MinvCpus`が0より大きいBatchのコンピューティング環境、SpotやリモートロケーションのGameLiftフリート、Spotを使うFleetIQのゲームサーバーグループ、プロビジョニングしたイベントポーラーを使うイベントソースマッピング、スケジュールで動くかストリーミングジョブを開始するGlueのトリガーとクローラー）は、`? could not estimate`に載ります。
+アクセスがゼロでも費用がかかるのに、まだルールのないリソースタイプのうち、よく使われるもの（WorkSpaces、AppStream 2.0、Lightsail、Elastic Beanstalkなど）は、`! not counted yet`に載せます。テンプレートから費用を見積もれないタイプも、ここに載せます。該当するのはアカウント単位のサービス（GuardDuty、Security Hub、Configのレコーダー、CloudWatchのOTelエンリッチメント、CloudWatch Logsのインテグレーション）、RDSのリザーブドインスタンスとElastiCacheやMemoryDBのリザーブドノード、Bedrockにインポートしたモデル、CloudFrontのディストリビューションテナント、OutpostsのRoute 53 Resolver、ECSのゲートウェイ（サービスをつなぐとECSがロードバランサーを追加します）と、テンプレートの外にあるリソースやプローブの数で決まる監視（EC2のアプリケーションステータスチェック、Network Synthetic Monitor、Network Flow Monitorのスコープ、Network Security Managerのデプロイ、ネットワークパフォーマンスのメトリクスのサブスクリプション）です。アイドル時に費用がかからないとわかっているタイプ（IAM、S3、SQS、SNS、CloudWatch Logs、Lambda関数、サブネットやルートテーブル、設定だけのタイプ、デプロイ時に一度だけ課金されるジョブ、提供が終わったサービスなど）は載せません。費用がかからないタイプは、すべてのCloudFormationタイプを調べた結果をもとに約1,700件を1つずつ名前で挙げていて、プレフィックスで判定するのは`Custom::`のリソースだけです。そのため、ほかのタイプが無料のサービスに新しいタイプが加わっても、そのタイプは`? no rule`に載ります。それ以外のルールのないタイプは、アイドル時$0とみなして`? no rule`に載せます。費用がかかるかもしれないリソースが、行を出さずに消えることはありません。一部だけ対応しているリソース（Fargate Spotとほかのキャパシティプロバイダ、SpotとWindowsのノードグループ、EMRのインスタンスフリート、Aurora Serverless v1、Local Zonesのインスタンス、cronのスケジュールで動くカナリア、Spotだけのフリート、複数のインスタンスタイプを使うフリート、`MinvCpus`が0より大きいBatchのコンピューティング環境、SpotやリモートロケーションのGameLiftフリート、Spotを使うFleetIQのゲームサーバーグループ、プロビジョニングしたイベントポーラーを使うイベントソースマッピング、スケジュールで動くかストリーミングジョブを開始するGlueのトリガーとクローラー）は、`? could not estimate`に載ります。
 
 ## 前提
 
