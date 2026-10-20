@@ -246,8 +246,14 @@ I/O, CloudWatch Logs, data transfer, requests.
 
 Common resource types that cost money with zero traffic but have no rule yet,
 such as WorkSpaces, AppStream 2.0, Lightsail and Elastic Beanstalk, are listed
-under `! not counted yet`. Types known to cost nothing idle (IAM, S3, SQS, SNS,
-CloudWatch Logs, Lambda functions, VPCs and subnets, and so on) are left out.
+under `! not counted yet`. So are types whose cost the template can't size:
+account-level services (GuardDuty, Security Hub, Config recorders, CloudWatch
+OTel enrichment, CloudWatch Logs integrations), reservations (RDS, ElastiCache,
+MemoryDB), Bedrock imported models, CloudFront distribution tenants and Route 53
+Resolver on Outposts. Types known to cost nothing idle (IAM, S3, SQS, SNS,
+CloudWatch Logs, Lambda functions, subnets and route tables, and so on) are
+left out. That list names each type; only `Custom::` resources are matched by
+prefix, so a new type in a service that is otherwise free still gets a line.
 Every other type with no rule is listed under `? no rule` and assumed $0 idle,
 so a resource that may cost money never disappears without a line.
 Partly supported types (Fargate Spot and other capacity providers, Spot and
