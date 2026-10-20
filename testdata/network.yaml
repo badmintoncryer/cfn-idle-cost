@@ -1,0 +1,126 @@
+# Network and edge types that cost money idle only in some configurations;
+# priced with networkPrices (rules_network_test.go).
+Resources:
+  Vpc: { Type: AWS::EC2::VPC, Properties: { CidrBlock: 10.0.0.0/16, VpcEncryptionControl: { Mode: monitor } } }
+  VpcPlain: { Type: AWS::EC2::VPC, Properties: { CidrBlock: 10.1.0.0/16 } }
+  VpcOther: { Type: AWS::EC2::VPC, Properties: { CidrBlock: 10.2.0.0/16 } }
+  # VpcPlain twice and vpc-outside count 2 VPCs; Vpc pays on its own line.
+  Tgw: { Type: AWS::EC2::TransitGateway, Properties: { EncryptionSupport: enable } }
+  TgwPlain: { Type: AWS::EC2::TransitGateway, Properties: {} }
+  AttachVpc: { Type: AWS::EC2::TransitGatewayVpcAttachment, Properties: { TransitGatewayId: !Ref Tgw, VpcId: !Ref Vpc, SubnetIds: [a] } }
+  AttachPlain: { Type: AWS::EC2::TransitGatewayVpcAttachment, Properties: { TransitGatewayId: !Ref Tgw, VpcId: !Ref VpcPlain, SubnetIds: [a] } }
+  AttachPlain2: { Type: AWS::EC2::TransitGatewayAttachment, Properties: { TransitGatewayId: !Ref Tgw, VpcId: !Ref VpcPlain, SubnetIds: [b] } }
+  AttachOutside: { Type: AWS::EC2::TransitGatewayVpcAttachment, Properties: { TransitGatewayId: !Ref Tgw, VpcId: vpc-outside, SubnetIds: [a] } }
+  AttachOther: { Type: AWS::EC2::TransitGatewayVpcAttachment, Properties: { TransitGatewayId: !Ref TgwPlain, VpcId: !Ref VpcOther, SubnetIds: [a] } }
+  Policy:
+    Type: AWS::NetworkFirewall::FirewallPolicy
+    Properties:
+      FirewallPolicyName: p
+      FirewallPolicy: { StatelessDefaultActions: [aws:pass], StatelessFragmentDefaultActions: [aws:pass], TLSInspectionConfigurationArn: arn:tls }
+  Firewall:
+    Type: AWS::NetworkFirewall::Firewall
+    Properties: { FirewallName: f, FirewallPolicyArn: !Ref Policy, VpcId: !Ref Vpc, SubnetMappings: [{ SubnetId: a }, { SubnetId: b }] }
+  # Its policy is outside this template: endpoints only.
+  FirewallOutside:
+    Type: AWS::NetworkFirewall::Firewall
+    Properties: { FirewallName: g, FirewallPolicyArn: arn:policy, VpcId: !Ref Vpc, SubnetMappings: [{ SubnetId: a }] }
+  SecondaryEndpoint:
+    Type: AWS::NetworkFirewall::VpcEndpointAssociation
+    Properties: { FirewallArn: !Ref Firewall, VpcId: !Ref VpcPlain, SubnetMapping: { SubnetId: c } }
+  ProxyEndpoint:
+    Type: AWS::RDS::DBProxyEndpoint
+    Properties: { DBProxyName: proxy, DBProxyEndpointName: ro, VpcSubnetIds: [a, b], TargetRole: READ_ONLY }
+  ServiceSameRegion:
+    Type: AWS::EC2::VPCEndpointService
+    Properties: { NetworkLoadBalancerArns: [arn:nlb], SupportedRegions: [!Ref "AWS::Region", us-east-1] }
+  ServiceCrossRegion:
+    Type: AWS::EC2::VPCEndpointService
+    Properties: { NetworkLoadBalancerArns: [arn:nlb], SupportedRegions: [us-east-1, eu-west-1] }
+  RuleGroupAdvanced:
+    Type: AWS::Route53Resolver::FirewallRuleGroup
+    Properties:
+      FirewallRules:
+        - { Priority: 1, Action: BLOCK, BlockResponse: NODATA, DnsThreatProtection: DGA, ConfidenceThreshold: HIGH }
+  RuleGroupBasic:
+    Type: AWS::Route53Resolver::FirewallRuleGroup
+    Properties:
+      FirewallRules: [{ Priority: 1, Action: BLOCK, BlockResponse: NODATA, FirewallDomainListId: !Ref Domains }]
+  AssocAdvanced:
+    Type: AWS::Route53Resolver::FirewallRuleGroupAssociation
+    Properties: { FirewallRuleGroupId: !GetAtt RuleGroupAdvanced.Id, Priority: 101, VpcId: !Ref Vpc }
+  AssocBasic:
+    Type: AWS::Route53Resolver::FirewallRuleGroupAssociation
+    Properties: { FirewallRuleGroupId: !GetAtt RuleGroupBasic.Id, Priority: 102, VpcId: !Ref Vpc }
+  AssocOutside:
+    Type: AWS::Route53Resolver::FirewallRuleGroupAssociation
+    Properties: { FirewallRuleGroupId: rslvr-frg-1, Priority: 103, VpcId: !Ref Vpc }
+  Domains: { Type: AWS::Route53Resolver::FirewallDomainList, Properties: { Domains: [a.example.com, b.example.com, "*.c.example.com"] } }
+  DomainsFile: { Type: AWS::Route53Resolver::FirewallDomainList, Properties: { DomainFileUrl: s3://bucket/domains.txt } }
+  TrafficPolicy:
+    Type: AWS::Route53::TrafficPolicyInstance
+    Properties: { HostedZoneId: Z1, Name: www.example.com, TrafficPolicyId: tp, TrafficPolicyVersion: 1, TTL: 60 }
+  CloudMapInstance:
+    Type: AWS::ServiceDiscovery::Instance
+    Properties: { ServiceId: srv-1, InstanceAttributes: { AWS_INSTANCE_IPV4: 10.0.0.1 } }
+  StreamVpc:
+    Type: AWS::KinesisFirehose::DeliveryStream
+    Properties:
+      AmazonopensearchserviceDestinationConfiguration:
+        IndexName: i
+        RoleARN: arn:role
+        S3Configuration: { BucketARN: arn:bucket, RoleARN: arn:role }
+        VpcConfiguration: { RoleARN: arn:role, SecurityGroupIds: [sg], SubnetIds: [a, b, c] }
+  StreamS3:
+    Type: AWS::KinesisFirehose::DeliveryStream
+    Properties: { S3DestinationConfiguration: { BucketARN: arn:bucket, RoleARN: arn:role } }
+  DistVip:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        ViewerCertificate: { AcmCertificateArn: arn:cert, SslSupportMethod: vip }
+  DistSni:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        ViewerCertificate: { AcmCertificateArn: arn:cert, SslSupportMethod: sni-only }
+  Metrics:
+    Type: AWS::CloudFront::MonitoringSubscription
+    Properties:
+      DistributionId: !Ref DistSni
+      MonitoringSubscription: { RealtimeMetricsSubscriptionConfig: { RealtimeMetricsSubscriptionStatus: Enabled } }
+  MetricsOff:
+    Type: AWS::CloudFront::MonitoringSubscription
+    Properties:
+      DistributionId: !Ref DistVip
+      MonitoringSubscription: { RealtimeMetricsSubscriptionConfig: { RealtimeMetricsSubscriptionStatus: Disabled } }
+  Anycast: { Type: AWS::CloudFront::AnycastIpList, Properties: { Name: a, IpCount: 3 } }
+  AnycastByoip:
+    Type: AWS::CloudFront::AnycastIpList
+    Properties: { Name: b, IpCount: 3, IpamCidrConfigs: [{ Cidr: 192.0.2.0/24, IpamPoolArn: arn:pool }] }
+  RuleGroup:
+    Type: AWS::WAFv2::RuleGroup
+    Properties:
+      Capacity: 10
+      Scope: REGIONAL
+      VisibilityConfig: { SampledRequestsEnabled: false, CloudWatchMetricsEnabled: false, MetricName: g }
+      Rules: [{ Name: a }, { Name: b }, { Name: c }]
+  # 2 rules of its own, plus the 3 rules of RuleGroup; the managed group adds none.
+  WebAcl:
+    Type: AWS::WAFv2::WebACL
+    Properties:
+      DefaultAction: { Allow: {} }
+      Scope: REGIONAL
+      VisibilityConfig: { SampledRequestsEnabled: false, CloudWatchMetricsEnabled: false, MetricName: w }
+      Rules:
+        - { Name: own, Priority: 0, Statement: { RuleGroupReferenceStatement: { Arn: !GetAtt RuleGroup.Arn } } }
+        - { Name: managed, Priority: 1, Statement: { ManagedRuleGroupStatement: { VendorName: AWS, Name: AWSManagedRulesCommonRuleSet } } }
+  App: { Type: AWS::Amplify::App, Properties: { Name: app } }
+  AssocAmplify: { Type: AWS::WAFv2::WebACLAssociation, Properties: { ResourceArn: !GetAtt App.Arn, WebACLArn: !GetAtt WebAcl.Arn } }
+  AssocAmplifyArn:
+    Type: AWS::WAFv2::WebACLAssociation
+    Properties: { ResourceArn: !Sub "arn:${AWS::Partition}:amplify:${AWS::Region}:${AWS::AccountId}:apps/d1", WebACLArn: !GetAtt WebAcl.Arn }
+  AssocAlb: { Type: AWS::WAFv2::WebACLAssociation, Properties: { ResourceArn: arn:aws:elasticloadbalancing:alb, WebACLArn: !GetAtt WebAcl.Arn } }
+  CertExport: { Type: AWS::CertificateManager::Certificate, Properties: { DomainName: example.com, CertificateExport: ENABLED } }
+  Cert: { Type: AWS::CertificateManager::Certificate, Properties: { DomainName: example.com } }

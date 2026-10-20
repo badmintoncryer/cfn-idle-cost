@@ -1,0 +1,39 @@
+us-east-1 · 1 stack · idle ≈ $2903/mo
+
+network                            $2903/mo
+  Firewall           ×2 endpoints   $577  firewall endpoint per AZ
+  Firewall           ×2 endpoints   $555  Advanced Inspection (TLS inspection) per AZ
+  DistVip            ×1             $600  dedicated IP custom SSL certificate
+  FirewallOutside    ×1 endpoints   $288  firewall endpoint per AZ
+  Tgw                ×2 VPCs        $219  encryption support, per attached VPC in this template
+  AssocAdvanced      ×1             $117  DNS Firewall Advanced rule group association
+  SecondaryEndpoint  ×1             $115  secondary firewall endpoint
+  Vpc                ×1             $110  VPC Encryption Controls (monitor mode)
+  TrafficPolicy      ×1              $50  Traffic Flow policy record
+  AttachOther        ×1              $36  Transit Gateway VPC attachment
+  AttachOutside      ×1              $36  Transit Gateway VPC attachment
+  AttachPlain        ×1              $36  Transit Gateway VPC attachment
+  AttachPlain2       ×1              $36  Transit Gateway VPC attachment
+  AttachVpc          ×1              $36  Transit Gateway VPC attachment
+  StreamVpc          ×3 AZ           $22  VPC delivery per AZ
+  AssocAmplify       ×1              $15  Amplify Hosting firewall
+  AssocAmplifyArn    ×1              $15  Amplify Hosting firewall
+  ProxyEndpoint      ×2 AZ           $15  proxy endpoint (interface endpoint per subnet)
+  Anycast            ×3 IPv4         $11  Anycast static IPv4 (IPv6 is free)
+  WebAcl             ×1            $5.00  web ACL
+  WebAcl             ×3 rules      $3.00  rules in rule group RuleGroup
+  WebAcl             ×2 rules      $2.00  rules (managed rule group fees not counted)
+  Metrics            ×8 metrics    $2.40  additional CloudFront metrics
+  CloudMapInstance   ×1            $0.10  Cloud Map registered instance
+  Domains            ×3 domains    $0.00  domains in a custom list
+
+? could not estimate: 4
+  network  AssocOutside  FirewallRuleGroupId does not point to a resource in this template
+  network  CertExport  exportable certificates bill $7 per name / $79 per wildcard at issuance and each renewal
+  network  DomainsFile  the domains come from DomainFileUrl
+  network  ServiceCrossRegion  cross-Region PrivateLink bills per active remote Region
+
+? no rule: 1 (assumed $0 idle; cfn-idle-cost doesn't know whether these cost money)
+  network  RuleGroup  AWS::WAFv2::RuleGroup
+
+prices: test prices · on-demand list prices, 730 h/mo, USD, free tier ignored
