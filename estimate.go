@@ -1159,6 +1159,11 @@ var notCounted = []string{
 	"AWS::EC2::ApplicationStatusCheck", "AWS::NetworkMonitor::Monitor", "AWS::NetworkFlowMonitor::Scope",
 	"AWS::NetworkSecurityManager::Deployment",        // billed per resource or probe outside the template
 	"AWS::EC2::NetworkPerformanceMetricSubscription", // a CloudWatch metric charge whose rate AWS doesn't state
+	"AWS::Macie::Session", "AWS::Macie::Member", "AWS::DevOpsGuru::ResourceCollection", "AWS::AuditManager::Assessment",
+	"AWS::InspectorV2::CisScanConfiguration", "AWS::InspectorV2::CodeSecurityScanConfiguration",
+	"AWS::CodeGuruReviewer::RepositoryAssociation", "AWS::AppFabric::IngestionDestination", // priced by resources, users or code outside the template
+	"AWS::IoTTwinMaker::Entity", "AWS::IoTTwinMaker::SyncJob", // per entity in the account's Standard pricing mode
+	"AWS::DRS::RecoveryPlanExecution", "AWS::SageMaker::PartnerApp", // instances the template does not name
 }
 
 func init() {
@@ -1423,7 +1428,14 @@ func init() {
 					continue // billed per request
 				}
 				t := e.mustStr(v, "InstanceType")
-				e.hourly(e.mustNum(v, "InitialInstanceCount"), "", "sagemaker|"+t, t+" hosting ("+e.str(v, "VariantName", "variant")+")")
+				n, why := e.num(v, "InitialInstanceCount", -1), ""
+				if n < 0 { // inference components with managed instance scaling
+					n, why = e.num(asMap(v["ManagedInstanceScaling"]), "MinInstanceCount", -1), ", MinInstanceCount"
+				}
+				if n < 0 {
+					panic(unresolved("InitialInstanceCount or ManagedInstanceScaling.MinInstanceCount is not set"))
+				}
+				e.hourly(n, "", "sagemaker|"+t, t+" hosting ("+e.str(v, "VariantName", "variant")+why+")")
 			}
 		},
 	}
@@ -1512,6 +1524,12 @@ func dbVCPU(class string) float64 {
 // of the same type share them, so only the first one in the stack is counted.
 func aossCollection(e *est, p map[string]any) {
 	if g := e.str(p, "CollectionGroupName", ""); g != "" {
+		for _, id := range sortedIDs(e.st.Resources) {
+			if r := e.st.Resources[id]; r.Type == "AWS::OpenSearchServerless::CollectionGroup" && e.str(e.props(r), "Name", "") == g {
+				e.add(1, "", 0, "OCUs billed on collection group "+e.st.DisplayPath(id))
+				return
+			}
+		}
 		panic(unresolved("capacity is set by collection group " + g))
 	}
 	typ := e.str(p, "Type", "SEARCH")
@@ -1700,12 +1718,12 @@ func init() {
 			return
 		}
 		in := asMap(p["Instances"])
-		if in["MasterInstanceFleet"] != nil || in["CoreInstanceFleet"] != nil {
-			panic(unresolved("instance fleets are not supported yet"))
-		}
-		e.emrGroup(asMap(in["MasterInstanceGroup"]), "primary")
-		if g := asMap(in["CoreInstanceGroup"]); g != nil {
-			e.emrGroup(g, "core")
+		for _, r := range [][2]string{{"Master", "primary"}, {"Core", "core"}} {
+			if f := asMap(in[r[0]+"InstanceFleet"]); f != nil {
+				e.emrFleet(f, r[1])
+			} else if g := asMap(in[r[0]+"InstanceGroup"]); g != nil || r[0] == "Master" {
+				e.emrGroup(g, r[1])
+			}
 		}
 	}
 	rules["AWS::EMR::InstanceGroupConfig"] = func(e *est, p map[string]any) {

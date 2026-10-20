@@ -1,0 +1,87 @@
+us-east-1 · 1 stack · idle ≈ $15411/mo
+
+data                                      $15411/mo
+  ClassifierEndpoint       ×2 IU           $2628  provisioned inference units
+  DevEndpointWorkers       ×6 DPU          $1927  development endpoint DPUs (NumberOfWorkers × WorkerType)
+  DevEndpoint              ×5 DPU          $1606  development endpoint DPUs (NumberOfNodes)
+  CanvasApp                ×1              $1387  Canvas workspace instance (billed until the app is deleted or logged out)
+  RecognizerEndpoint       ×1 IU           $1314  provisioned inference units
+  EnterpriseIndex          ×1              $1022  Enterprise Edition index
+  FeatureGroup             ×5.37 GB         $914  in-memory online store minimum (5 GiB)
+  Reservation              ×4 DPU           $876  provisioned capacity
+  FleetCluster             ×2               $280  m5.xlarge core instances (Linux)
+  FleetCluster             ×1               $140  m5.xlarge primary instances (Linux)
+  FleetCluster             ×2                $70  EMR fee, core
+  FleetCluster             ×1                $35  EMR fee, primary
+  FleetCluster             ×200 GB gp2       $20  EBS gp2 storage
+  TaskFleet                ×3               $420  m5.xlarge task instances (Linux)
+  TaskFleet                ×3               $105  EMR fee, task
+  Group                    ×2 OCU           $350  indexing minimum OCUs of the group
+  Group                    ×1 OCU           $175  search minimum OCUs of the group
+  ComponentEndpoint        ×2               $168  ml.m5.large hosting (managed, MinInstanceCount)
+  ComponentEndpoint        ×1                $84  ml.m5.large hosting (initial)
+  GenAIIndex               ×1               $234  GenAI Enterprise Edition index
+  Member                   ×1               $219  Hyperledger Fabric member (STARTER edition)
+  QIndex                   ×2 units         $204  Starter index units (user subscriptions not counted)
+  HyperPod                 ×2               $168  ml.m5.large HyperPod instances (workers), InstanceCount
+  HyperPod                 ×200 GB           $28  extra EBS volume per instance (workers)
+  InfluxCluster            ×2 nodes         $175  db.influx.medium primary and read replica (InfluxData read replica license not counted)
+  InfluxCluster            ×200 GB           $20  InfluxIOIncludedT1 storage of each node
+  Scheduler                ×1               $182  scheduled inference (created running)
+  Experiment               ×2               $168  ml.m5.large hosting (shadow variant shadow) while the experiment runs, up to 30 days
+  FinSpace                 ×1               $150  the superuser it creates (other users not counted)
+  Ranking                  ×1               $102  Intelligent Ranking rescore execution plan
+  Ranking                  ×2 units        $5.11  additional rescore capacity
+  KernelApp                ×1                $36  ml.t3.medium KernelGateway app
+  GenAISource1             ×1                $30  connector fee of GenAI Enterprise index GenAIIndex (once per index)
+  Scraper                  ×1                $29  managed collector (samples collected not counted)
+  Node                     ×1                $25  bc.t3.small peer node (storage not counted)
+  InternalAnalyzer         ×2 resources      $18  internal access analysis per monitored resource
+  ManagedEndpoint          ×1                $16  Application Load Balancer of the managed endpoint (the gateway pod's EMR on EKS fee not counted)
+  AssessedApp              ×1                $15  assessed application (assessed by Assessment)
+  DailyApp                 ×1                $15  assessed application (daily assessment)
+  ExternalAssessment       ×1                $15  the application it assesses (not in this template)
+  ProvisionedFeatureGroup  ×100 RCU        $9.49  provisioned read capacity
+  ProvisionedFeatureGroup  ×10 WCU         $4.75  provisioned write capacity
+  Grafana                  ×1              $9.00  Editor license every workspace pays for (active users not counted)
+  Imaging                  ×1              $5.00  data store fee (image storage not counted)
+  Space                    ×20 GB          $2.24  space storage (apps in the space not counted)
+  InactivePipeline         ×1              $1.00  inactive pipeline
+  Classifier               ×1              $0.50  custom model management fee (training not counted)
+  Recognizer               ×1              $0.50  custom model management fee (training not counted)
+  Slo                      ×17520 signals  $0.03  2 Application Signals per 300s SLI period
+  InlineTarget             ×3 tools        $0.00  tools indexed for semantic search
+  Record                   ×1              $0.00  registry record
+  DataMigration            ×0              $0.00  not started by CloudFormation; once started, CDC bills hourly until it is stopped
+  GenAISource2             ×1              $0.00  shares the connector fee of GenAISource1
+  InGroup                  ×1              $0.00  OCUs billed on collection group Group
+  ReplicationConfig        ×0              $0.00  not started by CloudFormation; once started, CDC keeps at least 2 DCU running
+  ServerlessAlwaysOn       ×0              $0.00  not started by CloudFormation; once a job starts it, the pre-initialized capacity bills until it is stopped (auto-stop is off)
+  V2Service                ×0              $0.00  billed monthly after its first failure mode assessment, which is not started by CloudFormation
+
+? could not estimate: 20
+  data  ActivePipeline  an active pipeline bills each activity and precondition by how often it runs (1 pipeline object)
+  data  BrewSchedule  runs its jobs on cron(0 1 * * ? *); node-hours per run are not known
+  data  Campaign  bills 2 minimum TPS (MinProvisionedTPS) at a rate set by the recipe of its solution version
+  data  DefaultTypeApp  ResourceSpec.InstanceType is not set; the domain's default applies
+  data  Flow  runs on rate(5minutes); each run is billed, even when it finds no new data
+  data  GroupNoMin  CapacityLimits.MinIndexingCapacityInOcu is not set; the default minimum is not documented
+  data  ImagePipeline  builds on cron(0 0 * * ? *); build instance time per run is not known
+  data  InvitedMember  joins an existing network, whose edition is not in the template
+  data  ManyTypesFleet  EMR chooses among several InstanceTypeConfigs
+  data  MaybeReservation  depends on Condition IsUnknown
+  data  NoCountEndpoint  InitialInstanceCount or ManagedInstanceScaling.MinInstanceCount is not set
+  data  QuickSetup  enables DevOps Guru, billed per analyzed resource-hour
+  data  RequestSlo  request-based SLOs: the signals they generate are not documented
+  data  S3Target  the tools are not listed inline; semantic search indexes each one
+  data  ScheduledQuery  runs on rate(5 minutes); query TCU time per run is not known
+  data  ScheduledSource  syncs on cron(0 12 * * ? *); sync hours per run are not known
+  data  Session  bills DPU-hours from creation until it times out after 2880 minutes, then stops: a one-off cost
+  data  SpotFleet  Spot capacity in instance fleets is not supported
+  data  SyncTask  runs on rate(1 hour); each Enhanced mode execution is billed
+  data  UnusedAnalyzer  bills each IAM role and user in the account monthly
+
+! not counted yet: 1 (these cost money idle; cfn-idle-cost has no rule for them)
+  data  Macie  AWS::Macie::Session
+
+prices: test prices · on-demand list prices, 730 h/mo, USD, free tier ignored

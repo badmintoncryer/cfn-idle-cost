@@ -201,9 +201,9 @@ and provisioned storage billed whether you use it or not.
 | `AWS::Transfer::Server` | hourly per protocol |
 | `AWS::AppRunner::Service` | memory of the minimum provisioned instances |
 | `AWS::RDS::DBProxy` | per vCPU of the target instances, or per ACU of Serverless v2 targets at their minimum (targets must be in the same template) |
-| `AWS::OpenSearchServerless::Collection` | minimum indexing and search OCUs (1 + 1 with standby replicas, 0.5 + 0.5 without), once per collection type in a stack, since collections share OCUs (assuming they use the same KMS key). Collections in a collection group are not estimated |
+| `AWS::OpenSearchServerless::Collection` | minimum indexing and search OCUs (1 + 1 with standby replicas, 0.5 + 0.5 without), once per collection type in a stack, since collections share OCUs (assuming they use the same KMS key). Collections in a collection group in the same template are billed on the group; in another group, they are not estimated |
 | `AWS::MemoryDB::Cluster` | node hourly × shards × (1 + replicas) (Redis and Valkey) |
-| `AWS::SageMaker::Endpoint` | instance hourly × `InitialInstanceCount` per production variant (serverless variants: $0 idle) |
+| `AWS::SageMaker::Endpoint` | instance hourly × `InitialInstanceCount` per production variant, or × `ManagedInstanceScaling.MinInstanceCount` when it is not set (endpoints that host inference components). Serverless variants: $0 idle |
 | `AWS::CodePipeline::Pipeline` | per active V1 pipeline (V2 pipelines bill per minute: $0 idle) |
 | `AWS::ApiGateway::Stage` | cache cluster hourly by `CacheClusterSize` when `CacheClusterEnabled` |
 | `AWS::DirectoryService::MicrosoftAD` | 2 domain controllers hourly (Standard or Enterprise). Controllers added later are not in the template |
@@ -226,7 +226,7 @@ and provisioned storage billed whether you use it or not.
 | `AWS::VpcLattice::Service` | service hourly (requests and data not counted) |
 | `AWS::DocDBElastic::Cluster` | shard vCPUs × shards × instances per shard |
 | `AWS::Timestream::InfluxDBInstance` | instance hourly (Single-AZ / Multi-AZ) and allocated storage |
-| `AWS::EMR::Cluster`, `AWS::EMR::InstanceGroupConfig` | EC2 hourly (Linux), EMR fee and EBS volumes of on-demand instance groups. Clusters that auto-terminate or end with their steps: $0 idle |
+| `AWS::EMR::Cluster`, `AWS::EMR::InstanceGroupConfig`, `AWS::EMR::InstanceFleetConfig` | EC2 hourly (Linux), EMR fee and EBS volumes of on-demand instance groups, and of instance fleets of one instance type (`TargetOnDemandCapacity` / `WeightedCapacity` instances). Clusters that auto-terminate or end with their steps: $0 idle |
 | `AWS::KinesisAnalyticsV2::Application` | KPUs (parallelism / parallelism per KPU) plus one for orchestration, and 50 GB of running storage per KPU, as if it runs (CloudFormation creates it stopped). Studio notebooks: two extra KPUs and storage for one. SQL applications are not estimated |
 | `AWS::NetworkManager::CoreNetwork` | hourly per edge location in `PolicyDocument`, priced in the stack's region |
 | `AWS::EC2::EC2Fleet`, `AWS::EC2::SpotFleet` | instance hourly (Linux) × on-demand target capacity, and the EBS volumes of its launch template, when the fleet launches one instance type. Spot capacity is not counted |
@@ -296,6 +296,39 @@ and provisioned storage billed whether you use it or not.
 | `AWS::ARCRegionSwitch::Plan` | monthly fee per Region switch plan |
 | `AWS::RefactorSpaces::Environment` | environment hourly, plus a Transit Gateway attachment per VPC of its applications and services in the same template (`NetworkFabricType: TRANSIT_GATEWAY`) |
 | `AWS::RefactorSpaces::Application` | the proxy Network Load Balancer hourly |
+| `AWS::Grafana::Workspace` | one Editor license a month, the minimum every workspace pays (active users not counted) |
+| `AWS::LookoutEquipment::InferenceScheduler` | scheduled inference hourly |
+| `AWS::ManagedBlockchain::Member` | Hyperledger Fabric member hourly, by network edition. A member that joins an existing network is not estimated |
+| `AWS::ManagedBlockchain::Node` | peer node hourly (storage not counted) |
+| `AWS::DataPipeline::Pipeline` | inactive pipeline monthly with `Activate: false`. Active pipelines, billed per activity and precondition by how often they run, are not estimated |
+| `AWS::HealthImaging::Datastore` | data store monthly fee |
+| `AWS::OpenSearchServerless::CollectionGroup` | `MinIndexingCapacityInOcu` and `MinSearchCapacityInOcu` hourly. Not estimated when a minimum is not set |
+| `AWS::Comprehend::DocumentClassifierEndpoint`, `AWS::Comprehend::EntityRecognizerEndpoint` | `DesiredInferenceUnits` × inference unit price |
+| `AWS::Comprehend::DocumentClassifier`, `AWS::Comprehend::EntityRecognizer` | custom model management fee monthly (training not counted) |
+| `AWS::KendraRanking::ExecutionPlan` | base capacity hourly plus `RescoreCapacityUnits` |
+| `AWS::Kendra::DataSource` | on a GenAI Enterprise index in the same template, the connector fee monthly, once per index. On other editions, $0 idle; data sources with a `Schedule` are not estimated |
+| `AWS::Athena::CapacityReservation` | DPU hourly × `TargetDpus` |
+| `AWS::QBusiness::Index` | index unit hourly × units (1 if not set), by `Type` (user subscriptions not counted) |
+| `AWS::APS::Scraper` | collector hourly (samples collected not counted) |
+| `AWS::Glue::DevEndpoint` | DPU hourly × `NumberOfNodes` (5 if not set), or × `NumberOfWorkers` and the DPUs of `WorkerType` |
+| `AWS::EMRServerless::Application` | $0 idle: an application starts with its first job. A $0 line notes pre-initialized capacity with auto-stop turned off |
+| `AWS::EMRContainers::Endpoint` | Application Load Balancer hourly of a Jupyter Enterprise Gateway endpoint (the EMR on EKS fee of the gateway pod not counted) |
+| `AWS::Timestream::InfluxDBCluster` | InfluxDB v2 node hourly × 2 (the primary and one read replica) and their storage (InfluxData read replica license not counted) |
+| `AWS::DMS::ReplicationConfig`, `AWS::DMS::DataMigration`, `AWS::ResilienceHubV2::Service` | $0 idle until started or assessed outside CloudFormation. A $0 line says what bills after that |
+| `AWS::ResilienceHub::App`, `AWS::ResilienceHub::AppAssessment` | application monthly fee once it is assessed: with `AppAssessmentSchedule: Daily`, or by an assessment (counted on the app when the app is in the same template) |
+| `AWS::ApplicationSignals::ServiceLevelObjective` | 2 Application Signals per SLI period (60 seconds if not set). Request-based SLOs are not estimated |
+| `AWS::AgentRegistry::RegistryRecord` | record monthly |
+| `AWS::BedrockAgentCore::GatewayTarget` | semantic search indexing per tool listed inline, when its gateway in the same template has `SearchType: SEMANTIC` |
+| `AWS::FinSpace::Environment` | user monthly for the superuser in `SuperuserParameters` |
+| `AWS::AccessAnalyzer::Analyzer` | internal access: monitored resource monthly × resources listed by ARN. External access: free. Unused access, billed per IAM role and user in the account, is not estimated |
+| `AWS::SSMQuickSetup::ConfigurationManager` | $0 idle unless it turns on DevOps Guru or AWS Config (not estimated) |
+| `AWS::SageMaker::App` | Studio app hourly by `AppType` and instance type (Canvas: workspace hourly; JupyterServer: free) |
+| `AWS::SageMaker::Space` | EBS volume of a JupyterLab or Code Editor space (5 GB if not set) |
+| `AWS::SageMaker::Cluster` | HyperPod instance hourly × `InstanceCount` (`MinInstanceCount` with auto scaling), and extra EBS volumes |
+| `AWS::SageMaker::FeatureGroup` | in-memory online store minimum (5 GiB) hourly, and provisioned read and write capacity |
+| `AWS::SageMaker::InferenceExperiment` | shadow variant hosting hourly while the experiment runs (up to 30 days) |
+| `AWS::AppFlow::Flow`, `AWS::DataBrew::Schedule`, `AWS::DataSync::Task`, `AWS::ImageBuilder::ImagePipeline`, `AWS::Timestream::ScheduledQuery` | $0 idle unless they run on a schedule (see below) |
+| `AWS::Glue::Session`, `AWS::Personalize::Campaign` | not estimated. A session bills once until it times out; the rate of a campaign's minimum TPS depends on its recipe |
 
 Usage-only charges are left out on purpose: S3, Lambda, Aurora storage and
 I/O, CloudWatch Logs, data transfer, requests.
@@ -306,13 +339,16 @@ Common resource types that cost money with zero traffic but have no rule yet,
 such as WorkSpaces, AppStream 2.0, Lightsail and Elastic Beanstalk, are listed
 under `! not counted yet`. So are types whose cost the template can't size:
 account-level services (GuardDuty, Security Hub, Config recorders, CloudWatch
-OTel enrichment, CloudWatch Logs integrations), reservations (RDS, ElastiCache,
+OTel enrichment, CloudWatch Logs integrations, Macie, DevOps Guru, Audit Manager,
+Inspector CIS and code repository scans, CodeGuru Reviewer, AppFabric, IoT
+TwinMaker entities), reservations (RDS, ElastiCache,
 MemoryDB), Bedrock imported models, CloudFront distribution tenants, Route 53
 Resolver on Outposts, ECS gateways (ECS adds load balancers as services
 attach), and monitoring billed per resource or probe outside the template (EC2
 application status checks, Network Synthetic Monitor, Network Flow Monitor
 scopes, Network Security Manager deployments, network performance metric
-subscriptions). Types known to cost nothing idle (IAM, S3, SQS, SNS, CloudWatch Logs,
+subscriptions), Elastic Disaster Recovery plan executions and SageMaker Partner
+AI Apps. Types known to cost nothing idle (IAM, S3, SQS, SNS, CloudWatch Logs,
 Lambda functions, subnets and route tables, configuration-only types, one-off
 jobs billed once on deploy, retired services, and so on) are left out. That list names each type
 (about 1,700, from a check of every CloudFormation type); only `Custom::`
@@ -321,12 +357,15 @@ free still gets a line.
 Every other type with no rule is listed under `? no rule` and assumed $0 idle,
 so a resource that may cost money never disappears without a line.
 Partly supported types (Fargate Spot and other capacity providers, Spot and
-Windows node groups, EMR instance fleets, Aurora Serverless v1, instances in
+Windows node groups, EMR instance fleets with Spot capacity or several instance
+types, Aurora Serverless v1, instances in
 Local Zones, canaries on a cron schedule, Spot-only fleets and fleets of several
 instance types, Batch compute environments with `MinvCpus` above 0, and
 GameLift fleets on Spot or in remote locations, FleetIQ game server groups
 that use Spot, event source mappings with provisioned pollers, and Glue triggers
-and crawlers that run on a schedule or start a streaming job) are listed under
+and crawlers that run on a schedule or start a streaming job, and AppFlow
+flows, DataBrew schedules, Enhanced mode DataSync tasks, Image Builder pipelines
+and Timestream scheduled queries that run on a schedule) are listed under
 `? could not estimate`.
 
 ## Assumptions

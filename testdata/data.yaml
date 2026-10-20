@@ -1,0 +1,330 @@
+Parameters:
+  Env: { Type: String, Default: dev }
+Conditions:
+  IsProd: !Equals [!Ref Env, prod]
+  IsUnknown: !Equals [!Ref AWS::AccountId, "123456789012"]
+Resources:
+  Grafana:
+    Type: AWS::Grafana::Workspace
+    Properties: { AuthenticationProviders: [AWS_SSO], PermissionType: SERVICE_MANAGED, AccountAccessType: CURRENT_ACCOUNT }
+  Scheduler:
+    Type: AWS::LookoutEquipment::InferenceScheduler
+    Properties: { DataInputConfiguration: {}, DataOutputConfiguration: {}, DataUploadFrequency: PT5M, ModelName: m, RoleArn: r }
+  Member:
+    Type: AWS::ManagedBlockchain::Member
+    Properties:
+      MemberConfiguration: { Name: m }
+      NetworkConfiguration:
+        Name: n
+        Framework: HYPERLEDGER_FABRIC
+        FrameworkVersion: "2.2"
+        VotingPolicy: {}
+        NetworkFrameworkConfiguration: { NetworkFabricConfiguration: { Edition: STARTER } }
+  InvitedMember:
+    Type: AWS::ManagedBlockchain::Member
+    Properties: { MemberConfiguration: { Name: m }, NetworkId: n-123, InvitationId: i-123 }
+  Node:
+    Type: AWS::ManagedBlockchain::Node
+    Properties: { NetworkId: n-123, NodeConfiguration: { InstanceType: bc.t3.small, AvailabilityZone: us-east-1a } }
+  Campaign:
+    Type: AWS::Personalize::Campaign
+    Properties: { Name: c, SolutionVersionArn: arn, MinProvisionedTPS: 2 }
+  InactivePipeline:
+    Type: AWS::DataPipeline::Pipeline
+    Properties: { Name: p, Activate: false }
+  ActivePipeline:
+    Type: AWS::DataPipeline::Pipeline
+    Properties: { Name: p, PipelineObjects: [{ Id: Default, Name: Default, Fields: [] }] }
+  Imaging:
+    Type: AWS::HealthImaging::Datastore
+    Properties: {}
+  # A collection in a group in this template is billed on the group.
+  Group:
+    Type: AWS::OpenSearchServerless::CollectionGroup
+    Properties: { Name: g, StandbyReplicas: DISABLED, CapacityLimits: { MinIndexingCapacityInOcu: 2, MinSearchCapacityInOcu: 1 } }
+  GroupNoMin:
+    Type: AWS::OpenSearchServerless::CollectionGroup
+    Properties: { Name: g2, StandbyReplicas: ENABLED }
+  InGroup:
+    Type: AWS::OpenSearchServerless::Collection
+    Properties: { Name: c, CollectionGroupName: g }
+  ClassifierEndpoint:
+    Type: AWS::Comprehend::DocumentClassifierEndpoint
+    Properties: { EndpointName: e, ModelArn: arn, DesiredInferenceUnits: 2 }
+  RecognizerEndpoint:
+    Type: AWS::Comprehend::EntityRecognizerEndpoint
+    Properties: { EndpointName: e, DesiredInferenceUnits: 1 }
+  Classifier:
+    Type: AWS::Comprehend::DocumentClassifier
+    Properties: { DocumentClassifierName: c, LanguageCode: en, DataAccessRoleArn: r, InputDataConfig: {} }
+  Recognizer:
+    Type: AWS::Comprehend::EntityRecognizer
+    Properties: { RecognizerName: r, LanguageCode: en, DataAccessRoleArn: r, InputDataConfig: {} }
+  Ranking:
+    Type: AWS::KendraRanking::ExecutionPlan
+    Properties: { Name: r, CapacityUnits: { RescoreCapacityUnits: 2 } }
+  # Two connectors on one GenAI index pay one fee; a scheduled sync on an
+  # Enterprise index bills its run time.
+  GenAIIndex:
+    Type: AWS::Kendra::Index
+    Properties: { Name: i, Edition: GEN_AI_ENTERPRISE_EDITION, RoleArn: r }
+  GenAISource1:
+    Type: AWS::Kendra::DataSource
+    Properties: { Name: s, IndexId: !Ref GenAIIndex, Type: S3 }
+  GenAISource2:
+    Type: AWS::Kendra::DataSource
+    Properties: { Name: s, IndexId: !GetAtt GenAIIndex.Id, Type: WEBCRAWLER }
+  EnterpriseIndex:
+    Type: AWS::Kendra::Index
+    Properties: { Name: i, Edition: ENTERPRISE_EDITION, RoleArn: r }
+  ScheduledSource:
+    Type: AWS::Kendra::DataSource
+    Properties: { Name: s, IndexId: !Ref EnterpriseIndex, Type: S3, Schedule: "cron(0 12 * * ? *)" }
+  Reservation:
+    Type: AWS::Athena::CapacityReservation
+    Properties: { Name: r, TargetDpus: 4 }
+  QIndex:
+    Type: AWS::QBusiness::Index
+    Properties: { ApplicationId: a, DisplayName: i, Type: STARTER, CapacityConfiguration: { Units: 2 } }
+  Scraper:
+    Type: AWS::APS::Scraper
+    Properties: { Source: {}, Destination: {}, ScrapeConfiguration: {} }
+  DevEndpoint:
+    Type: AWS::Glue::DevEndpoint
+    Properties: { RoleArn: r }
+  DevEndpointWorkers:
+    Type: AWS::Glue::DevEndpoint
+    Properties: { RoleArn: r, WorkerType: G.2X, NumberOfWorkers: 3 }
+  Session:
+    Type: AWS::Glue::Session
+    Properties: { Role: r, Command: { Name: glueetl } }
+  # Instance fleets: a task fleet of one type with weighted capacity, and one of
+  # a transient cluster, shown on the cluster.
+  FleetCluster:
+    Type: AWS::EMR::Cluster
+    Properties:
+      Name: f
+      ReleaseLabel: emr-7.0.0
+      JobFlowRole: r
+      ServiceRole: s
+      Instances:
+        MasterInstanceFleet: { TargetOnDemandCapacity: 1, InstanceTypeConfigs: [{ InstanceType: m5.xlarge }] }
+        CoreInstanceFleet:
+          TargetOnDemandCapacity: 4
+          InstanceTypeConfigs:
+            - InstanceType: m5.xlarge
+              WeightedCapacity: 2
+              EbsConfiguration: { EbsBlockDeviceConfigs: [{ VolumeSpecification: { VolumeType: gp2, SizeInGB: 100 } }] }
+  TaskFleet:
+    Type: AWS::EMR::InstanceFleetConfig
+    Properties: { ClusterId: !Ref FleetCluster, InstanceFleetType: TASK, TargetOnDemandCapacity: 3, InstanceTypeConfigs: [{ InstanceType: m5.xlarge }] }
+  SpotFleet:
+    Type: AWS::EMR::InstanceFleetConfig
+    Properties: { ClusterId: !Ref FleetCluster, InstanceFleetType: TASK, TargetSpotCapacity: 3, InstanceTypeConfigs: [{ InstanceType: m5.xlarge }] }
+  ManyTypesFleet:
+    Type: AWS::EMR::InstanceFleetConfig
+    Properties: { ClusterId: !Ref FleetCluster, InstanceFleetType: TASK, TargetOnDemandCapacity: 3, InstanceTypeConfigs: [{ InstanceType: m5.xlarge }, { InstanceType: m5.2xlarge }] }
+  ServerlessAutoStop:
+    Type: AWS::EMRServerless::Application
+    Properties: { ReleaseLabel: emr-7.0.0, Type: SPARK, InitialCapacity: [{ Key: Driver, Value: { WorkerCount: 1, WorkerConfiguration: { Cpu: 4 vCPU, Memory: 16 GB } } }] }
+  ServerlessAlwaysOn:
+    Type: AWS::EMRServerless::Application
+    Properties:
+      ReleaseLabel: emr-7.0.0
+      Type: SPARK
+      AutoStopConfiguration: { Enabled: false }
+      InitialCapacity: [{ Key: Driver, Value: { WorkerCount: 1, WorkerConfiguration: { Cpu: 4 vCPU, Memory: 16 GB } } }]
+  ManagedEndpoint:
+    Type: AWS::EMRContainers::Endpoint
+    Properties: { Name: e, VirtualClusterId: v, Type: JUPYTER_ENTERPRISE_GATEWAY, ReleaseLabel: emr-6.9.0-latest, ExecutionRoleArn: r }
+  InfluxCluster:
+    Type: AWS::Timestream::InfluxDBCluster
+    Properties: { DbInstanceType: db.influx.medium, AllocatedStorage: 100, DeploymentType: MULTI_NODE_READ_REPLICAS }
+  ReplicationConfig:
+    Type: AWS::DMS::ReplicationConfig
+    Properties: { ReplicationType: cdc, ComputeConfig: { MaxCapacityUnits: 16, MinCapacityUnits: 2 } }
+  FullLoadConfig:
+    Type: AWS::DMS::ReplicationConfig
+    Properties: { ReplicationType: full-load, ComputeConfig: { MaxCapacityUnits: 16 } }
+  DataMigration:
+    Type: AWS::DMS::DataMigration
+    Properties: { DataMigrationType: full-load-and-cdc, MigrationProjectIdentifier: p, ServiceAccessRoleArn: r }
+  # An app is billed once it has been assessed: on a daily schedule, or by an assessment.
+  DailyApp:
+    Type: AWS::ResilienceHub::App
+    Properties: { Name: a, AppTemplateBody: "{}", ResourceMappings: [], AppAssessmentSchedule: Daily }
+  AssessedApp:
+    Type: AWS::ResilienceHub::App
+    Properties: { Name: a, AppTemplateBody: "{}", ResourceMappings: [] }
+  IdleApp:
+    Type: AWS::ResilienceHub::App
+    Properties: { Name: a, AppTemplateBody: "{}", ResourceMappings: [] }
+  Assessment:
+    Type: AWS::ResilienceHub::AppAssessment
+    Properties: { AppArn: !Ref AssessedApp, AssessmentName: x }
+  ExternalAssessment:
+    Type: AWS::ResilienceHub::AppAssessment
+    Properties: { AppArn: "arn:aws:resiliencehub:us-east-1:123456789012:app/x", AssessmentName: x }
+  V2Service:
+    Type: AWS::ResilienceHubV2::Service
+    Properties: { Name: s, Regions: [us-east-1] }
+  Slo:
+    Type: AWS::ApplicationSignals::ServiceLevelObjective
+    Properties: { Name: s, Sli: { SliMetric: { PeriodSeconds: 300 }, MetricThreshold: 1, ComparisonOperator: LessThan } }
+  RequestSlo:
+    Type: AWS::ApplicationSignals::ServiceLevelObjective
+    Properties: { Name: s, RequestBasedSli: { RequestBasedSliMetric: {} } }
+  Record:
+    Type: AWS::AgentRegistry::RegistryRecord
+    Properties: {}
+  SemanticGateway:
+    Type: AWS::BedrockAgentCore::Gateway
+    Properties: { Name: g, ProtocolType: MCP, ProtocolConfiguration: { Mcp: { SearchType: SEMANTIC } }, AuthorizerType: NONE, RoleArn: r }
+  InlineTarget:
+    Type: AWS::BedrockAgentCore::GatewayTarget
+    Properties:
+      GatewayIdentifier: !Ref SemanticGateway
+      TargetConfiguration: { Mcp: { Lambda: { LambdaArn: arn, ToolSchema: { InlinePayload: [{ Name: a }, { Name: b }, { Name: c }] } } } }
+  S3Target:
+    Type: AWS::BedrockAgentCore::GatewayTarget
+    Properties:
+      GatewayIdentifier: !Ref SemanticGateway
+      TargetConfiguration: { Mcp: { OpenApiSchema: { S3: { Uri: s3://b/k } } } }
+  FinSpace:
+    Type: AWS::FinSpace::Environment
+    Properties: { Name: f, SuperuserParameters: { FirstName: a, LastName: b, EmailAddress: c } }
+  ExternalAnalyzer:
+    Type: AWS::AccessAnalyzer::Analyzer
+    Properties: { Type: ACCOUNT }
+  InternalAnalyzer:
+    Type: AWS::AccessAnalyzer::Analyzer
+    Properties:
+      Type: ACCOUNT_INTERNAL_ACCESS
+      AnalyzerConfiguration: { InternalAccessConfiguration: { InternalAccessAnalysisRule: { Inclusions: [{ ResourceArns: [a, b] }] } } }
+  UnusedAnalyzer:
+    Type: AWS::AccessAnalyzer::Analyzer
+    Properties: { Type: ACCOUNT_UNUSED_ACCESS }
+  QuickSetup:
+    Type: AWS::SSMQuickSetup::ConfigurationManager
+    Properties: { ConfigurationDefinitions: [{ Type: AWSQuickSetupType-DevOpsGuru, Parameters: {} }] }
+  QuickSetupFree:
+    Type: AWS::SSMQuickSetup::ConfigurationManager
+    Properties: { ConfigurationDefinitions: [{ Type: AWSQuickSetupType-SSMHostMgmt, Parameters: {} }] }
+  # Schedules
+  Flow:
+    Type: AWS::AppFlow::Flow
+    Properties:
+      FlowName: f
+      Tasks: []
+      SourceFlowConfig: {}
+      DestinationFlowConfigList: []
+      TriggerConfig: { TriggerType: Scheduled, TriggerProperties: { ScheduleExpression: rate(5minutes) } }
+  SuspendedFlow:
+    Type: AWS::AppFlow::Flow
+    Properties:
+      FlowName: f
+      Tasks: []
+      SourceFlowConfig: {}
+      DestinationFlowConfigList: []
+      FlowStatus: Suspended
+      TriggerConfig: { TriggerType: Scheduled, TriggerProperties: { ScheduleExpression: rate(5minutes) } }
+  BrewSchedule:
+    Type: AWS::DataBrew::Schedule
+    Properties: { Name: s, CronExpression: "cron(0 1 * * ? *)", JobNames: [j] }
+  SyncTask:
+    Type: AWS::DataSync::Task
+    Properties: { SourceLocationArn: a, DestinationLocationArn: b, TaskMode: ENHANCED, Schedule: { ScheduleExpression: rate(1 hour) } }
+  BasicSyncTask:
+    Type: AWS::DataSync::Task
+    Properties: { SourceLocationArn: a, DestinationLocationArn: b, Schedule: { ScheduleExpression: rate(1 hour) } }
+  ImagePipeline:
+    Type: AWS::ImageBuilder::ImagePipeline
+    Properties: { Name: p, InfrastructureConfigurationArn: i, Schedule: { ScheduleExpression: "cron(0 0 * * ? *)" } }
+  ScheduledQuery:
+    Type: AWS::Timestream::ScheduledQuery
+    Properties: { QueryString: q, ScheduleConfiguration: { ScheduleExpression: rate(5 minutes) }, NotificationConfiguration: {}, ScheduledQueryExecutionRoleArn: r, ErrorReportConfiguration: {} }
+  # SageMaker
+  KernelApp:
+    Type: AWS::SageMaker::App
+    Properties: { AppName: a, AppType: KernelGateway, DomainId: d, UserProfileName: u, ResourceSpec: { InstanceType: ml.t3.medium } }
+  JupyterApp:
+    Type: AWS::SageMaker::App
+    Properties: { AppName: default, AppType: JupyterServer, DomainId: d, UserProfileName: u }
+  CanvasApp:
+    Type: AWS::SageMaker::App
+    Properties: { AppName: default, AppType: Canvas, DomainId: d, UserProfileName: u }
+  DefaultTypeApp:
+    Type: AWS::SageMaker::App
+    Properties: { AppName: a, AppType: KernelGateway, DomainId: d, UserProfileName: u }
+  Space:
+    Type: AWS::SageMaker::Space
+    Properties: { DomainId: d, SpaceName: s, SpaceSettings: { AppType: JupyterLab, SpaceStorageSettings: { EbsStorageSettings: { EbsVolumeSizeInGb: 20 } } } }
+  HyperPod:
+    Type: AWS::SageMaker::Cluster
+    Properties:
+      InstanceGroups:
+        - InstanceGroupName: workers
+          InstanceType: ml.m5.large
+          InstanceCount: 2
+          ExecutionRole: r
+          LifeCycleConfig: {}
+          InstanceStorageConfigs: [{ EbsVolumeConfig: { VolumeSizeInGB: 100 } }]
+  FeatureGroup:
+    Type: AWS::SageMaker::FeatureGroup
+    Properties:
+      FeatureGroupName: f
+      RecordIdentifierFeatureName: id
+      EventTimeFeatureName: t
+      FeatureDefinitions: []
+      OnlineStoreConfig: { EnableOnlineStore: true, StorageType: InMemory }
+  ProvisionedFeatureGroup:
+    Type: AWS::SageMaker::FeatureGroup
+    Properties:
+      FeatureGroupName: f
+      RecordIdentifierFeatureName: id
+      EventTimeFeatureName: t
+      FeatureDefinitions: []
+      OnlineStoreConfig: { EnableOnlineStore: true }
+      ThroughputConfig: { ThroughputMode: Provisioned, ProvisionedReadCapacityUnits: 100, ProvisionedWriteCapacityUnits: 10 }
+  Experiment:
+    Type: AWS::SageMaker::InferenceExperiment
+    Properties:
+      Name: x
+      Type: ShadowMode
+      RoleArn: r
+      EndpointName: e
+      ModelVariants:
+        - { ModelName: m1, VariantName: prod, InfrastructureConfig: { InfrastructureType: RealTimeInference, RealTimeInferenceConfig: { InstanceType: ml.m5.large, InstanceCount: 1 } } }
+        - { ModelName: m2, VariantName: shadow, InfrastructureConfig: { InfrastructureType: RealTimeInference, RealTimeInferenceConfig: { InstanceType: ml.m5.large, InstanceCount: 2 } } }
+      ShadowModeConfig: { SourceModelVariantName: prod, ShadowModelVariants: [{ ShadowModelVariantName: shadow, SamplingPercentage: 50 }] }
+  # Endpoints that host inference components: InitialInstanceCount, or the
+  # managed scaling minimum when it is not set (0 scales to zero).
+  ComponentConfig:
+    Type: AWS::SageMaker::EndpointConfig
+    Properties:
+      ExecutionRoleArn: r
+      ProductionVariants:
+        - { VariantName: initial, InstanceType: ml.m5.large, InitialInstanceCount: 1, ManagedInstanceScaling: { Status: ENABLED, MinInstanceCount: 0, MaxInstanceCount: 2 } }
+        - { VariantName: managed, InstanceType: ml.m5.large, ManagedInstanceScaling: { Status: ENABLED, MinInstanceCount: 2, MaxInstanceCount: 4 } }
+        - { VariantName: zero, InstanceType: ml.m5.large, ManagedInstanceScaling: { Status: ENABLED, MinInstanceCount: 0, MaxInstanceCount: 4 } }
+  ComponentEndpoint:
+    Type: AWS::SageMaker::Endpoint
+    Properties: { EndpointConfigName: !GetAtt ComponentConfig.EndpointConfigName }
+  NoCountConfig:
+    Type: AWS::SageMaker::EndpointConfig
+    Properties: { ProductionVariants: [{ VariantName: v, InstanceType: ml.m5.large }] }
+  NoCountEndpoint:
+    Type: AWS::SageMaker::Endpoint
+    Properties: { EndpointConfigName: !GetAtt NoCountConfig.EndpointConfigName }
+  # Account-level costs, and a conditional resource.
+  Macie:
+    Type: AWS::Macie::Session
+    Properties: {}
+  ProdOnly:
+    Type: AWS::Athena::CapacityReservation
+    Condition: IsProd
+    Properties: { Name: r, TargetDpus: 4 }
+  MaybeReservation:
+    Type: AWS::Athena::CapacityReservation
+    Condition: IsUnknown
+    Properties: { Name: r, TargetDpus: 4 }
