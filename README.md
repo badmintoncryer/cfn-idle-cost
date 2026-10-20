@@ -329,6 +329,27 @@ and provisioned storage billed whether you use it or not.
 | `AWS::SageMaker::InferenceExperiment` | shadow variant hosting hourly while the experiment runs (up to 30 days) |
 | `AWS::AppFlow::Flow`, `AWS::DataBrew::Schedule`, `AWS::DataSync::Task`, `AWS::ImageBuilder::ImagePipeline`, `AWS::Timestream::ScheduledQuery` | $0 idle unless they run on a schedule (see below) |
 | `AWS::Glue::Session`, `AWS::Personalize::Campaign` | not estimated. A session bills once until it times out; the rate of a campaign's minimum TPS depends on its recipe |
+| `AWS::CodeBuild::Fleet` | reserved capacity × `BaseCapacity`, billed per minute whether builds run or not (`BUILD_GENERAL1_*` sizes; `ATTRIBUTE_BASED_COMPUTE` and `CUSTOM_INSTANCE_TYPE` are not estimated) |
+| `AWS::AppStream::ImageBuilder` | instance hourly, as a Windows image builder (it runs from creation). Linux images are not estimated |
+| `AWS::WorkspacesInstances::WorkspaceInstance` | WorkSpaces Core managed instance hourly at the Linux / BYOL rate, and the EBS volumes in `BlockDeviceMappings` |
+| `AWS::WorkspacesInstances::Volume` | EBS volume, like `AWS::EC2::Volume` |
+| `AWS::Cloud9::EnvironmentEC2` | 10 GiB gp3 root volume, plus instance hourly when `AutomaticStopTimeMinutes` is 0 (never stops). Not estimated when it is not set |
+| `AWS::Deadline::Fleet` | $0 idle for customer-managed fleets and service-managed fleets with `MinWorkerCount: 0`; others are not estimated (Deadline picks the instance type) |
+| `AWS::PCS::Cluster` | Slurm controller hourly by `Size`, plus Slurm accounting hourly when `Accounting.Mode` is `STANDARD` (accounting storage not counted) |
+| `AWS::PCS::ComputeNodeGroup` | `MinInstanceCount` × (EC2 hourly + PCS node management fee, advanced tier for P and Trn instances), for on-demand groups with one instance type |
+| `AWS::EVS::Environment` | EC2 hourly and the EVS fee per host in `Hosts` (VCF licenses and VPC Route Server endpoints not counted) |
+| `AWS::M2::Environment` | Blu Age or Rocket Enterprise Server (`microfocus`) runtime hourly × `HighAvailabilityConfig.DesiredCapacity` (1 if not set) |
+| `AWS::MediaLive::Input` | idle push input hourly (RTP, RTMP and UDP push, MediaConnect, Elemental Link, CDI, SRT listener). Pull inputs: $0. Other types are not estimated |
+| `AWS::MediaLive::Multiplex` | idle multiplex hourly (it is created idle) |
+| `AWS::SSMIncidents::ResponsePlan` | Incident Manager response plan monthly |
+| `AWS::PaymentCryptography::Key` | monthly per active key |
+| `AWS::B2BI::Partnership` | monthly per partnership |
+| `AWS::BillingConductor::BillingGroup` | monthly × `LinkedAccountIds`. Groups with `AutoAssociate` or a billing transfer are not estimated |
+| `AWS::PricingPlanManager::Subscription` | $0 for the Free plan. Paid CloudFront flat-rate plans are not estimated: the fee starts once the subscription is approved, which CloudFormation leaves pending |
+| `AWS::SMSVOICE::PhoneNumber` | monthly lease (built-in list prices; not in the Price List): US 10DLC $1, US toll-free $2, simulator $1, long codes in the 15 countries on the pricing page |
+| `AWS::SMSVOICE::Registration` | $0 idle; 10DLC campaign registrations are not estimated (the monthly fee starts once the campaign is approved) |
+| `AWS::Lightsail::LoadBalancer`, `Disk`, `Container`, `StaticIp` | load balancer hourly, disk GB-month, container service nodes hourly × `Scale` (billed while disabled too), static IP hourly while not attached |
+| `AWS::Lightsail::Bucket`, `Distribution` | monthly bundle by the size in `BundleId` (`small_*`, `medium_*`, `large_*`) |
 
 Usage-only charges are left out on purpose: S3, Lambda, Aurora storage and
 I/O, CloudWatch Logs, data transfer, requests.
@@ -347,8 +368,12 @@ Resolver on Outposts, ECS gateways (ECS adds load balancers as services
 attach), and monitoring billed per resource or probe outside the template (EC2
 application status checks, Network Synthetic Monitor, Network Flow Monitor
 scopes, Network Security Manager deployments, network performance metric
-subscriptions), Elastic Disaster Recovery plan executions and SageMaker Partner
-AI Apps. Types known to cost nothing idle (IAM, S3, SQS, SNS, CloudWatch Logs,
+subscriptions), Elastic Disaster Recovery plan executions, SageMaker Partner
+AI Apps, Oracle Database@AWS, WorkSpaces Pools, Launch Wizard deployments,
+Service Catalog provisioned products, Lambda MicroVM images and Lightsail
+snapshots. MediaConnect flows and router I/O and MediaTailor channels are
+listed there too: CloudFormation creates them stopped, and they are billed once
+started. Types known to cost nothing idle (IAM, S3, SQS, SNS, CloudWatch Logs,
 Lambda functions, subnets and route tables, configuration-only types, one-off
 jobs billed once on deploy, retired services, and so on) are left out. That list names each type
 (about 1,700, from a check of every CloudFormation type); only `Custom::`
@@ -405,7 +430,10 @@ and Timestream scheduled queries that run on a schedule) are listed under
   instances. Functions are found in every input stack of the same region, by
   `Ref` / `Fn::GetAtt`, `Fn::ImportValue` of its export (strong CDK references),
   `Fn::GetStackOutput` (weak CDK references) or its ARN. The
-  `FunctionScalingConfig` of an `AWS::Lambda::Version` is not read.
+  `FunctionScalingConfig` of an `AWS::Lambda::Version` is not read. A function
+  whose capacity provider is in none of the inputs (another app's ARN, for
+  example) is listed under `? could not estimate`, since its instances are
+  billed on that provider.
 - CloudWatch dashboards are not in the Price List, so the $3 list price is
   built in and also used with `--live`.
 - Plain templates have no construct paths, so lines show the logical ID.

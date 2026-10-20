@@ -1164,6 +1164,14 @@ var notCounted = []string{
 	"AWS::CodeGuruReviewer::RepositoryAssociation", "AWS::AppFabric::IngestionDestination", // priced by resources, users or code outside the template
 	"AWS::IoTTwinMaker::Entity", "AWS::IoTTwinMaker::SyncJob", // per entity in the account's Standard pricing mode
 	"AWS::DRS::RecoveryPlanExecution", "AWS::SageMaker::PartnerApp", // instances the template does not name
+	"AWS::MediaConnect::Flow", "AWS::MediaConnect::FlowOutput", "AWS::MediaConnect::RouterInput",
+	"AWS::MediaConnect::RouterOutput", "AWS::MediaTailor::Channel", // created stopped, billed once started
+	"AWS::WorkSpaces::WorkspacesPool", "AWS::LaunchWizard::Deployment",
+	"AWS::ServiceCatalog::CloudFormationProvisionedProduct", // compute type or resources not in the template
+	"AWS::ODB::CloudExadataInfrastructure", "AWS::ODB::CloudVmCluster",
+	"AWS::ODB::CloudAutonomousVmCluster", // Oracle prices, not in the Price List
+	"AWS::Lambda::MicrovmImage", "AWS::Lightsail::InstanceSnapshot",
+	"AWS::Lightsail::DiskSnapshot", "AWS::Lightsail::DatabaseSnapshot", // sized by the data
 }
 
 func init() {
@@ -2104,6 +2112,12 @@ func gameLiftFleet(e *est, p map[string]any) {
 
 func init() {
 	rules["AWS::Lambda::CapacityProvider"] = capacityProvider
+	rules["AWS::Lambda::Function"] = func(e *est, p map[string]any) {
+		arn, ok := asMap(asMap(p["CapacityProviderConfig"])["LambdaManagedInstancesCapacityProviderConfig"])["CapacityProviderArn"]
+		if ok && !e.providerInInputs(arn) {
+			panic(unresolved("its capacity provider is not in the inputs"))
+		}
+	}
 	rules["AWS::Lambda::EventSourceMapping"] = func(e *est, p map[string]any) {
 		if n := e.num(asMap(p["ProvisionedPollerConfig"]), "MinimumPollers", 0); n > 0 {
 			panic(unresolved(fmt.Sprintf("%g provisioned event pollers are not supported yet", n)))
@@ -2173,6 +2187,34 @@ func capacityProvider(e *est, p map[string]any) {
 	}
 	e.hourly(n, "", "ec2|"+t, fmt.Sprintf("%s Lambda Managed Instances%s (minimum; headroom not counted)", t, why))
 	e.hourly(n, "", "lmi|"+t, "Lambda Managed Instances management fee")
+}
+
+// providerInInputs says whether a capacity provider of this region's input
+// stacks is the one a function's CapacityProviderArn names. The functions it
+// serves are billed on the provider; without it they cost nothing visible.
+func (e *est) providerInInputs(arn any) bool {
+	for _, s := range e.all {
+		if s.Region != e.st.Region {
+			continue
+		}
+		pe := &est{st: s, all: e.all, prices: e.prices}
+		for _, id := range sortedIDs(s.Resources) {
+			r := s.Resources[id]
+			if r.Type != "AWS::Lambda::CapacityProvider" {
+				continue
+			}
+			if r.Condition != "" {
+				if on, ok := pe.tryCondition(r.Condition); ok && !on {
+					continue
+				}
+			}
+			pe.r, pe.id = r, id
+			if pe.pointsHere(e.st, arn) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // pointsHere says whether v, read in stack s, names this resource: with Ref or

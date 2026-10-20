@@ -1,0 +1,96 @@
+# Service types from the coverage survey (CodeBuild, AppStream, WorkSpaces,
+# Cloud9, Deadline, PCS, EVS, M2, MediaLive, Lightsail, End User Messaging, ...);
+# priced with servicesPrices in rules_services_test.go.
+Resources:
+  # CodeBuild reserved fleets: 2 × $0.003/min; BaseCapacity 0 is free.
+  Fleet: { Type: AWS::CodeBuild::Fleet, Properties: { BaseCapacity: 2, ComputeType: BUILD_GENERAL1_SMALL, EnvironmentType: LINUX_CONTAINER } }
+  FleetEmpty: { Type: AWS::CodeBuild::Fleet, Properties: { BaseCapacity: 0, ComputeType: BUILD_GENERAL1_SMALL, EnvironmentType: LINUX_CONTAINER } }
+  FleetCustom: { Type: AWS::CodeBuild::Fleet, Properties: { BaseCapacity: 1, ComputeType: CUSTOM_INSTANCE_TYPE, EnvironmentType: LINUX_EC2 } }
+  ImageBuilder: { Type: AWS::AppStream::ImageBuilder, Properties: { Name: ib, InstanceType: stream.standard.medium, ImageName: AppStream-WinServer2022-06-17-2024 } }
+  ImageBuilderLinux: { Type: AWS::AppStream::ImageBuilder, Properties: { Name: ib, InstanceType: stream.standard.medium, ImageName: AppStream-AmazonLinux2-06-17-2024 } }
+  CoreInstance:
+    Type: AWS::WorkspacesInstances::WorkspaceInstance
+    Properties:
+      ManagedInstance:
+        InstanceType: m5.large
+        BlockDeviceMappings: [{ DeviceName: /dev/sda1, Ebs: { VolumeSize: 50, VolumeType: gp3 } }]
+  CoreVolume: { Type: AWS::WorkspacesInstances::Volume, Properties: { AvailabilityZone: us-east-1a, SizeInGB: 100, VolumeType: gp3 } }
+  CoreVolumeSnap: { Type: AWS::WorkspacesInstances::Volume, Properties: { AvailabilityZone: us-east-1a, SnapshotId: snap-1 } }
+  # Cloud9: 0 never stops; 30 stops when idle (root volume only); unset is unknown.
+  Cloud9AlwaysOn: { Type: AWS::Cloud9::EnvironmentEC2, Properties: { InstanceType: t3.small, ImageId: amazonlinux-2023-x86_64, AutomaticStopTimeMinutes: 0 } }
+  Cloud9: { Type: AWS::Cloud9::EnvironmentEC2, Properties: { InstanceType: t3.small, ImageId: amazonlinux-2023-x86_64, AutomaticStopTimeMinutes: 30 } }
+  Cloud9Default: { Type: AWS::Cloud9::EnvironmentEC2, Properties: { InstanceType: t3.small, ImageId: amazonlinux-2023-x86_64 } }
+  DeadlineSmf:
+    Type: AWS::Deadline::Fleet
+    Properties: { DisplayName: f, FarmId: farm-1, RoleArn: arn, MaxWorkerCount: 10, MinWorkerCount: 2, Configuration: { ServiceManagedEc2: { InstanceCapabilities: {}, InstanceMarketOptions: { Type: on-demand } } } }
+  DeadlineCmf:
+    Type: AWS::Deadline::Fleet
+    Properties: { DisplayName: f, FarmId: farm-1, RoleArn: arn, MaxWorkerCount: 10, MinWorkerCount: 2, Configuration: { CustomerManaged: { Mode: NO_SCALING } } }
+  Pcs:
+    Type: AWS::PCS::Cluster
+    Properties: { Size: SMALL, Scheduler: { Type: SLURM, Version: "24.11" }, Networking: { SubnetIds: [subnet-1] }, SlurmConfiguration: { Accounting: { Mode: STANDARD } } }
+  PcsNodes:
+    Type: AWS::PCS::ComputeNodeGroup
+    Properties: { ClusterId: !Ref Pcs, IamInstanceProfileArn: arn, SubnetIds: [subnet-1], InstanceConfigs: [{ InstanceType: c5.large }], ScalingConfiguration: { MinInstanceCount: 2, MaxInstanceCount: 4 } }
+  PcsGpu:
+    Type: AWS::PCS::ComputeNodeGroup
+    Properties: { ClusterId: !Ref Pcs, IamInstanceProfileArn: arn, SubnetIds: [subnet-1], InstanceConfigs: [{ InstanceType: p5.48xlarge }], ScalingConfiguration: { MinInstanceCount: 1, MaxInstanceCount: 1 } }
+  PcsDynamic:
+    Type: AWS::PCS::ComputeNodeGroup
+    Properties: { ClusterId: !Ref Pcs, IamInstanceProfileArn: arn, SubnetIds: [subnet-1], InstanceConfigs: [{ InstanceType: c5.large }], ScalingConfiguration: { MinInstanceCount: 0, MaxInstanceCount: 4 } }
+  PcsSpot:
+    Type: AWS::PCS::ComputeNodeGroup
+    Properties: { ClusterId: !Ref Pcs, IamInstanceProfileArn: arn, SubnetIds: [subnet-1], PurchaseOption: SPOT, InstanceConfigs: [{ InstanceType: c5.large }], ScalingConfiguration: { MinInstanceCount: 1, MaxInstanceCount: 4 } }
+  Evs:
+    Type: AWS::EVS::Environment
+    Properties:
+      VpcId: vpc-1
+      ServiceAccessSubnetId: subnet-1
+      VcfVersion: VCF-5.2.1
+      TermsAccepted: true
+      Hosts:
+        - { HostName: h1, InstanceType: i4i.metal }
+        - { HostName: h2, InstanceType: i4i.metal }
+        - { HostName: h3, InstanceType: i4i.metal }
+        - { HostName: h4, InstanceType: i4i.metal }
+  M2:
+    Type: AWS::M2::Environment
+    Properties: { Name: m2, EngineType: bluage, InstanceType: M2.m5.large, HighAvailabilityConfig: { DesiredCapacity: 2 } }
+  M2Rocket: { Type: AWS::M2::Environment, Properties: { Name: m2, EngineType: microfocus, InstanceType: M2.m5.large } }
+  # MediaLive: push inputs pay an idle fee, pull inputs don't.
+  PushInput: { Type: AWS::MediaLive::Input, Properties: { Type: RTMP_PUSH } }
+  PullInput: { Type: AWS::MediaLive::Input, Properties: { Type: URL_PULL } }
+  OtherInput: { Type: AWS::MediaLive::Input, Properties: { Type: SMPTE_2110_RECEIVER_GROUP } }
+  Multiplex:
+    Type: AWS::MediaLive::Multiplex
+    Properties: { Name: mux, AvailabilityZones: [us-east-1a, us-east-1b], MultiplexSettings: { TransportStreamBitrate: 1000000, TransportStreamId: 1 } }
+  ResponsePlan: { Type: AWS::SSMIncidents::ResponsePlan, Properties: { Name: rp, IncidentTemplate: { Title: t, Impact: 3 } } }
+  PaymentKey: { Type: AWS::PaymentCryptography::Key, Properties: { Exportable: true, KeyAttributes: {} } }
+  Partnership: { Type: AWS::B2BI::Partnership, Properties: { Name: p, Email: a@example.com, ProfileId: p-1, Capabilities: [c-1] } }
+  BillingGroup:
+    Type: AWS::BillingConductor::BillingGroup
+    Properties: { Name: bg, PrimaryAccountId: "111111111111", ComputationPreference: { PricingPlanArn: arn }, AccountGrouping: { LinkedAccountIds: ["111111111111", "222222222222", "333333333333"] } }
+  BillingGroupAuto:
+    Type: AWS::BillingConductor::BillingGroup
+    Properties: { Name: bg, PrimaryAccountId: "111111111111", ComputationPreference: { PricingPlanArn: arn }, AccountGrouping: { LinkedAccountIds: ["111111111111"], AutoAssociate: true } }
+  PlanFree: { Type: AWS::PricingPlanManager::Subscription, Properties: { PlanFamily: CloudFront, PlanTier: FREE, ResourceArns: [arn] } }
+  PlanPro: { Type: AWS::PricingPlanManager::Subscription, Properties: { PlanFamily: CloudFront, PlanTier: PRO, ResourceArns: [arn] } }
+  # End User Messaging: lease prices are hard-coded.
+  TollFree: { Type: AWS::SMSVOICE::PhoneNumber, Properties: { IsoCountryCode: US, NumberType: TOLL_FREE, NumberCapabilities: [SMS], MandatoryKeywords: {} } }
+  LongCodeUk: { Type: AWS::SMSVOICE::PhoneNumber, Properties: { IsoCountryCode: GB, NumberType: LONG_CODE, NumberCapabilities: [SMS], MandatoryKeywords: {} } }
+  LongCodeJp: { Type: AWS::SMSVOICE::PhoneNumber, Properties: { IsoCountryCode: JP, NumberType: LONG_CODE, NumberCapabilities: [VOICE], MandatoryKeywords: {} } }
+  Campaign: { Type: AWS::SMSVOICE::Registration, Properties: { RegistrationType: US_TEN_DLC_CAMPAIGN_REGISTRATION } }
+  Brand: { Type: AWS::SMSVOICE::Registration, Properties: { RegistrationType: US_TEN_DLC_BRAND_REGISTRATION } }
+  # Lightsail
+  LsLb: { Type: AWS::Lightsail::LoadBalancer, Properties: { LoadBalancerName: lb, InstancePort: 80 } }
+  LsDisk: { Type: AWS::Lightsail::Disk, Properties: { DiskName: d, SizeInGb: 32 } }
+  LsIp: { Type: AWS::Lightsail::StaticIp, Properties: { StaticIpName: ip } }
+  LsIpAttached: { Type: AWS::Lightsail::StaticIp, Properties: { StaticIpName: ip, AttachedTo: web } }
+  LsContainer: { Type: AWS::Lightsail::Container, Properties: { ServiceName: c, Power: micro, Scale: 2 } }
+  LsBucket: { Type: AWS::Lightsail::Bucket, Properties: { BucketName: b, BundleId: medium_1_0 } }
+  LsBucketOdd: { Type: AWS::Lightsail::Bucket, Properties: { BucketName: b, BundleId: huge_9_0 } }
+  LsCdn:
+    Type: AWS::Lightsail::Distribution
+    Properties: { DistributionName: d, BundleId: small_1_0, DefaultCacheBehavior: { Behavior: cache }, Origin: { Name: lb, RegionName: us-east-1 } }
+  LsSnapshot: { Type: AWS::Lightsail::DiskSnapshot, Properties: { DiskSnapshotName: s, DiskName: d } }
+  Flow: { Type: AWS::MediaConnect::Flow, Properties: { Name: f, Source: { Name: s } } }
