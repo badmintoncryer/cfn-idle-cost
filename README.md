@@ -378,7 +378,7 @@ DataSync task executions) and types priced outside the template or with no
 published price (DataZone environments and projects, SageMaker inference
 components and monitoring schedules, Timestream tables, QuickSight topics,
 Supply Chain and others). Types known to cost nothing idle (IAM, S3, SQS, SNS, CloudWatch Logs,
-Lambda functions, subnets and route tables, configuration-only types, one-off
+Lambda functions, subnets and route tables, configuration-only types, most one-off
 jobs billed once on deploy, retired services, and so on) are left out. That list names each type
 (about 1,700, from a check of every CloudFormation type); only `Custom::`
 resources are matched by prefix, so a new type in a service that is otherwise
