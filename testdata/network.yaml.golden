@@ -34,7 +34,4 @@ network                            $2903/mo
   network  ServiceCrossRegion  cross-Region PrivateLink bills per active remote Region
   network  VpcMaybe  depends on Condition IsProd
 
-? no rule: 1 (assumed $0 idle; cfn-idle-cost doesn't know whether these cost money)
-  network  RuleGroup  AWS::WAFv2::RuleGroup
-
 prices: test prices · on-demand list prices, 730 h/mo, USD, free tier ignored
