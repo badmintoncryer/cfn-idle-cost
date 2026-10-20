@@ -484,25 +484,10 @@ func init() {
 			}
 		},
 		"AWS::AutoScaling::AutoScalingGroup": func(e *est, p map[string]any) {
-			if _, ok := p["MixedInstancesPolicy"]; ok {
-				panic(unresolved("MixedInstancesPolicy is not supported yet"))
-			}
+			t, bdm, assoc := e.asgLaunch(p)
 			n, why := e.num(p, "DesiredCapacity", -1), "DesiredCapacity"
 			if n < 0 {
 				n, why = e.mustNum(p, "MinSize"), "MinSize"
-			}
-			var t string
-			var bdm, assoc any
-			if lt, ok := p["LaunchTemplate"]; ok {
-				data := e.launchTemplate(asMap(lt))
-				t, bdm = e.mustStr(data, "InstanceType"), data["BlockDeviceMappings"]
-				assoc = firstMap(data["NetworkInterfaces"])["AssociatePublicIpAddress"]
-			} else if _, ok := p["LaunchConfigurationName"]; ok {
-				_, lc := e.ref(p, "LaunchConfigurationName")
-				t, bdm = e.mustStr(lc.Properties, "InstanceType"), lc.Properties["BlockDeviceMappings"]
-				assoc = lc.Properties["AssociatePublicIpAddress"]
-			} else {
-				panic(unresolved("no LaunchTemplate or LaunchConfigurationName"))
 			}
 			e.hourly(n, "", "ec2|"+t, fmt.Sprintf("%s on-demand (Linux), %s", t, why))
 			e.blockDevices(bdm, n)
@@ -1345,6 +1330,9 @@ func init() {
 }
 
 func lambdaProvisioned(e *est, p map[string]any) {
+	if e.r.Type == "AWS::Lambda::Version" {
+		e.snapStartCache(p)
+	}
 	pc := e.num(asMap(p["ProvisionedConcurrencyConfig"]), "ProvisionedConcurrentExecutions", 0)
 	if pc == 0 {
 		return

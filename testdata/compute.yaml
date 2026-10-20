@@ -1,0 +1,105 @@
+# Compute, database and service types that were treated as free; priced with
+# computePrices in rules_compute_test.go.
+Resources:
+  # Limitless: default MinACU 16 for MaxACU <= 400; 20 for 401-500 (5 nodes, 3 of them shards).
+  Limitless: { Type: AWS::RDS::DBShardGroup, Properties: { DBClusterIdentifier: !Ref Aurora, MaxACU: 400 } }
+  LimitlessStandby: { Type: AWS::RDS::DBShardGroup, Properties: { DBClusterIdentifier: !Ref Aurora, MaxACU: 500, ComputeRedundancy: 1 } }
+  LimitlessMin: { Type: AWS::RDS::DBShardGroup, Properties: { DBClusterIdentifier: !Ref Aurora, MaxACU: 768, MinACU: 28 } }
+  Aurora: { Type: AWS::RDS::DBCluster, Properties: { Engine: aurora-postgresql } }
+  AuroraWriter: { Type: AWS::RDS::DBInstance, Properties: { DBClusterIdentifier: !Ref Aurora, DBInstanceClass: db.r6g.large } }
+  Pg: { Type: AWS::RDS::DBInstance, Properties: { Engine: postgres, DBInstanceClass: db.t4g.micro, AllocatedStorage: 20 } }
+  BlueGreen:
+    Type: AWS::RDS::Deployment
+    Properties: { BlueGreenDeploymentName: bg, Source: !GetAtt Pg.DBInstanceArn, TargetDBInstanceClass: db.t4g.small }
+  BlueGreenAurora: { Type: AWS::RDS::Deployment, Properties: { BlueGreenDeploymentName: bg, Source: !GetAtt Aurora.DBClusterArn } }
+  BlueGreenSub: { Type: AWS::RDS::Deployment, Properties: { BlueGreenDeploymentName: bg, Source: !Sub "arn:aws:rds:us-east-1:111111111111:db:x" } }
+  # Warm pools: MaxSize 5 - DesiredCapacity 2 = 3 prepared instances.
+  Lt:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateData:
+        InstanceType: t3.micro
+        BlockDeviceMappings: [{ DeviceName: /dev/xvda, Ebs: { VolumeSize: 20, VolumeType: gp3 } }]
+  LtAmi: { Type: AWS::EC2::LaunchTemplate, Properties: { LaunchTemplateData: { InstanceType: t3.micro } } }
+  Asg:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties: { MinSize: 1, MaxSize: 5, DesiredCapacity: 2, LaunchTemplate: { LaunchTemplateId: !Ref Lt, Version: "1" } }
+  AsgAmi:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties: { MinSize: 1, MaxSize: 5, DesiredCapacity: 2, LaunchTemplate: { LaunchTemplateId: !Ref LtAmi, Version: "1" } }
+  WarmStopped: { Type: AWS::AutoScaling::WarmPool, Properties: { AutoScalingGroupName: !Ref Asg } }
+  WarmRunning: { Type: AWS::AutoScaling::WarmPool, Properties: { AutoScalingGroupName: !Ref Asg, PoolState: Running, MaxGroupPreparedCapacity: 3 } }
+  WarmAmi: { Type: AWS::AutoScaling::WarmPool, Properties: { AutoScalingGroupName: !Ref AsgAmi, PoolState: Hibernated } }
+  WarmMin: { Type: AWS::AutoScaling::WarmPool, Properties: { AutoScalingGroupName: !Ref Asg, MaxGroupPreparedCapacity: 2, MinSize: 1 } }
+  WarmEmpty: { Type: AWS::AutoScaling::WarmPool, Properties: { AutoScalingGroupName: !Ref Asg, MaxGroupPreparedCapacity: 2 } }
+  # GameLift
+  Container: { Type: AWS::GameLift::ContainerFleet, Properties: { FleetRoleArn: arn, InstanceType: c5.large } }
+  ContainerLoc:
+    Type: AWS::GameLift::ContainerFleet
+    Properties: { FleetRoleArn: arn, InstanceType: c5.large, Locations: [{ Location: us-east-1, LocationCapacity: { MinSize: 2, MaxSize: 4 } }] }
+  ContainerZero:
+    Type: AWS::GameLift::ContainerFleet
+    Properties:
+      FleetRoleArn: arn
+      InstanceType: c5.large
+      Locations: [{ Location: us-east-1, LocationCapacity: { MaxSize: 4, ManagedCapacityConfiguration: { ZeroCapacityStrategy: SCALE_TO_AND_FROM_ZERO } } }]
+  ContainerSpot: { Type: AWS::GameLift::ContainerFleet, Properties: { FleetRoleArn: arn, InstanceType: c5.large, BillingType: SPOT } }
+  FleetIQ:
+    Type: AWS::GameLift::GameServerGroup
+    Properties:
+      GameServerGroupName: g
+      RoleArn: arn
+      MinSize: 2
+      MaxSize: 4
+      BalancingStrategy: ON_DEMAND_ONLY
+      InstanceDefinitions: [{ InstanceType: c5.large }, { InstanceType: m5.large }]
+  FleetIQSpot:
+    Type: AWS::GameLift::GameServerGroup
+    Properties: { GameServerGroupName: g, RoleArn: arn, MinSize: 1, InstanceDefinitions: [{ InstanceType: c5.large }, { InstanceType: m5.large }] }
+  FleetIQZero:
+    Type: AWS::GameLift::GameServerGroup
+    Properties: { GameServerGroupName: g, RoleArn: arn, MinSize: 0, InstanceDefinitions: [{ InstanceType: c5.large }, { InstanceType: m5.large }] }
+  # ECS Express Mode: the first one also carries the shared ALB.
+  Express: { Type: AWS::ECS::ExpressGatewayService, Properties: { InfrastructureRoleArn: arn, PrimaryContainer: { Image: nginx } } }
+  ExpressBig:
+    Type: AWS::ECS::ExpressGatewayService
+    Properties:
+      InfrastructureRoleArn: arn
+      Cpu: "2048"
+      Memory: "4096"
+      ScalingTarget: { MinTaskCount: 2 }
+      NetworkConfiguration: { Subnets: [subnet-11111111] }
+  # EKS, FSx, Transfer, AppConfig
+  Argo: { Type: AWS::EKS::Capability, Properties: { ClusterName: c, CapabilityName: a, Type: ARGOCD, RoleArn: arn, DeletePropagationPolicy: RETAIN } }
+  Ack: { Type: AWS::EKS::Capability, Properties: { ClusterName: c, CapabilityName: a, Type: ACK, RoleArn: arn, DeletePropagationPolicy: RETAIN } }
+  Cache:
+    Type: AWS::FSx::FileCache
+    Properties: { FileCacheType: LUSTRE, FileCacheTypeVersion: "2.12", StorageCapacity: 1200, SubnetIds: [subnet-11111111] }
+  WebApp: { Type: AWS::Transfer::WebApp, Properties: { IdentityProviderDetails: {} } }
+  WebApp2: { Type: AWS::Transfer::WebApp, Properties: { IdentityProviderDetails: {}, WebAppUnits: { Provisioned: 2 } } }
+  Experiment: { Type: AWS::AppConfig::ExperimentRun, Properties: { ApplicationIdentifier: a, ExperimentDefinitionIdentifier: e, ExposurePercentage: 10 } }
+  # Glue: only scheduled or streaming work is unresolved.
+  StreamJob: { Type: AWS::Glue::Job, Properties: { Role: r, Command: { Name: gluestreaming } } }
+  BatchJob: { Type: AWS::Glue::Job, Properties: { Role: r, Command: { Name: glueetl } } }
+  TrigScheduled:
+    Type: AWS::Glue::Trigger
+    Properties: { Type: SCHEDULED, Schedule: "cron(0 * * * ? *)", StartOnCreation: true, Actions: [{ JobName: !Ref BatchJob }] }
+  TrigStream: { Type: AWS::Glue::Trigger, Properties: { Type: CONDITIONAL, StartOnCreation: true, Actions: [{ JobName: !Ref StreamJob }] } }
+  TrigStopped: { Type: AWS::Glue::Trigger, Properties: { Type: SCHEDULED, Schedule: "cron(0 * * * ? *)", Actions: [{ JobName: !Ref BatchJob }] } }
+  TrigOnDemand: { Type: AWS::Glue::Trigger, Properties: { Type: ON_DEMAND, Actions: [{ JobName: !Ref StreamJob }] } }
+  Crawler: { Type: AWS::Glue::Crawler, Properties: { Role: r, Targets: {}, Schedule: { ScheduleExpression: "cron(0 1 * * ? *)" } } }
+  CrawlerManual: { Type: AWS::Glue::Crawler, Properties: { Role: r, Targets: {} } }
+  # Budgets: two actions on one budget bill it once.
+  Budget: { Type: AWS::Budgets::Budget, Properties: { Budget: { BudgetType: COST, TimeUnit: MONTHLY } } }
+  Action1: { Type: AWS::Budgets::BudgetsAction, Properties: { BudgetName: !Ref Budget, ActionType: APPLY_IAM_POLICY } }
+  Action2: { Type: AWS::Budgets::BudgetsAction, Properties: { BudgetName: !Ref Budget, ActionType: RUN_SSM_DOCUMENTS } }
+  Action3: { Type: AWS::Budgets::BudgetsAction, Properties: { BudgetName: other, ActionType: APPLY_IAM_POLICY } }
+  LogAlarm: { Type: AWS::CloudWatch::LogAlarm, Properties: { ComparisonOperator: GreaterThanThreshold, Threshold: 1 } }
+  # Lambda SnapStart: Python versions cache a snapshot; Java ones are free.
+  Py:
+    Type: AWS::Lambda::Function
+    Properties: { Runtime: python3.13, MemorySize: 1024, SnapStart: { ApplyOn: PublishedVersions } }
+  Java: { Type: AWS::Lambda::Function, Properties: { Runtime: java21, SnapStart: { ApplyOn: PublishedVersions } } }
+  PyVersion: { Type: AWS::Lambda::Version, Properties: { FunctionName: !Ref Py } }
+  JavaVersion: { Type: AWS::Lambda::Version, Properties: { FunctionName: !Ref Java } }
+  OutsideVersion: { Type: AWS::Lambda::Version, Properties: { FunctionName: my-function } }

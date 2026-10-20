@@ -184,7 +184,7 @@ and provisioned storage billed whether you use it or not.
 | `AWS::NetworkFirewall::Firewall` | endpoint hourly × subnets, plus Advanced Inspection hourly × subnets when its firewall policy (in the same template) has a TLS inspection configuration |
 | `AWS::WAFv2::WebACL` | web ACL, its rules, and the rules of the rule groups in the same template it references (managed rule group fees not counted) |
 | `AWS::CloudWatch::Alarm`, `CompositeAlarm` | per alarm metric (standard or high resolution), per composite alarm |
-| `AWS::Lambda::Alias`, `AWS::Lambda::Version` | provisioned concurrency × function memory (x86 and ARM) |
+| `AWS::Lambda::Alias`, `AWS::Lambda::Version` | provisioned concurrency × function memory (x86 and ARM). Versions: the SnapStart cache per GB of memory, for a non-Java function in the same template |
 | `AWS::Lambda::CapacityProvider` | Lambda Managed Instances: EC2 hourly (Linux) plus the management fee × the instances the functions that use it need at least. See [Assumptions](#assumptions). Needs `AllowedInstanceTypes` with one type |
 | `AWS::CloudWatch::Dashboard` | $3 per dashboard (the list price; dashboards are not in the Price List) |
 | `AWS::EC2::TransitGatewayAttachment`, `TransitGatewayVpcAttachment`, `TransitGatewayPeeringAttachment`, `TransitGatewayConnect` | attachment hourly |
@@ -253,6 +253,19 @@ and provisioned storage billed whether you use it or not.
 | `AWS::CloudFront::AnycastIpList` | hourly × `IpCount` IPv4 addresses (BYOIP lists and IPv6: $0) |
 | `AWS::WAFv2::WebACLAssociation` | Amplify Hosting firewall monthly fee when the resource is an Amplify app |
 | `AWS::CertificateManager::Certificate` | $0 idle, unless `CertificateExport: ENABLED` (billed per name at issuance and renewal, not estimated) |
+| `AWS::RDS::DBShardGroup` | Aurora Limitless minimum capacity (`MinACU`, by default 4 ACU per node of the `MaxACU` size) hourly, plus standby shards for `ComputeRedundancy` |
+| `AWS::RDS::Deployment` | the green copy of a Blue/Green deployment, priced like its `Source` instance or cluster in the same template with the `Target*` settings |
+| `AWS::AutoScaling::WarmPool` | the group's prepared instances (`MaxGroupPreparedCapacity`, by default `MaxSize`, minus `DesiredCapacity`, at least `MinSize`): EBS volumes while stopped or hibernated, instance hourly too while running |
+| `AWS::GameLift::ContainerFleet` | Linux instance hourly × desired instances in the home Region (`MinSize` if not set, 1 with no locations). Scale-to-zero fleets: $0 idle |
+| `AWS::GameLift::GameServerGroup` | `MinSize` × (EC2 hourly + FleetIQ fee) of the first instance type, for `ON_DEMAND_ONLY` groups (Linux assumed) |
+| `AWS::ECS::ExpressGatewayService` | Fargate vCPU and memory (1 vCPU and 2 GB by default) and public IPv4 × `MinTaskCount`, plus the Application Load Balancer Express Mode services share, once per stack |
+| `AWS::EKS::Capability` | hourly fee per Argo CD, ACK or kro capability (managed resources not counted) |
+| `AWS::FSx::FileCache` | storage at $1.33/GB-month (the us-east-1 list price; File Cache is not in the Price List) |
+| `AWS::Transfer::WebApp` | hourly per web app unit (1 if not set) |
+| `AWS::AppConfig::ExperimentRun` | hourly while the experiment runs (creating it starts the run) |
+| `AWS::Budgets::BudgetsAction` | daily fee of an action-enabled budget, once per budget in the stack |
+| `AWS::CloudWatch::LogAlarm` | per alarm, as a standard alarm (scanned log data not counted) |
+| `AWS::Glue::Trigger`, `AWS::Glue::Crawler` | $0 idle unless they run on a schedule or start a streaming job (see below) |
 
 Usage-only charges are left out on purpose: S3, Lambda, Aurora storage and
 I/O, CloudWatch Logs, data transfer, requests.
@@ -275,8 +288,9 @@ Partly supported types (Fargate Spot and other capacity providers, Spot and
 Windows node groups, EMR instance fleets, Aurora Serverless v1, instances in
 Local Zones, canaries on a cron schedule, Spot-only fleets and fleets of several
 instance types, Batch compute environments with `MinvCpus` above 0, and
-GameLift fleets on Spot or in remote locations, and event source mappings with
-provisioned pollers) are listed under
+GameLift fleets on Spot or in remote locations, FleetIQ game server groups
+that use Spot, event source mappings with provisioned pollers, and Glue triggers
+and crawlers that run on a schedule or start a streaming job) are listed under
 `? could not estimate`.
 
 ## Assumptions

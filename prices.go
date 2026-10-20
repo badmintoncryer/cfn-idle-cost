@@ -130,7 +130,7 @@ var selectors = []selector{
 			}
 			return ""
 		}},
-	{name: "rds", service: "AmazonRDS", families: []string{"Database Instance", "Database Storage", "Provisioned IOPS", "Provisioned Throughput", "ServerlessV2"},
+	{name: "rds", service: "AmazonRDS", families: []string{"Database Instance", "Database Storage", "Provisioned IOPS", "Provisioned Throughput", "ServerlessV2", "Limitless"},
 		key: func(a map[string]string, u string) string {
 			if !in(a["engineCode"], rdsEngines...) {
 				return ""
@@ -153,6 +153,8 @@ var selectors = []selector{
 				f["productFamily"], f["instanceType"] = "Database Instance", "db."+t
 			case strings.HasPrefix(u, "Aurora:ServerlessV2"):
 				f["productFamily"] = "ServerlessV2"
+			case strings.Contains(u, "Limitless"):
+				f["productFamily"] = "Limitless"
 			case strings.Contains(u, "Throughput"):
 				f["productFamily"] = "Provisioned Throughput"
 			case strings.Contains(u, "PIOPS") && !strings.Contains(u, "Storage"):
@@ -248,7 +250,8 @@ var selectors = []selector{
 		key: func(a map[string]string, u string) string { return keep(u, "Global-Accelerator-fixed-fee") }},
 	{name: "eks", service: "AmazonEKS", families: []string{"Compute"},
 		key: func(a map[string]string, u string) string {
-			return keep(u, "AmazonEKS-Hours:perCluster", "AmazonEKS-Hours:extendedSupport")
+			return keep(u, "AmazonEKS-Hours:perCluster", "AmazonEKS-Hours:extendedSupport", "AmazonEKSCapabilities-ArgoCD-Hours:perCapability",
+				"AmazonEKSCapabilities-ACK-Hours:perCapability", "AmazonEKSCapabilities-KRO-Hours:perCapability")
 		}},
 	{name: "nfw", service: "AWSNetworkFirewall", families: []string{"AWS Firewall"},
 		key: func(a map[string]string, u string) string {
@@ -262,7 +265,7 @@ var selectors = []selector{
 		}},
 	{name: "lambda", service: "AWSLambda", families: []string{"Serverless"},
 		key: func(a map[string]string, u string) string {
-			return keep(u, "Lambda-Provisioned-Concurrency", "Lambda-Provisioned-Concurrency-ARM")
+			return keep(u, "Lambda-Provisioned-Concurrency", "Lambda-Provisioned-Concurrency-ARM", "Lambda-SnapStart-Cached-GB-S")
 		}},
 	{name: "lmi", service: "AWSLambda", families: []string{"Serverless"},
 		key: func(a map[string]string, u string) string {
@@ -325,7 +328,7 @@ var selectors = []selector{
 			return a["brokerEngine"] + "|" + a["deploymentOption"] + "|" + a["instanceType"]
 		}},
 	{name: "transfer", service: "AWSTransfer", families: []string{"AWS Transfer Family"},
-		key: func(a map[string]string, u string) string { return keep(u, "ProtocolHours") }},
+		key: func(a map[string]string, u string) string { return keep(u, "ProtocolHours", "WebAppHours") }},
 	{name: "codepipeline", service: "AWSCodePipeline", families: []string{"Active Pipeline"},
 		key: func(a map[string]string, u string) string { return keep(u, "activePipeline") }},
 	{name: "apprunner", service: "AWSAppRunner", families: []string{"Compute"},
@@ -364,7 +367,9 @@ var selectors = []selector{
 	{name: "osis", service: "AmazonES", families: []string{"Amazon OpenSearch Service Ingestion"},
 		key: func(a map[string]string, u string) string { return keep(u, "IngestionOCU") }},
 	{name: "ssm", service: "AWSSystemsManager", families: []string{"AWS Systems Manager"},
-		key: func(a map[string]string, u string) string { return keep(u, "PS-Advanced-Param-Tier1") }},
+		key: func(a map[string]string, u string) string {
+			return keep(u, "PS-Advanced-Param-Tier1", "AppConfig-ExperimentHours")
+		}},
 	{name: "mcs", service: "AmazonMCS", families: []string{"Provisioned IOPS"},
 		key: func(a map[string]string, u string) string {
 			return keep(u, "ReadCapacityUnit-Hrs", "WriteCapacityUnit-Hrs")
@@ -434,8 +439,11 @@ var selectors = []selector{
 	{name: "gamelift", service: "AmazonGameLift", families: []string{"GameLift EC2 Instance"},
 		key: func(a map[string]string, u string) string {
 			if os, ok := strings.CutPrefix(a["operation"], "Consume"); ok && strings.HasPrefix(u, "BoxUsage:") {
-				if os, ok := strings.CutSuffix(os, "GameLiftInstance"); ok { // not FleetIQ
+				if os, ok := strings.CutSuffix(os, "GameLiftInstance"); ok {
 					return os + "|" + a["instanceType"]
+				}
+				if os, ok := strings.CutSuffix(os, "FleetIQOnDemand"); ok { // the FleetIQ fee, on top of EC2
+					return os + "FleetIQ|" + a["instanceType"]
 				}
 			}
 			return ""
@@ -444,6 +452,9 @@ var selectors = []selector{
 			_, t, _ := strings.Cut(d, "|")
 			return map[string]string{"instanceType": t}
 		}},
+	// Budgets has one offer, for the "aws-other" location.
+	{name: "budgets", service: "AWSBudgets", global: true, families: []string{"AWS Budgets"},
+		key: func(a map[string]string, u string) string { return keep(u, "ActionEnabledBudgetsUsage") }},
 	{name: "influx", service: "AmazonTimestream", families: []string{"Database Instance", "Influx Optimized Storage"},
 		key: func(a map[string]string, u string) string {
 			if strings.Contains(u, "Db.influx") || strings.Contains(u, "InfluxDBStorage") {
