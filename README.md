@@ -181,8 +181,8 @@ and provisioned storage billed whether you use it or not.
 | `AWS::Route53::HostedZone` | per hosted zone |
 | `AWS::EKS::Cluster` | cluster hourly, plus the extended support fee when `Version` is past the end of standard support on the date of the prices (the snapshot date, or today with `--live`) |
 | `AWS::EKS::Nodegroup` | instance hourly × `DesiredSize` (or `MinSize`), on-demand, one instance type |
-| `AWS::NetworkFirewall::Firewall` | endpoint hourly × subnets |
-| `AWS::WAFv2::WebACL` | web ACL and its rules (managed rule group fees not counted) |
+| `AWS::NetworkFirewall::Firewall` | endpoint hourly × subnets, plus Advanced Inspection hourly × subnets when its firewall policy (in the same template) has a TLS inspection configuration |
+| `AWS::WAFv2::WebACL` | web ACL, its rules, and the rules of the rule groups in the same template it references (managed rule group fees not counted) |
 | `AWS::CloudWatch::Alarm`, `CompositeAlarm` | per alarm metric (standard or high resolution), per composite alarm |
 | `AWS::Lambda::Alias`, `AWS::Lambda::Version` | provisioned concurrency × function memory (x86 and ARM) |
 | `AWS::Lambda::CapacityProvider` | Lambda Managed Instances: EC2 hourly (Linux) plus the management fee × the instances the functions that use it need at least. See [Assumptions](#assumptions). Needs `AllowedInstanceTypes` with one type |
@@ -238,6 +238,21 @@ and provisioned storage billed whether you use it or not.
 | `AWS::NeptuneGraph::Graph` | provisioned m-NCUs hourly × (1 + replicas) |
 | `AWS::GameLift::Fleet` | instance hourly × desired instances (1 if not set) in the home Region, Linux or Windows from the build. Anywhere fleets: $0 idle |
 | `AWS::Batch::ComputeEnvironment` | $0 idle for Fargate, unmanaged and `MinvCpus: 0` environments |
+| `AWS::EC2::VPC` | VPC Encryption Controls hourly when `VpcEncryptionControl.Mode` is set |
+| `AWS::EC2::TransitGateway` | with `EncryptionSupport: enable`, VPC Encryption Controls hourly × the VPCs attached to it in the same template (a VPC with its own encryption controls is counted on the VPC) |
+| `AWS::NetworkFirewall::VpcEndpointAssociation` | secondary endpoint hourly |
+| `AWS::RDS::DBProxyEndpoint` | interface endpoint hourly × subnets |
+| `AWS::EC2::VPCEndpointService` | $0 idle, unless `SupportedRegions` lists another region (cross-Region PrivateLink, not estimated) |
+| `AWS::Route53Resolver::FirewallRuleGroupAssociation` | DNS Firewall Advanced hourly when the rule group (in the same template) has a `DnsThreatProtection` rule |
+| `AWS::Route53Resolver::FirewallDomainList` | monthly × `Domains` (lists imported with `DomainFileUrl` are not estimated) |
+| `AWS::Route53::TrafficPolicyInstance` | monthly per Traffic Flow policy record |
+| `AWS::ServiceDiscovery::Instance` | monthly per Cloud Map registered instance |
+| `AWS::KinesisFirehose::DeliveryStream` | VPC delivery hourly × subnets, for OpenSearch Service, OpenSearch Serverless and Elasticsearch destinations in a VPC |
+| `AWS::CloudFront::Distribution` | dedicated IP custom SSL monthly fee when `SslSupportMethod` is `vip` |
+| `AWS::CloudFront::MonitoringSubscription` | 8 CloudWatch metrics when additional metrics are enabled |
+| `AWS::CloudFront::AnycastIpList` | hourly × `IpCount` IPv4 addresses (BYOIP lists and IPv6: $0) |
+| `AWS::WAFv2::WebACLAssociation` | Amplify Hosting firewall monthly fee when the resource is an Amplify app |
+| `AWS::CertificateManager::Certificate` | $0 idle, unless `CertificateExport: ENABLED` (billed per name at issuance and renewal, not estimated) |
 
 Usage-only charges are left out on purpose: S3, Lambda, Aurora storage and
 I/O, CloudWatch Logs, data transfer, requests.

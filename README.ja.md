@@ -156,8 +156,8 @@ jobs:
 | `AWS::Route53::HostedZone` | ホストゾーンごとの料金 |
 | `AWS::EKS::Cluster` | クラスターの時間料金。`Version`が価格の基準日（同梱のスナップショットの日付、`--live`なら当日）に標準サポートを過ぎていれば、延長サポートの料金も加えます |
 | `AWS::EKS::Nodegroup` | インスタンスの時間料金×`DesiredSize`（なければ`MinSize`）。オンデマンドで、インスタンスタイプが1つの場合 |
-| `AWS::NetworkFirewall::Firewall` | エンドポイントの時間料金×サブネット数 |
-| `AWS::WAFv2::WebACL` | Web ACLとルール（マネージドルールグループの追加料金は含みません） |
+| `AWS::NetworkFirewall::Firewall` | エンドポイントの時間料金×サブネット数。同じテンプレートにあるファイアウォールポリシーがTLSインスペクションの設定を持つときは、Advanced Inspectionの時間料金×サブネット数も加える |
+| `AWS::WAFv2::WebACL` | Web ACLとルール。同じテンプレートのルールグループを参照していれば、そのグループのルールも数える（マネージドルールグループの追加料金は含みません） |
 | `AWS::CloudWatch::Alarm`、`CompositeAlarm` | アラームのメトリクスごとの料金（標準解像度・高解像度）、複合アラームごとの料金 |
 | `AWS::Lambda::Alias`、`AWS::Lambda::Version` | プロビジョニング済み同時実行数×関数のメモリ（x86とARM） |
 | `AWS::Lambda::CapacityProvider` | Lambda Managed Instances。EC2の時間料金（Linux）と管理料金×このプロバイダを使う関数に最低限必要なインスタンス数。[前提](#前提)を参照してください。`AllowedInstanceTypes`でタイプを1つに決めている必要があります |
@@ -213,6 +213,21 @@ jobs:
 | `AWS::NeptuneGraph::Graph` | プロビジョニングしたm-NCUの時間料金×（1＋レプリカ数） |
 | `AWS::GameLift::Fleet` | ホームリージョンのインスタンスの時間料金×希望するインスタンス数（指定がなければ1）。LinuxかWindowsかはビルドから読む。Anywhereフリートはアイドル時$0 |
 | `AWS::Batch::ComputeEnvironment` | Fargate、アンマネージド、`MinvCpus: 0`のコンピューティング環境はアイドル時$0 |
+| `AWS::EC2::VPC` | `VpcEncryptionControl.Mode`を指定したときの、VPC暗号化コントロールの時間料金 |
+| `AWS::EC2::TransitGateway` | `EncryptionSupport: enable`のとき、VPC暗号化コントロールの時間料金×同じテンプレートでアタッチしているVPCの数。暗号化コントロールを自分で設定しているVPCは、VPCの行で数える |
+| `AWS::NetworkFirewall::VpcEndpointAssociation` | セカンダリエンドポイントの時間料金 |
+| `AWS::RDS::DBProxyEndpoint` | インターフェイスエンドポイントの時間料金×サブネット数 |
+| `AWS::EC2::VPCEndpointService` | アイドル時$0。`SupportedRegions`にほかのリージョンがあるとき（クロスリージョンのPrivateLink）は見積もらない |
+| `AWS::Route53Resolver::FirewallRuleGroupAssociation` | 同じテンプレートにあるルールグループが`DnsThreatProtection`のルールを持つときの、DNS Firewall Advancedの時間料金 |
+| `AWS::Route53Resolver::FirewallDomainList` | 月額料金×`Domains`のドメイン数。`DomainFileUrl`で読み込むリストは見積もらない |
+| `AWS::Route53::TrafficPolicyInstance` | トラフィックフローのポリシーレコードごとの月額料金 |
+| `AWS::ServiceDiscovery::Instance` | Cloud Mapに登録したインスタンスごとの月額料金 |
+| `AWS::KinesisFirehose::DeliveryStream` | 宛先がVPC内のOpenSearch Service、OpenSearch Serverless、Elasticsearchのときの、VPC配信の時間料金×サブネット数 |
+| `AWS::CloudFront::Distribution` | `SslSupportMethod`が`vip`のときの、専用IPカスタムSSLの月額料金 |
+| `AWS::CloudFront::MonitoringSubscription` | 追加メトリクスを有効にしたときの、CloudWatchメトリクス8つ分の料金 |
+| `AWS::CloudFront::AnycastIpList` | 時間料金×`IpCount`のIPv4アドレス数（BYOIPのリストとIPv6は$0） |
+| `AWS::WAFv2::WebACLAssociation` | 関連付ける先がAmplifyアプリのときの、Amplify Hostingのファイアウォールの月額料金 |
+| `AWS::CertificateManager::Certificate` | アイドル時$0。`CertificateExport: ENABLED`のときは、発行と更新のたびにドメイン名ごとの料金がかかるので見積もらない |
 
 使った分だけかかる費用は、意図して対象から外しています。S3、Lambda、AuroraのストレージとI/O、CloudWatch Logs、データ転送、リクエスト料金がこれに当たります。
 

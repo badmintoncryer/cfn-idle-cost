@@ -227,7 +227,7 @@ var free = []string{
 	"AWS::Synthetics::Group",
 	"AWS::Transfer::Agreement", "AWS::Transfer::Certificate", "AWS::Transfer::Connector", "AWS::Transfer::HostKey",
 	"AWS::Transfer::Profile", "AWS::Transfer::User", "AWS::Transfer::Workflow",
-	"AWS::WAFv2::IPSet", "AWS::WAFv2::LoggingConfiguration", "AWS::WAFv2::RegexPatternSet",
+	"AWS::WAFv2::IPSet", "AWS::WAFv2::LoggingConfiguration", "AWS::WAFv2::RegexPatternSet", "AWS::WAFv2::RuleGroup",
 	"AWS::XRay::Group", "AWS::XRay::ResourcePolicy", "AWS::XRay::SamplingRule", "AWS::XRay::TransactionSearchConfig",
 }
 

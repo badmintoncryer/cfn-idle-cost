@@ -73,6 +73,12 @@ func byInstanceType(detail string) map[string]string {
 	return map[string]string{"instanceType": detail}
 }
 
+// byUsagetype narrows a --live query of a global offer, whose usagetypes carry
+// no region prefix.
+func byUsagetype(detail string) map[string]string {
+	return map[string]string{"usagetype": detail}
+}
+
 func in(s string, set ...string) bool {
 	for _, x := range set {
 		if s == x {
@@ -108,7 +114,7 @@ var selectors = []selector{
 	{name: "vpc", service: "AmazonVPC",
 		key: func(a map[string]string, u string) string {
 			return keep(u, "PublicIPv4:InUseAddress", "VpcEndpoint-Hours", "VpcEndpoint-GWLBE-Hours", "VPN-Usage-Hours:ipsec.1", "ClientVPN-EndpointHours", "VPCLattice-Service-Hourly",
-				"VerifiedAccess-App-Hours", "VerifiedAccess-non-HTTP-App-Hours")
+				"VerifiedAccess-App-Hours", "VerifiedAccess-non-HTTP-App-Hours", "VPCEncryptionControls-hours")
 		}},
 	{name: "tgw", service: "AmazonVPC",
 		key: func(a map[string]string, u string) string {
@@ -219,8 +225,25 @@ var selectors = []selector{
 	{name: "r53", service: "AmazonRoute53", global: true, families: []string{"DNS Zone"},
 		key: func(a map[string]string, u string) string { return keep(u, "HostedZone") }},
 	// Resolver endpoints are priced per region inside the global Route 53 offer.
-	{name: "resolver", service: "AmazonRoute53", global: true, families: []string{"DNS Query"},
-		key: func(a map[string]string, u string) string { return keep(u, "ResolverNetworkInterface") }},
+	{name: "resolver", service: "AmazonRoute53", global: true, families: []string{"DNS Query", "DNS Domain Names"},
+		key: func(a map[string]string, u string) string {
+			return keep(u, "ResolverNetworkInterface", "AdvancedDNS-ThreatProtectionsVPCAssociationHours", "DNS-FirewallDomainName")
+		}},
+	// Traffic Flow records and the CloudFront fees have no productFamily.
+	{name: "r53tf", service: "AmazonRoute53", global: true,
+		key:        func(a map[string]string, u string) string { return keep(u, "Traffic-Flow-Policy-Records") },
+		liveFilter: byUsagetype},
+	{name: "cf", service: "AmazonCloudFront", global: true,
+		key: func(a map[string]string, u string) string {
+			return keep(u, "SSL-Cert-Custom", "Global-AnycastStaticIP-IPv4")
+		},
+		liveFilter: byUsagetype},
+	{name: "cloudmap", service: "AWSCloudMap", families: []string{"AWS Cloud Map"},
+		key: func(a map[string]string, u string) string { return keep(u, "Cloud-Map-Resources") }},
+	{name: "firehose", service: "AmazonKinesisFirehose", families: []string{"Kinesis Firehose"},
+		key: func(a map[string]string, u string) string { return keep(u, "Firehose-VpcDelivery-Hours") }},
+	{name: "amplify", service: "AWSAmplify", families: []string{"AWS Amplify"},
+		key: func(a map[string]string, u string) string { return keep(u, "AmplifyWAF") }},
 	{name: "ga", service: "AWSGlobalAccelerator", global: true, families: []string{"AWS Global Accelerator"},
 		key: func(a map[string]string, u string) string { return keep(u, "Global-Accelerator-fixed-fee") }},
 	{name: "eks", service: "AmazonEKS", families: []string{"Compute"},
@@ -228,12 +251,14 @@ var selectors = []selector{
 			return keep(u, "AmazonEKS-Hours:perCluster", "AmazonEKS-Hours:extendedSupport")
 		}},
 	{name: "nfw", service: "AWSNetworkFirewall", families: []string{"AWS Firewall"},
-		key: func(a map[string]string, u string) string { return keep(u, "Endpoint-Hour") }},
+		key: func(a map[string]string, u string) string {
+			return keep(u, "Endpoint-Hour", "Secondary-Endpoint-Hour", "Advanced-Inspection-Endpoint-Hour")
+		}},
 	{name: "waf", service: "awswaf", families: []string{"Web Application Firewall"},
 		key: func(a map[string]string, u string) string { return keep(u, "WebACLV2", "RuleV2") }},
-	{name: "cw", service: "AmazonCloudWatch", families: []string{"Alarm", "Canaries", "Contributor Insights"},
+	{name: "cw", service: "AmazonCloudWatch", families: []string{"Alarm", "Canaries", "Contributor Insights", "Metric"},
 		key: func(a map[string]string, u string) string {
-			return keep(u, "CW:AlarmMonitorUsage", "CW:HighResAlarmMonitorUsage", "CW:CompositeAlarmMonitorUsage", "CW:Canary-runs", "CW:ContributorInsightRules")
+			return keep(u, "CW:AlarmMonitorUsage", "CW:HighResAlarmMonitorUsage", "CW:CompositeAlarmMonitorUsage", "CW:Canary-runs", "CW:ContributorInsightRules", "CW:MetricMonitorUsage")
 		}},
 	{name: "lambda", service: "AWSLambda", families: []string{"Serverless"},
 		key: func(a map[string]string, u string) string {

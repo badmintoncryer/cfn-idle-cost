@@ -1193,20 +1193,8 @@ func init() {
 			}
 			e.hourly(n, "", "ec2|"+t, fmt.Sprintf("%s on-demand (Linux), %s", t, why))
 		},
-		"AWS::NetworkFirewall::Firewall": func(e *est, p map[string]any) {
-			n := e.length(p, "SubnetMappings")
-			if n < 0 {
-				n = e.length(p, "AvailabilityZoneMappings")
-			}
-			if n < 0 {
-				panic(unresolved("SubnetMappings is not set"))
-			}
-			e.hourly(float64(n), "endpoints", "nfw|Endpoint-Hour", "firewall endpoint per AZ")
-		},
-		"AWS::WAFv2::WebACL": func(e *est, p map[string]any) {
-			e.monthly(1, "", "waf|WebACLV2", "web ACL")
-			e.monthly(float64(max(0, e.length(p, "Rules"))), "rules", "waf|RuleV2", "rules (managed rule group fees not counted)")
-		},
+		"AWS::NetworkFirewall::Firewall": networkFirewall,
+		"AWS::WAFv2::WebACL":             webACL,
 		"AWS::CloudWatch::Alarm": func(e *est, p map[string]any) {
 			n, high := 1.0, e.num(p, "Period", 60) < 60
 			if l, ok := p["Metrics"].([]any); ok {
