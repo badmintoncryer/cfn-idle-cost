@@ -373,7 +373,11 @@ AI Apps, Oracle Database@AWS, WorkSpaces Pools, Launch Wizard deployments,
 Service Catalog provisioned products, Lambda MicroVM images and Lightsail
 snapshots. MediaConnect flows and router I/O and MediaTailor channels are
 listed there too: CloudFormation creates them stopped, and they are billed once
-started. Types known to cost nothing idle (IAM, S3, SQS, SNS, CloudWatch Logs,
+started. So are jobs charged once at creation (Security Agent pentest jobs,
+DataSync task executions) and types priced outside the template or with no
+published price (DataZone environments and projects, SageMaker inference
+components and monitoring schedules, Timestream tables, QuickSight topics,
+Supply Chain and others). Types known to cost nothing idle (IAM, S3, SQS, SNS, CloudWatch Logs,
 Lambda functions, subnets and route tables, configuration-only types, one-off
 jobs billed once on deploy, retired services, and so on) are left out. That list names each type
 (about 1,700, from a check of every CloudFormation type); only `Custom::`

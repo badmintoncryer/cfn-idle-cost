@@ -81,7 +81,7 @@ data                                      $15411/mo
   data  SyncTask  runs on rate(1 hour); each Enhanced mode execution is billed
   data  UnusedAnalyzer  bills each IAM role and user in the account monthly
 
-! not counted yet: 1 (these cost money idle; cfn-idle-cost has no rule for them)
+! not counted yet: 1 (these may cost money idle; cfn-idle-cost has no rule for them)
   data  Macie  AWS::Macie::Session
 
 prices: test prices · on-demand list prices, 730 h/mo, USD, free tier ignored
