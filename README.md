@@ -362,8 +362,7 @@ under `! not counted yet`. So are types whose cost the template can't size:
 account-level services (GuardDuty, Security Hub, Config recorders, CloudWatch
 OTel enrichment, CloudWatch Logs integrations, Macie, DevOps Guru, Audit Manager,
 Inspector CIS and code repository scans, CodeGuru Reviewer, AppFabric, IoT
-TwinMaker entities), reservations (RDS, ElastiCache,
-MemoryDB), Bedrock imported models, CloudFront distribution tenants, Route 53
+TwinMaker entities), Bedrock imported models, CloudFront distribution tenants, Route 53
 Resolver on Outposts, ECS gateways (ECS adds load balancers as services
 attach), and monitoring billed per resource or probe outside the template (EC2
 application status checks, Network Synthetic Monitor, Network Flow Monitor

@@ -1178,7 +1178,6 @@ var notCounted = []string{
 	"AWS::Route53Resolver::OutpostResolver", // priced per model copy, plan or Outpost
 	"AWS::CloudWatch::OTelEnrichment", "AWS::GuardDuty::Detector", "AWS::SecurityHub::Hub", "AWS::SecurityHub::HubV2",
 	"AWS::Config::ConfigurationRecorder", "AWS::Logs::Integration", // priced by the rest of the account
-	"AWS::RDS::ReservedDBInstance", "AWS::ElastiCache::ReservedCacheNode", "AWS::MemoryDB::ReservedNode", // a commitment
 	"AWS::ECS::Gateway", // ECS adds ALBs as services attach; the count isn't in the template
 	"AWS::EC2::ApplicationStatusCheck", "AWS::NetworkMonitor::Monitor", "AWS::NetworkFlowMonitor::Scope",
 	"AWS::NetworkSecurityManager::Deployment",        // billed per resource or probe outside the template

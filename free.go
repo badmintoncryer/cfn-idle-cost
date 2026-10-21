@@ -711,6 +711,10 @@ var free = []string{
 	"AWS::SageMaker::ReservedCapacity", "AWS::MediaLive::Reservation", "AWS::Panorama::Package",
 	"AWS::Panorama::PackageVersion", "AWS::Panorama::ApplicationInstance", "AWS::OpsWorks::Instance",
 	"AWS::SimSpaceWeaver::Simulation",
+	// Commitments a template can't buy today: only in the legacy resource spec, not in the current schema.
+	"AWS::SavingsPlans::SavingsPlan", "AWS::EC2::ReservedInstances", "AWS::EC2::HostReservation",
+	"AWS::EKS::EksAnywhereSubscription", "AWS::RDS::ReservedDBInstance", "AWS::ElastiCache::ReservedCacheNode",
+	"AWS::MemoryDB::ReservedNode",
 	// Billed per user, task-hour or use, cents a month at most, or ended on idle timeout; a Route 53
 	// profile's fee is counted on its ProfileAssociation.
 	"AWS::SupportAuthZ::SupportPermit", "AWS::IoTSiteWise::Pipeline", "AWS::IoTSiteWise::Task",
