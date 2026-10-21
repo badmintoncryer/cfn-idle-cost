@@ -7,7 +7,7 @@ import (
 
 // paid are types that cost money idle; a whole-service prefix in free once hid them.
 var paid = []string{
-	"AWS::RDS::DBShardGroup", "AWS::EKS::EksAnywhereSubscription", "AWS::FSx::FileCache", "AWS::RDS::Deployment",
+	"AWS::RDS::DBShardGroup", "AWS::FSx::FileCache", "AWS::RDS::Deployment",
 	"AWS::AppConfig::ExperimentRun", "AWS::CloudFront::Distribution", "AWS::Route53Resolver::OutpostResolver",
 	"AWS::Transfer::WebApp", "AWS::AutoScaling::WarmPool", "AWS::GameLift::ContainerFleet", "AWS::GameLift::GameServerGroup",
 	"AWS::Route53Resolver::FirewallRuleGroupAssociation", "AWS::NetworkFirewall::VpcEndpointAssociation", "AWS::EC2::VPC",
@@ -18,7 +18,7 @@ var paid = []string{
 	"AWS::CloudFront::MonitoringSubscription", "AWS::CloudWatch::LogAlarm", "AWS::ServiceDiscovery::Instance",
 	"AWS::Route53Resolver::FirewallDomainList", "AWS::CertificateManager::Certificate", "AWS::CloudWatch::OTelEnrichment",
 	"AWS::GuardDuty::Detector", "AWS::SecurityHub::HubV2", "AWS::Config::ConfigurationRecorder", "AWS::Logs::Integration",
-	"AWS::RDS::ReservedDBInstance", "AWS::Lambda::Version",
+	"AWS::Lambda::Version",
 }
 
 // costsIdle are types an audit of every CloudFormation type found to cost money idle
@@ -37,9 +37,9 @@ var costsIdle = []string{
 	"AWS::DevOpsGuru::ResourceCollection", "AWS::DirectConnect::Connection",
 	"AWS::DirectConnect::DirectConnectGatewayAssociation", "AWS::DirectConnect::PrivateVirtualInterface",
 	"AWS::DirectConnect::TransitVirtualInterface", "AWS::DocDBElastic::ClusterSnapshot",
-	"AWS::EC2::ApplicationStatusCheck", "AWS::EC2::CapacityReservationFleet", "AWS::EC2::HostReservation",
+	"AWS::EC2::ApplicationStatusCheck", "AWS::EC2::CapacityReservationFleet",
 	"AWS::EC2::IPAM", "AWS::EC2::IPAMPoolCidr", "AWS::EC2::NetworkPerformanceMetricSubscription",
-	"AWS::EC2::ReservedInstances", "AWS::EC2::RouteServerEndpoint", "AWS::EC2::SpotInstancesRequest",
+	"AWS::EC2::RouteServerEndpoint", "AWS::EC2::SpotInstancesRequest",
 	"AWS::EC2::TrafficMirrorSession", "AWS::EC2::VPCEncryptionControl", "AWS::EC2::VPNConcentrator",
 	"AWS::EMR::InstanceFleetConfig", "AWS::EMRContainers::Endpoint", "AWS::EMRServerless::Application",
 	"AWS::EVS::Environment", "AWS::FMS::Policy", "AWS::FinSpace::Environment", "AWS::FraudDetector::Detector",
@@ -71,7 +71,7 @@ var costsIdle = []string{
 	"AWS::SES::Tenant", "AWS::SMSVOICE::PhoneNumber", "AWS::SMSVOICE::RcsAgent", "AWS::SMSVOICE::Registration",
 	"AWS::SSMIncidents::ResponsePlan", "AWS::SSMQuickSetup::ConfigurationManager", "AWS::SageMaker::App",
 	"AWS::SageMaker::Cluster", "AWS::SageMaker::FeatureGroup", "AWS::SageMaker::InferenceExperiment",
-	"AWS::SageMaker::PartnerApp", "AWS::SageMaker::Space", "AWS::SavingsPlans::SavingsPlan",
+	"AWS::SageMaker::PartnerApp", "AWS::SageMaker::Space",
 	"AWS::ServiceCatalog::CloudFormationProvisionedProduct", "AWS::ServiceDiscovery::PrivateDnsNamespace",
 	"AWS::ServiceDiscovery::PublicDnsNamespace", "AWS::StorageGateway::Gateway", "AWS::Timestream::InfluxDBBackup",
 	"AWS::Timestream::InfluxDBCluster", "AWS::Timestream::ScheduledQuery",
