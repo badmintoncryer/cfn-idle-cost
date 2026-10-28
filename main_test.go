@@ -32,7 +32,7 @@ var testPrices = &Prices{Source: "test prices", AsOf: "2026-10-16", Regions: map
 		"kinesis|Storage-ShardHour":         0.0195,
 	},
 	"eu-west-1": {
-		"rdsproxy|RDS:ProxyUsage": 0.015, "rdsproxy|RDS:Proxy-ASv2-Usage": 0.015, "rds|InstanceUsage:db.r6g.large|16": 0.276,
+		"rdsproxy|RDS:ProxyUsage": 0.015, "rdsproxy|RDS:Proxy-ASv2-Usage": 0.015, "rds|InstanceUsage:db.r6g.large|16": 0.276, "rds|InstanceUsage:db.t2.small|2": 0.036, "rds|RDS:GP3-Storage|2": 0.127,
 		"rds|Aurora:ServerlessV2Usage|16": 0.13, "aoss|IndexingOCU": 0.24, "aoss|SearchOCU": 0.24,
 		"memorydb|Redis|db.t4g.small": 0.048, "sagemaker|ml.m5.large": 0.128,
 		"eks|AmazonEKS-Hours:perCluster": 0.1, "ec2|t3.medium": 0.0456, "nfw|Endpoint-Hour": 0.395,

@@ -890,7 +890,7 @@ func rdsCluster(e *est, p map[string]any) {
 	engine := strings.ToLower(e.str(p, "Engine", "aurora"))
 	if strings.HasPrefix(engine, "aurora") {
 		if e.str(p, "EngineMode", "provisioned") == "serverless" {
-			panic(unresolved("Aurora Serverless v1 is not supported")) // billed per ACU on the cluster, not its instances
+			panic(unresolved("Aurora Serverless v1 reached end of support on 2025-03-31 and can no longer be created; use Serverless v2"))
 		}
 		return
 	}
@@ -1112,22 +1112,18 @@ func globalTable(e *est, p map[string]any) {
 
 func ecsService(e *est, p map[string]any) {
 	lt := e.str(p, "LaunchType", "")
+	n := e.num(p, "DesiredCount", 1)
+	tasks := count(n, "task")
 	if lt == "" {
-		// Only an all-FARGATE strategy is priced: splitting tasks by base and
-		// weight across Spot or other providers is not supported.
 		cps, _ := p["CapacityProviderStrategy"].([]any)
-		for _, c := range cps {
-			switch cp := e.str(asMap(c), "CapacityProvider", ""); cp {
-			case "FARGATE":
-				lt = cp
-			case "FARGATE_SPOT":
-				panic(unresolved("Fargate Spot is not supported"))
-			default:
-				panic(unresolved("capacity provider " + cp + " is not supported"))
-			}
-		}
-		if lt == "" {
+		if len(cps) == 0 {
 			panic(unresolved("LaunchType is not set (cluster default capacity provider)"))
+		}
+		lt = "FARGATE"
+		n, tasks = e.fargateShare(cps, n)
+		if n == 0 {
+			e.add(1, "", 0, "no tasks on FARGATE ("+tasks+")")
+			return
 		}
 	}
 	switch lt {
@@ -1136,7 +1132,6 @@ func ecsService(e *est, p map[string]any) {
 	case "FARGATE_SPOT":
 		panic(unresolved("Fargate Spot is not supported"))
 	}
-	n := e.num(p, "DesiredCount", 1)
 	_, td := e.ref(p, "TaskDefinition")
 	tp := td.Properties
 	plat := asMap(tp["RuntimePlatform"])
@@ -1153,18 +1148,58 @@ func ecsService(e *est, p map[string]any) {
 	}
 	vcpu := e.mustNum(tp, "Cpu") / 1024
 	gb := e.mustNum(tp, "Memory") / 1024
-	e.hourly(n*vcpu, "vCPU", "fargate|Fargate-"+pre+"vCPU-Hours:perCPU", "Fargate vCPU ("+count(n, "task")+")")
+	e.hourly(n*vcpu, "vCPU", "fargate|Fargate-"+pre+"vCPU-Hours:perCPU", "Fargate vCPU ("+tasks+")")
 	if pre == "Windows-" {
-		e.hourly(n*vcpu, "vCPU", "fargate|Fargate-Windows-OS-Hours:perCPU", "Fargate Windows OS license ("+count(n, "task")+")")
+		e.hourly(n*vcpu, "vCPU", "fargate|Fargate-Windows-OS-Hours:perCPU", "Fargate Windows OS license ("+tasks+")")
 	}
-	e.hourly(n*gb, "GB", "fargate|Fargate-"+pre+"GB-Hours", "Fargate memory ("+count(n, "task")+")")
+	e.hourly(n*gb, "GB", "fargate|Fargate-"+pre+"GB-Hours", "Fargate memory ("+tasks+")")
 	if es := e.num(asMap(tp["EphemeralStorage"]), "SizeInGiB", 20); es > 20 && pre != "Windows-" {
 		e.hourly(n*(es-20), "GB", "fargate|Fargate-EphemeralStorage-GB-Hours", "Fargate ephemeral storage above 20 GB")
 	}
 	vpc := asMap(asMap(p["NetworkConfiguration"])["AwsvpcConfiguration"])
 	if e.maybe(func() bool { return e.str(vpc, "AssignPublicIp", "DISABLED") == "ENABLED" }) {
-		e.hourly(n, "IPv4", "vpc|PublicIPv4:InUseAddress", "public IPv4 per task ("+count(n, "task")+")")
+		e.hourly(n, "IPv4", "vpc|PublicIPv4:InUseAddress", "public IPv4 per task ("+tasks+")")
 	}
+}
+
+// fargateShare splits DesiredCount over a capacity provider strategy: the
+// provider with a Base runs that many tasks first, and the rest are split by
+// Weight. Only the FARGATE share is priced: Fargate Spot has no fixed price,
+// and other providers run on Auto Scaling groups counted on their own.
+// ponytail: ECS doesn't document how it rounds a split, so a fractional
+// share is rounded up.
+func (e *est) fargateShare(cps []any, n float64) (float64, string) {
+	var base, weight, bases, weights float64
+	var others []string
+	for _, c := range cps {
+		m := asMap(c)
+		b, w := e.num(m, "Base", 0), e.num(m, "Weight", 0)
+		bases, weights = bases+b, weights+w
+		if cp := e.str(m, "CapacityProvider", ""); cp == "FARGATE" {
+			base, weight = b, w
+		} else if w > 0 || b > 0 {
+			others = append(others, cp)
+		}
+	}
+	if len(others) == 0 {
+		return n, count(n, "task")
+	}
+	rest := max(0, n-bases)
+	if rest > 0 && weights == 0 {
+		panic(unresolved("no capacity provider has a Weight"))
+	}
+	share := min(n, base)
+	if rest > 0 {
+		share += rest * weight / weights
+	}
+	if share == 0 {
+		return 0, count(n, "task") + "; " + strings.Join(others, ", ") + " not counted here"
+	}
+	label := fmt.Sprintf("%g of %s on FARGATE", math.Ceil(share), count(n, "task"))
+	if share != math.Ceil(share) {
+		label += ", rounded up"
+	}
+	return math.Ceil(share), label + "; " + strings.Join(others, ", ") + " not counted here"
 }
 
 // notCounted are types that may cost money with zero traffic but have no rule yet.
@@ -1483,8 +1518,8 @@ func init() {
 	}
 }
 
-// rdsProxy bills per vCPU of the provisioned instances behind the proxy, or
-// per ACU of the Serverless v2 ones (their minimum, idle).
+// rdsProxy bills per vCPU of the provisioned instances behind the proxy (at
+// least 2 each), or per ACU of the Serverless v2 ones (their minimum, idle).
 func rdsProxy(e *est, p map[string]any) {
 	var vcpu, acu float64
 	found := false
@@ -1520,7 +1555,7 @@ func rdsProxy(e *est, p map[string]any) {
 					ip := e.props(inst)
 					class := e.mustStr(ip, "DBInstanceClass")
 					if class != "db.serverless" {
-						vcpu += dbVCPU(class)
+						vcpu += max(2, dbVCPU(class)) // billed for at least 2 vCPUs per instance
 						continue
 					}
 					if cluster == nil {
@@ -1559,8 +1594,10 @@ func dbVCPU(class string) float64 {
 	panic(unresolved("vCPU count of " + class + " is not known"))
 }
 
-// aossCollection bills the minimum OCUs of a Classic collection. Collections
-// of the same type share them, so only the first one in the stack is counted.
+// aossCollection bills the minimum OCUs of a Classic collection. Outside a
+// collection group, collections share OCUs when they use the same KMS key,
+// and vector search collections don't share with search and time series
+// ones, so only the first collection of each kind and key is counted.
 func aossCollection(e *est, p map[string]any) {
 	if g := e.str(p, "CollectionGroupName", ""); g != "" {
 		for _, id := range sortedIDs(e.st.Resources) {
@@ -1571,13 +1608,13 @@ func aossCollection(e *est, p map[string]any) {
 		}
 		panic(unresolved("capacity is set by collection group " + g))
 	}
-	typ := e.str(p, "Type", "SEARCH")
+	key := e.aossShare(p)
 	for _, id := range sortedIDs(e.st.Resources) {
 		r := e.st.Resources[id]
 		if id == e.id {
 			break
 		}
-		if r.Type == e.r.Type && r.Properties["CollectionGroupName"] == nil && e.str(e.props(r), "Type", "SEARCH") == typ {
+		if r.Type == e.r.Type && r.Properties["CollectionGroupName"] == nil && e.maybe(func() bool { return e.aossShare(e.props(r)) == key }) {
 			e.add(1, "", 0, "shares the OCUs of "+e.st.DisplayPath(id))
 			return
 		}
@@ -1588,6 +1625,57 @@ func aossCollection(e *est, p map[string]any) {
 	}
 	e.hourly(ocu, "OCU", "aoss|IndexingOCU", "indexing "+why)
 	e.hourly(ocu, "OCU", "aoss|SearchOCU", "search "+why)
+}
+
+// aossShare names the OCUs a collection outside a group runs on: vector
+// search or not, and its KMS key. The key comes from the collection, or from
+// an encryption SecurityPolicy in the template whose rules match its name;
+// a collection with neither is taken to use the AWS owned key.
+func (e *est) aossShare(p map[string]any) string {
+	kind := "search"
+	if e.str(p, "Type", "SEARCH") == "VECTORSEARCH" {
+		kind = "vector"
+	}
+	ec := asMap(p["EncryptionConfig"])
+	switch {
+	case ec["KmsKeyArn"] != nil:
+		return kind + " " + fmt.Sprint(ec["KmsKeyArn"])
+	case p["KmsKeyArn"] != nil:
+		return kind + " " + fmt.Sprint(p["KmsKeyArn"])
+	case ec["AWSOwnedKey"] != nil:
+		return kind
+	}
+	name := e.str(p, "Name", "")
+	for _, id := range sortedIDs(e.st.Resources) {
+		r := e.st.Resources[id]
+		if r.Type != "AWS::OpenSearchServerless::SecurityPolicy" || !e.maybe(func() bool { return e.str(e.props(r), "Type", "") == "encryption" }) {
+			continue
+		}
+		var pol struct {
+			Rules []struct {
+				ResourceType string
+				Resource     []string
+			}
+			AWSOwnedKey bool
+			KmsARN      string
+		}
+		doc, ok := r.Properties["Policy"].(string)
+		if !ok || json.Unmarshal([]byte(doc), &pol) != nil {
+			panic(unresolved("encryption policy " + e.st.DisplayPath(id) + " is not a JSON string"))
+		}
+		for _, rule := range pol.Rules {
+			for _, res := range rule.Resource {
+				pat := strings.TrimPrefix(res, "collection/")
+				if strings.EqualFold(rule.ResourceType, "collection") && (pat == name || strings.HasSuffix(pat, "*") && strings.HasPrefix(name, strings.TrimSuffix(pat, "*"))) {
+					if pol.AWSOwnedKey || pol.KmsARN == "" {
+						return kind
+					}
+					return kind + " " + pol.KmsARN
+				}
+			}
+		}
+	}
+	return kind
 }
 
 func init() {
