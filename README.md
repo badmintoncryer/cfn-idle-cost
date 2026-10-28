@@ -70,6 +70,7 @@ nested stacks) or CloudFormation templates (JSON or YAML).
 | `--max-increase <usd>` | With `--base`: exit `3` if the idle cost grows by more than `usd` per month. |
 | `--region <r>` | Region for stacks that have none: env-agnostic CDK stacks and plain templates. Stacks with an `env` keep their own region. Without it, such stacks are an error. |
 | `--parameter [Stack:]Key=Value` | Value of a template parameter, for every stack that has it or only `Stack`. Repeat it for more. Parameters without one use their `Default`. |
+| `--hours <n>` | Price hour-based charges (instances, NAT Gateways, load balancers, …) for `n` hours a month instead of 730, for environments that only run part of the time: `220` is weekdays 8:00–18:00. Monthly fees and storage stay whole. |
 | `--live` | Fetch current prices from the [Price List Query API](https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/using-price-list-query-api.html) instead of the bundled snapshot. Needs AWS credentials with `pricing:GetProducts`. |
 | `--version` | Print the version. |
 
@@ -398,7 +399,7 @@ and Timestream scheduled queries that run on a schedule) are listed under
 
 ## Assumptions
 
-- On-demand list prices in USD, 730 hours a month. Savings Plans, Reserved
+- On-demand list prices in USD, 730 hours a month (or `--hours`). Savings Plans, Reserved
   Instances and the free tier are ignored.
 - EC2 instances are priced as Linux with shared tenancy (the AMI is not read).
   A root volume that comes from the AMI (no `VolumeSize` in

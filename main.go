@@ -33,6 +33,9 @@ Flags:
   --parameter [Stack:]Key=Value
                        value of a template parameter, for every stack or only Stack (repeatable);
                        parameters without one use their Default
+  --hours n            price hour-based charges (instances, NAT Gateways, load balancers, …) for
+                       n hours a month instead of 730, e.g. 220 for weekdays 8:00-18:00;
+                       monthly fees and storage stay whole
   --live               fetch current prices from the AWS Price List Query API
                        (needs credentials with pricing:GetProducts) instead of the bundled snapshot
   --version            print the version
@@ -78,6 +81,7 @@ func run(args []string, stdout io.Writer) error {
 	maxTotal := fs.Float64("max", -1, "")
 	maxIncrease := fs.Float64("max-increase", -1, "")
 	live := fs.Bool("live", false, "")
+	hours := fs.Float64("hours", 730, "")
 	var params paramFlag
 	fs.Var(&params, "parameter", "")
 	showVersion := fs.Bool("version", false, "")
@@ -119,6 +123,10 @@ func run(args []string, stdout io.Writer) error {
 	if *format == "html" && *base != "" {
 		return usageError{"--format html does not support --base yet; use md or text"}
 	}
+	if *hours <= 0 || *hours > 744 {
+		return usageError{"--hours must be more than 0 and at most 744 (31 days)"}
+	}
+	hoursPerMonth = *hours
 	if *maxIncrease >= 0 && *base == "" {
 		return usageError{"--max-increase needs --base"}
 	}
