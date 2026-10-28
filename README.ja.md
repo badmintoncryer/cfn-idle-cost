@@ -68,6 +68,25 @@ npx cfn-idle-cost [flags] [cdk.out | template ...]
 
 終了コードは、成功が`0`、エラーが`1`、使い方の誤り（リージョンのないスタックを含みます）が`2`、`--max`か`--max-increase`の超過が`3`です。見積もれなかったリソースがあっても、成功なら`0`を返します。予算のフラグを付けたときに見積もれなかったリソースがあると、実際のアイドルコストはもっと高いかもしれないという警告を出します。`--max`はこの場合も失敗にしません。一方、`--max-increase`は、見積もれないリソースが追加されたときや、見積もれていたリソースが見積もれなくなったときに失敗します。増加額を確かめられないためです。`? no rule`のリソースは警告の件数に含めますが、予算のチェックを失敗させることはありません。
 
+## `cdk synth`で使う
+
+npmのパッケージには、CDKの[検証プラグイン](https://docs.aws.amazon.com/cdk/v2/guide/policy-validation-synthesis.html)も入っています。CIを用意しなくても、`cdk synth`のたびにアイドルコストを表示します。
+
+```ts
+import { IdleCost } from 'cfn-idle-cost';
+
+const app = new App();
+// ... スタック
+IdleCost.apply(app, { max: 200, warnAbove: 20 });
+```
+
+- `max`: アイドルコストの合計が月にこのドル数を超えたら、synthを失敗させます。
+- `warnAbove`: アイドルコストが月にこのドル数以上のリソースを、そのコンストラクトの警告として出します。
+- `region`: 環境を指定しないスタックのリージョン（既定は`CDK_DEFAULT_REGION`、次に`AWS_REGION`）。
+- `args`: ほかのフラグ。例: `['--parameter', 'Env=prod']`。
+
+`IdleCost.apply`には、`Validations`のあるaws-cdk-libが要ります。古いバージョンでは、`new App({ policyValidationBeta1: [...] })`に`new IdleCostValidation({ ... })`を渡してください。プラグインは各スタックのテンプレートだけを見るので、ネストスタックのリソースはsynthでは数えません。それらはCLIで`cdk.out`を見積もってください。
+
 ## プルリクエストで使う
 
 `--base`を付けると、変更によってアイドルコストがどう変わるかを表示します。

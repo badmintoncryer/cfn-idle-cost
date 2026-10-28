@@ -81,6 +81,31 @@ fail on them, but `--max-increase` does when the pull request adds a resource
 that can't be estimated or makes one unresolvable, since its increase can't be
 checked. Resources under `? no rule` are in the warning but never fail a budget.
 
+## At `cdk synth`
+
+The npm package also has a CDK
+[validation plugin](https://docs.aws.amazon.com/cdk/v2/guide/policy-validation-synthesis.html),
+so the idle cost shows up at every `cdk synth`, with no CI to set up:
+
+```ts
+import { IdleCost } from 'cfn-idle-cost';
+
+const app = new App();
+// ... your stacks
+IdleCost.apply(app, { max: 200, warnAbove: 20 });
+```
+
+- `max`: fail the synth when the total idle cost is over this many USD a month.
+- `warnAbove`: report each resource that idles at this many USD a month or
+  more as a warning, at its construct.
+- `region`: region for env-agnostic stacks (default `CDK_DEFAULT_REGION`, then `AWS_REGION`).
+- `args`: more flags, e.g. `['--parameter', 'Env=prod']`.
+
+`IdleCost.apply` needs an aws-cdk-lib with `Validations`; on older versions pass
+`new IdleCostValidation({ ... })` in `new App({ policyValidationBeta1: [...] })`.
+The plugin sees each stack's template, so resources in nested stacks are not
+counted at synth; run the CLI on `cdk.out` for those.
+
 ## In pull requests
 
 `--base` shows what a change does to the idle cost:
