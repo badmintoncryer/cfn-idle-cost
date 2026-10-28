@@ -173,7 +173,7 @@ and provisioned storage billed whether you use it or not.
 | `AWS::DynamoDB::Table` | provisioned RCU / WCU, including GSIs (Standard and Standard-IA) |
 | `AWS::DynamoDB::GlobalTable` | provisioned RCU and the auto scaling minimum WCU of the replica in the stack's region, including GSIs (replicated WCU with two or more replicas). Replicas in other regions are counted in the line, not priced |
 | `AWS::Kinesis::Stream` | provisioned shard hours (and extended retention over 24 hours), or the on-demand stream hour |
-| `AWS::ECS::Service` (Fargate) | vCPU, memory, ephemeral storage above 20 GB and public IPv4 (`AssignPublicIp: ENABLED`) × `DesiredCount` (x86 and ARM Linux, and Windows with its OS license per vCPU) |
+| `AWS::ECS::Service` (Fargate) | vCPU, memory, ephemeral storage above 20 GB and public IPv4 (`AssignPublicIp: ENABLED`) × `DesiredCount` (x86 and ARM Linux, and Windows with its OS license per vCPU). With a capacity provider strategy, only the FARGATE share is priced: `Base` first, then the rest by `Weight`, rounded up since ECS doesn't document how it rounds. Fargate Spot tasks are not counted, and tasks on other providers are counted through their Auto Scaling groups |
 | `AWS::EFS::FileSystem` | provisioned throughput |
 | `AWS::FSx::FileSystem` | storage and throughput capacity for Windows, Lustre, OpenZFS and ONTAP, SSD IOPS above the included 3 per GB (the ONTAP capacity pool is pay-per-use) |
 | `AWS::KMS::Key`, `AWS::KMS::ReplicaKey` | $1 per key |
@@ -200,8 +200,8 @@ and provisioned storage billed whether you use it or not.
 | `AWS::AmazonMQ::Broker` | broker hourly (ActiveMQ and RabbitMQ, single or multi-AZ) |
 | `AWS::Transfer::Server` | hourly per protocol |
 | `AWS::AppRunner::Service` | memory of the minimum provisioned instances |
-| `AWS::RDS::DBProxy` | per vCPU of the target instances, or per ACU of Serverless v2 targets at their minimum (targets must be in the same template) |
-| `AWS::OpenSearchServerless::Collection` | minimum indexing and search OCUs (1 + 1 with standby replicas, 0.5 + 0.5 without), once per collection type in a stack, since collections share OCUs (assuming they use the same KMS key). Collections in a collection group in the same template are billed on the group; in another group, they are not estimated |
+| `AWS::RDS::DBProxy` | per vCPU of the target instances (at least 2 per instance), or per ACU of Serverless v2 targets at their minimum (targets must be in the same template) |
+| `AWS::OpenSearchServerless::Collection` | minimum indexing and search OCUs (1 + 1 with standby replicas, 0.5 + 0.5 without), once per KMS key in a stack, since collections outside a group share OCUs when they use the same key. Vector search collections get their own OCUs. The key comes from `EncryptionConfig`, or from an encryption `SecurityPolicy` in the template whose rules match the collection name; otherwise the AWS owned key is assumed. Collections in a collection group in the same template are billed on the group; in another group, they are not estimated |
 | `AWS::MemoryDB::Cluster` | node hourly × shards × (1 + replicas) (Redis and Valkey) |
 | `AWS::SageMaker::Endpoint` | instance hourly × `InitialInstanceCount` per production variant, or × `ManagedInstanceScaling.MinInstanceCount` when it is not set (endpoints that host inference components). Serverless variants: $0 idle |
 | `AWS::CodePipeline::Pipeline` | per active V1 pipeline (V2 pipelines bill per minute: $0 idle) |
@@ -302,7 +302,7 @@ and provisioned storage billed whether you use it or not.
 | `AWS::ManagedBlockchain::Node` | peer node hourly (storage not counted) |
 | `AWS::DataPipeline::Pipeline` | inactive pipeline monthly with `Activate: false`. Active pipelines, billed per activity and precondition by how often they run, are not estimated |
 | `AWS::HealthImaging::Datastore` | data store monthly fee |
-| `AWS::OpenSearchServerless::CollectionGroup` | `MinIndexingCapacityInOcu` and `MinSearchCapacityInOcu` hourly. Not estimated when a minimum is not set |
+| `AWS::OpenSearchServerless::CollectionGroup` | `MinIndexingCapacityInOcu` and `MinSearchCapacityInOcu` hourly. A `NEXTGEN` group without them scales to zero ($0 idle); other groups are not estimated when a minimum is not set |
 | `AWS::Comprehend::DocumentClassifierEndpoint`, `AWS::Comprehend::EntityRecognizerEndpoint` | `DesiredInferenceUnits` × inference unit price |
 | `AWS::Comprehend::DocumentClassifier`, `AWS::Comprehend::EntityRecognizer` | custom model management fee monthly (training not counted) |
 | `AWS::KendraRanking::ExecutionPlan` | base capacity hourly plus `RescoreCapacityUnits` |
@@ -384,9 +384,9 @@ resources are matched by prefix, so a new type in a service that is otherwise
 free still gets a line.
 Every other type with no rule is listed under `? no rule` and assumed $0 idle,
 so a resource that may cost money never disappears without a line.
-Partly supported types (Fargate Spot and other capacity providers, Spot and
+Partly supported types (Spot and
 Windows node groups, EMR instance fleets with Spot capacity or several instance
-types, Aurora Serverless v1, instances in
+types, Aurora Serverless v1 (past end of support), instances in
 Local Zones, canaries on a cron schedule, Spot-only fleets and fleets of several
 instance types, Batch compute environments with `MinvCpus` above 0, and
 GameLift fleets on Spot or in remote locations, FleetIQ game server groups

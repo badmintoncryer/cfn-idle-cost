@@ -10,7 +10,8 @@ Resources:
   WinNodes:
     Type: AWS::EKS::Nodegroup
     Properties: { ClusterName: c, NodeRole: r, Subnets: [a], AmiType: WINDOWS_CORE_2022_x86_64, InstanceTypes: [m5.large], ScalingConfig: { DesiredSize: 2 } }
-  # Only an all-FARGATE capacity provider strategy is priced, whatever the order.
+  # The FARGATE share of a capacity provider strategy is priced, whatever the order:
+  # Base first, then the rest by Weight. Fargate Spot is not counted.
   Td: { Type: AWS::ECS::TaskDefinition, Properties: { Cpu: "1024", Memory: "2048" } }
   SpotLast:
     Type: AWS::ECS::Service
@@ -18,6 +19,12 @@ Resources:
   SpotFirst:
     Type: AWS::ECS::Service
     Properties: { TaskDefinition: !Ref Td, DesiredCount: 4, CapacityProviderStrategy: [{ CapacityProvider: FARGATE_SPOT, Weight: 3 }, { CapacityProvider: FARGATE, Base: 1 }] }
+  Uneven:
+    Type: AWS::ECS::Service
+    Properties: { TaskDefinition: !Ref Td, DesiredCount: 3, CapacityProviderStrategy: [{ CapacityProvider: FARGATE, Weight: 1 }, { CapacityProvider: FARGATE_SPOT, Weight: 1 }] }
+  AllSpot:
+    Type: AWS::ECS::Service
+    Properties: { TaskDefinition: !Ref Td, DesiredCount: 2, CapacityProviderStrategy: [{ CapacityProvider: FARGATE_SPOT, Weight: 1 }] }
   FargateOnly:
     Type: AWS::ECS::Service
     Properties: { TaskDefinition: !Ref Td, DesiredCount: 1, CapacityProviderStrategy: [{ CapacityProvider: FARGATE }] }
@@ -27,7 +34,7 @@ Resources:
     Properties: { VpcEndpointType: Interface, ServiceName: s, VpcId: v, SubnetIds: [a, b, !If [ThirdAz, c, !Ref "AWS::NoValue"]] }
   # CloudFormation's default StorageType is gp3.
   Db: { Type: AWS::RDS::DBInstance, Properties: { Engine: postgres, DBInstanceClass: db.t4g.micro, AllocatedStorage: 20 } }
-  # Aurora Serverless v1 bills on the cluster.
+  # Aurora Serverless v1 is past end of support.
   V1: { Type: AWS::RDS::DBCluster, Properties: { Engine: aurora-mysql, EngineMode: serverless } }
   # OpenSearch gp3 includes 250 MiB/s above 170 GiB: only 50 of the 300 are billed.
   Search:

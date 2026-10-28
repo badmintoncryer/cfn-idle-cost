@@ -1,12 +1,16 @@
-eu-west-1 · 1 stack · idle ≈ $3839/mo
+eu-west-1 · 1 stack · idle ≈ $4591/mo
 
-more                             $3839/mo
+more                             $4591/mo
   Broker         ×1               $661  mq.m5.large RabbitMQ Multi-AZ
   Firewall       ×2 endpoints     $577  firewall endpoint per AZ
   Kafka          ×3 brokers       $495  kafka.m5.large brokers
   Kafka          ×300 GB           $33  broker storage
+  Keyed          ×1 OCU           $175  indexing minimum OCUs, standby replicas
+  Keyed          ×1 OCU           $175  search minimum OCUs, standby replicas
   Logs           ×1 OCU           $175  indexing minimum OCUs, standby replicas
   Logs           ×1 OCU           $175  search minimum OCUs, standby replicas
+  Secure         ×1 OCU           $175  indexing minimum OCUs, standby replicas
+  Secure         ×1 OCU           $175  search minimum OCUs, standby replicas
   Sftp           ×1 protocols     $219  server
   ProxyDbWriter  ×1               $201  db.r6g.large aurora-mysql
   ProxyDbReader  ×2 ACU           $190  Serverless v2 minimum capacity
@@ -24,6 +28,9 @@ more                             $3839/mo
   Proxy          ×2 ACU            $22  per ACU of the Serverless v2 targets (minimum)
   Attach         ×1                $36  Transit Gateway VPC attachment
   RegionBox      ×1                $33  t3.medium on-demand (Linux)
+  SmallDb        ×1                $26  db.t2.small mysql Single-AZ
+  SmallDb        ×20 GB gp3      $2.54  storage
+  SmallProxy     ×2 vCPU           $22  per vCPU of the target instances
   Live           ×2 concurrency    $18  provisioned concurrency (1024 MB)
   Acl            ×1              $5.00  web ACL
   Acl            ×3 rules        $3.00  rules (managed rule group fees not counted)
@@ -32,6 +39,7 @@ more                             $3839/mo
   MathAlarm      ×2 metrics      $0.60  high-resolution alarm per metric
   Alarm          ×1 metrics      $0.10  alarm per metric
   Logs2          ×1              $0.00  shares the OCUs of Logs
+  Series         ×1              $0.00  shares the OCUs of Logs
 
 ? could not estimate: 1
   more  EdgeBox  Local Zone eu-west-1-lhr-1a prices are not supported yet

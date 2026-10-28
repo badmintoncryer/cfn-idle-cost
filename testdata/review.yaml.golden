@@ -1,23 +1,28 @@
-us-east-1 · 1 stack · idle ≈ $354/mo
+us-east-1 · 1 stack · idle ≈ $499/mo
 
-review                       $354/mo
+review                       $499/mo
   Search       ×1            $122  r6g.large.search data nodes
   Search       ×500 GB gp3    $61  EBS storage
   Search       ×50 MiB/s    $3.20  gp3 throughput above 250 MiB/s
+  Uneven       ×2 vCPU        $59  Fargate vCPU (2 of 3 tasks on FARGATE, rounded up; FARGATE_SPOT not counted here)
+  Uneven       ×4 GB          $13  Fargate memory (2 of 3 tasks on FARGATE, rounded up; FARGATE_SPOT not counted here)
   DocsWriter   ×1 DCU         $66  serverless minimum capacity
   Stream       ×2 shards      $29  extended retention (over 24 hours)
   Stream       ×2 shards      $22  provisioned shards
   FargateOnly  ×1 vCPU        $30  Fargate vCPU (1 task)
   FargateOnly  ×2 GB        $6.49  Fargate memory (1 task)
+  SpotFirst    ×1 vCPU        $30  Fargate vCPU (1 of 4 tasks on FARGATE; FARGATE_SPOT not counted here)
+  SpotFirst    ×2 GB        $6.49  Fargate memory (1 of 4 tasks on FARGATE; FARGATE_SPOT not counted here)
+  SpotLast     ×1 vCPU        $30  Fargate vCPU (1 of 4 tasks on FARGATE; FARGATE_SPOT not counted here)
+  SpotLast     ×2 GB        $6.49  Fargate memory (1 of 4 tasks on FARGATE; FARGATE_SPOT not counted here)
   Db           ×1             $12  db.t4g.micro postgres Single-AZ
   Db           ×20 GB gp3   $2.30  storage
   Secret       ×3           $1.20  secret and its replicas
+  AllSpot      ×1           $0.00  no tasks on FARGATE (2 tasks; FARGATE_SPOT not counted here)
 
-? could not estimate: 5
+? could not estimate: 3
   review  Endpoint  SubnetIds has an item that uses Fn::If
-  review  SpotFirst  Fargate Spot is not supported
-  review  SpotLast  Fargate Spot is not supported
-  review  V1  Aurora Serverless v1 is not supported
+  review  V1  Aurora Serverless v1 reached end of support on 2025-03-31 and can no longer be created; use Serverless v2
   review  WinNodes  Windows node groups (WINDOWS_CORE_2022_x86_64) are not supported yet
 
 ! not counted yet: 1 (these may cost money idle; cfn-idle-cost has no rule for them)
