@@ -146,7 +146,7 @@ func (rep Report) WriteText(w io.Writer) {
 			}
 		}
 	}
-	fmt.Fprintf(w, "\nprices: %s · on-demand list prices, %d h/mo, USD, free tier ignored\n", rep.Prices, hoursPerMonth)
+	fmt.Fprintf(w, "\nprices: %s · %s, %d h/mo, USD, free tier ignored\n", rep.Prices, priceBasis(), hoursPerMonth)
 }
 
 // count: "1 task", "2 tasks".
@@ -225,7 +225,7 @@ func (rep Report) WriteMarkdown(w io.Writer) {
 	}
 	fmt.Fprint(w, "</details>\n\n")
 	writeMarkdownUnknown(w, rep)
-	fmt.Fprintf(w, "<sub>cfn-idle-cost · prices: %s · on-demand list prices, %d h/mo, USD, free tier ignored</sub>\n", rep.Prices, hoursPerMonth)
+	fmt.Fprintf(w, "<sub>cfn-idle-cost · prices: %s · %s, %d h/mo, USD, free tier ignored</sub>\n", rep.Prices, priceBasis(), hoursPerMonth)
 }
 
 func writeMarkdownUnknown(w io.Writer, rep Report) {

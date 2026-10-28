@@ -43,7 +43,7 @@ var testPrices = &Prices{Source: "test prices", AsOf: "2026-10-16", Regions: map
 		"mq|RabbitMQ|Multi-AZ|m5.large": 0.906, "transfer|ProtocolHours": 0.3, "codepipeline|activePipeline": 1,
 	},
 	"us-east-1": {"rds|Aurora:ServerlessV2IOOptimizedUsage|21": 0.16, "kms|KMS-Keys": 1, "ebs|EBS:VolumeUsage.gp3": 0.08, "ebs|EBS:VolumeP-IOPS.gp3": 0.005, "secrets|AWSSecretsManager-Secrets": 0.4,
-		"ec2|t3.micro": 0.0104, "vpc|PublicIPv4:InUseAddress": 0.005, "fargate|Fargate-vCPU-Hours:perCPU": 0.04048, "fargate|Fargate-GB-Hours": 0.004445,
+		"ec2|t3.micro": 0.0104, "ec2|t3.micro|ri1y": 0.0065, "vpc|PublicIPv4:InUseAddress": 0.005, "fargate|Fargate-vCPU-Hours:perCPU": 0.04048, "fargate|Fargate-GB-Hours": 0.004445,
 		"fsx|ONTAP|Storage.SAZ_2N:SSD": 0.125, "fsx|ONTAP|ThroughputCapacity.SAZ_2N": 0.72, "fsx|ONTAP|Storage.SAZ_2N2:SSD": 0.125,
 		"fsx|ONTAP|ThroughputCapacity.SAZ_2N2": 1.6, "fsx|ONTAP|ProvisionedSSDIOPS.SAZ_2N2": 0.017,
 		"ddb|ReadCapacityUnit-Hrs": 0.00013, "ddb|ReplWriteCapacityUnit-Hrs": 0.00065, "ddb|IA-ReadCapacityUnit-Hrs": 0.00016, "ddb|IA-WriteCapacityUnit-Hrs": 0.00081,
@@ -324,7 +324,13 @@ func TestParseOffer(t *testing.T) {
 	  "E":{"E.1":{"priceDimensions":{"E.1.1":{"unit":"Hrs","pricePerUnit":{"USD":"0.02"}}}}},
 	  "C":{"C.1":{"priceDimensions":{"C.1.1":{"unit":"GiBps-mo","pricePerUnit":{"USD":"49.152"}}}}},
 	  "D":{"D.1":{"priceDimensions":{"D.1.1":{"unit":"ReadCapacityUnit-Hrs","pricePerUnit":{"USD":"0"}},"D.1.2":{"unit":"ReadCapacityUnit-Hrs","pricePerUnit":{"USD":"0.0001484"}}}}}
-	},"Reserved":{"A":{}}}}`
+	},"Reserved":{
+	  "A":{"A.R1":{"termAttributes":{"LeaseContractLength":"1yr","PurchaseOption":"No Upfront","OfferingClass":"standard"},"priceDimensions":{"A.R1.1":{"unit":"Hrs","pricePerUnit":{"USD":"0.0086"}}}},
+	       "A.R2":{"termAttributes":{"LeaseContractLength":"1yr","PurchaseOption":"No Upfront","OfferingClass":"convertible"},"priceDimensions":{"A.R2.1":{"unit":"Hrs","pricePerUnit":{"USD":"0.0099"}}}},
+	       "A.R3":{"termAttributes":{"LeaseContractLength":"3yr","PurchaseOption":"No Upfront","OfferingClass":"standard"},"priceDimensions":{"A.R3.1":{"unit":"Hrs","pricePerUnit":{"USD":"0.006"}}}},
+	       "A.R4":{"termAttributes":{"LeaseContractLength":"1yr","PurchaseOption":"Partial Upfront","OfferingClass":"standard"},"priceDimensions":{"A.R4.1":{"unit":"Quantity","pricePerUnit":{"USD":"36"}},"A.R4.2":{"unit":"Hrs","pricePerUnit":{"USD":"0.004"}}}}},
+	  "D":{"D.R1":{"termAttributes":{"LeaseContractLength":"1yr","PurchaseOption":"No Upfront"},"priceDimensions":{"D.R1.1":{"unit":"Hrs","pricePerUnit":{"USD":"0.00005"}}}}}
+	}}}`
 	all := map[string]map[string]float64{}
 	var ec2Sels []selector
 	for _, s := range selectors {
@@ -339,6 +345,7 @@ func TestParseOffer(t *testing.T) {
 	}
 	want := map[string]float64{
 		"ec2|t3.micro":                   0.0136, // Linux only; the Local Zone SKU E is dropped
+		"ec2|t3.micro|ri1y":              0.0086, // 1-yr, no upfront, standard; DynamoDB's reserved capacity is not kept
 		"ebs|EBS:VolumeP-Throughput.gp3": 0.048,  // per MiB/s
 		"ddb|ReadCapacityUnit-Hrs":       0.0001484,
 	}
@@ -390,6 +397,32 @@ func TestBundledPrices(t *testing.T) {
 			if v, ok := p.Get(r, k); !ok || v <= 0 {
 				t.Errorf("%s: %s = %v, %v", r, k, v, ok)
 			}
+		}
+	}
+}
+
+// --pricing reserved-1y prices instances at their RI rate where there is one
+// and leaves the rest (the public IPv4 address) at on-demand.
+func TestReservedPricing(t *testing.T) {
+	path := t.TempDir() + "/box.yaml"
+	os.WriteFile(path, []byte("Resources: {Box: {Type: AWS::EC2::Instance, Properties: {ImageId: ami-1, InstanceType: t3.micro}}}\n"), 0o644)
+	stacks, err := LoadInputs([]string{path})
+	if err != nil {
+		t.Fatal(err)
+	}
+	stacks[0].Region = "us-east-1"
+	reservedPricing = true
+	defer func() { reservedPricing = false }()
+	var b bytes.Buffer
+	NewReport(stacks, Estimate(stacks, testPrices), testPrices).WriteText(&b)
+	for _, want := range []string{"$4.75  t3.micro 1-yr RI (Linux)", "1-yr no-upfront Reserved Instance rates"} {
+		if !strings.Contains(b.String(), want) {
+			t.Errorf("no %q in\n%s", want, b.String())
+		}
+	}
+	for _, args := range [][]string{{"--pricing", "3y"}, {"--pricing", "reserved-1y", "--live"}} {
+		if _, ok := run(append([]string{path, "--region", "us-east-1"}, args...), io.Discard).(usageError); !ok {
+			t.Errorf("%v: want a usage error", args)
 		}
 	}
 }

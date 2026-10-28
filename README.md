@@ -71,6 +71,7 @@ nested stacks) or CloudFormation templates (JSON or YAML).
 | `--region <r>` | Region for stacks that have none: env-agnostic CDK stacks and plain templates. Stacks with an `env` keep their own region. Without it, such stacks are an error. |
 | `--parameter [Stack:]Key=Value` | Value of a template parameter, for every stack that has it or only `Stack`. Repeat it for more. Parameters without one use their `Default`. |
 | `--live` | Fetch current prices from the [Price List Query API](https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/using-price-list-query-api.html) instead of the bundled snapshot. Needs AWS credentials with `pricing:GetProducts`. |
+| `--pricing reserved-1y` | Price EC2, RDS, ElastiCache, OpenSearch Service, Redshift and MemoryDB instances at the 1-year, no-upfront, standard Reserved Instance rate, to see the idle cost you would commit to. Those lines say `1-yr RI`; everything else stays on-demand. Uses the bundled snapshot only (not with `--live`). Default `on-demand`. |
 | `--version` | Print the version. |
 
 Exit codes: `0` success (even when some resources could not be estimated), `1`
@@ -398,8 +399,9 @@ and Timestream scheduled queries that run on a schedule) are listed under
 
 ## Assumptions
 
-- On-demand list prices in USD, 730 hours a month. Savings Plans, Reserved
-  Instances and the free tier are ignored.
+- On-demand list prices in USD, 730 hours a month. Savings Plans and the free
+  tier are ignored, and Reserved Instances are used only with
+  `--pricing reserved-1y`.
 - EC2 instances are priced as Linux with shared tenancy (the AMI is not read).
   A root volume that comes from the AMI (no `VolumeSize` in
   `BlockDeviceMappings`) is not counted.

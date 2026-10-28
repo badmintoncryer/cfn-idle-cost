@@ -394,9 +394,33 @@ func (e *est) price(key string) float64 {
 // ---- items
 
 func (e *est) hourly(qty float64, unit, key, reason string) {
-	if qty > 0 {
-		e.add(qty, unit, qty*e.price(key)*hoursPerMonth, reason)
+	if qty <= 0 {
+		return
 	}
+	p := e.price(key)
+	if reservedPricing {
+		if ri, ok := e.prices.Get(e.st.Region, key+riSuffix); ok {
+			p = ri
+			if strings.Contains(reason, "on-demand") {
+				reason = strings.Replace(reason, "on-demand", "1-yr RI", 1)
+			} else {
+				reason += " · 1-yr RI"
+			}
+		}
+	}
+	e.add(qty, unit, qty*p*hoursPerMonth, reason)
+}
+
+// reservedPricing prices instances at their 1-year, no-upfront Reserved Instance
+// rate where the snapshot has one (--pricing reserved-1y).
+var reservedPricing bool
+
+// priceBasis says in the footer which rates the estimate uses.
+func priceBasis() string {
+	if reservedPricing {
+		return "1-yr no-upfront Reserved Instance rates where marked 1-yr RI, on-demand list prices for the rest"
+	}
+	return "on-demand list prices"
 }
 
 func (e *est) monthly(qty float64, unit, key, reason string) {

@@ -67,6 +67,21 @@ type selector struct {
 	// liveFilter narrows a --live query to one key's products (an instance
 	// family has thousands); nil queries the whole family once.
 	liveFilter func(detail string) map[string]string
+	// reserved also records the 1-year, no-upfront standard Reserved Instance
+	// rate of each key, under key + riSuffix (--pricing reserved-1y).
+	reserved bool
+}
+
+// riSuffix marks the snapshot key of a Reserved Instance rate.
+const riSuffix = "|ri1y"
+
+// The services whose instances have Reserved Instances (or reserved nodes).
+func init() {
+	for i := range selectors {
+		if in(selectors[i].name, "ec2", "rds", "es", "elasticache", "redshift", "memorydb") {
+			selectors[i].reserved = true
+		}
+	}
 }
 
 func byInstanceType(detail string) map[string]string {
@@ -700,10 +715,13 @@ type offerProduct struct {
 }
 
 type offerTerm struct {
-	PriceDimensions map[string]struct {
-		Unit         string            `json:"unit"`
-		PricePerUnit map[string]string `json:"pricePerUnit"`
-	} `json:"priceDimensions"`
+	TermAttributes  map[string]string         `json:"termAttributes"`
+	PriceDimensions map[string]priceDimension `json:"priceDimensions"`
+}
+
+type priceDimension struct {
+	Unit         string            `json:"unit"`
+	PricePerUnit map[string]string `json:"pricePerUnit"`
 }
 
 // match returns the snapshot key of a product, or "".
@@ -774,11 +792,30 @@ func record(out map[string]map[string]float64, region, key string, terms map[str
 	}
 }
 
+// recordReserved keeps the hourly rate of the 1-year, no-upfront standard
+// Reserved Instance term under key + riSuffix.
+func recordReserved(out map[string]map[string]float64, region, key string, terms map[string]offerTerm) {
+	for _, t := range terms {
+		a := t.TermAttributes
+		if a["LeaseContractLength"] != "1yr" || a["PurchaseOption"] != "No Upfront" || !in(a["OfferingClass"], "", "standard") {
+			continue
+		}
+		hourly := offerTerm{PriceDimensions: map[string]priceDimension{}} // not the upfront Quantity, if any
+		for id, d := range t.PriceDimensions {
+			if d.Unit == "Hrs" {
+				hourly.PriceDimensions[id] = d
+			}
+		}
+		record(out, region, key+riSuffix, map[string]offerTerm{"": hourly})
+	}
+}
+
 // parseOffer streams one bulk offer file (EC2 is ~450 MB per region) and adds
 // the selected prices to out (region -> key -> price).
 func parseOffer(r io.Reader, sels []selector, offerRegion string, out map[string]map[string]float64) (pub string, err error) {
 	dec := json.NewDecoder(r)
 	keys := map[string][2]string{} // sku -> region, key
+	reserved := map[string]bool{}  // skus whose Reserved terms are kept
 	if _, err := dec.Token(); err != nil {
 		return "", err
 	}
@@ -805,6 +842,7 @@ func parseOffer(r io.Reader, sels []selector, offerRegion string, out map[string
 				for _, s := range sels {
 					if k := s.match(p); k != "" {
 						keys[sku] = [2]string{reg, k}
+						reserved[sku] = s.reserved
 						break
 					}
 				}
@@ -812,13 +850,13 @@ func parseOffer(r io.Reader, sels []selector, offerRegion string, out map[string
 			})
 		case "terms":
 			err = eachEntry(dec, func(termType string) error {
-				if termType != "OnDemand" {
+				if termType != "OnDemand" && termType != "Reserved" {
 					var skip json.RawMessage
 					return dec.Decode(&skip)
 				}
 				return eachEntry(dec, func(sku string) error {
 					rk, ok := keys[sku]
-					if !ok {
+					if !ok || termType == "Reserved" && !reserved[sku] {
 						var skip json.RawMessage
 						return dec.Decode(&skip)
 					}
@@ -826,7 +864,11 @@ func parseOffer(r io.Reader, sels []selector, offerRegion string, out map[string
 					if err := dec.Decode(&terms); err != nil {
 						return err
 					}
-					record(out, rk[0], rk[1], terms)
+					if termType == "Reserved" {
+						recordReserved(out, rk[0], rk[1], terms)
+					} else {
+						record(out, rk[0], rk[1], terms)
+					}
 					return nil
 				})
 			})
