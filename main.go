@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -28,6 +29,8 @@ Flags:
   --format f           text (default), md (for a pull request comment), json, or html
                        (a page to open in a browser, without --base)
   --max usd            exit 3 if the total idle cost is over usd per month
+  --max Stage=usd      exit 3 if the idle cost of a CDK Stage is over usd per month (repeatable;
+                       "(app)" is the stacks outside any Stage)
   --max-increase usd   with --base: exit 3 if the idle cost grows by more than usd per month
   --region r           region for stacks without one (env-agnostic stacks, plain templates)
   --parameter [Stack:]Key=Value
@@ -75,7 +78,8 @@ func run(args []string, stdout io.Writer) error {
 	region := fs.String("region", "", "")
 	base := fs.String("base", "", "")
 	format := fs.String("format", "text", "")
-	maxTotal := fs.Float64("max", -1, "")
+	maxes := budgetFlag{total: -1}
+	fs.Var(&maxes, "max", "")
 	maxIncrease := fs.Float64("max-increase", -1, "")
 	live := fs.Bool("live", false, "")
 	var params paramFlag
@@ -152,7 +156,10 @@ func run(args []string, stdout io.Writer) error {
 		d = NewDiff(NewReport(baseStacks, Estimate(baseStacks, prices), prices), rep)
 	}
 	// Before writing: WriteJSON rounds the totals to cents in place.
-	budget := checkBudget(rep, d, *maxTotal, *maxIncrease)
+	if unknown := maxes.unknownStages(rep); len(unknown) > 0 {
+		return usageError{"--max: no Stage " + strings.Join(unknown, ", ")}
+	}
+	budget := checkBudget(rep, d, maxes, *maxIncrease)
 	switch {
 	case d != nil && *format == "json":
 		err = d.WriteJSON(stdout)
@@ -176,8 +183,9 @@ func run(args []string, stdout io.Writer) error {
 }
 
 // checkBudget returns overBudget when a --max or --max-increase gate fails.
-func checkBudget(rep Report, d *Diff, maxTotal, maxIncrease float64) error {
-	if maxTotal < 0 && maxIncrease < 0 {
+func checkBudget(rep Report, d *Diff, maxes budgetFlag, maxIncrease float64) error {
+	maxTotal := maxes.total
+	if maxTotal < 0 && maxIncrease < 0 && len(maxes.stages) == 0 {
 		return nil
 	}
 	if n := rep.unknownCount(); n > 0 {
@@ -187,6 +195,13 @@ func checkBudget(rep Report, d *Diff, maxTotal, maxIncrease float64) error {
 	if total := rep.Total(); maxTotal >= 0 && total > maxTotal {
 		return overBudget{fmt.Sprintf("over budget: idle cost $%.2f/mo is over --max $%.2f", total, maxTotal)}
 	}
+	for _, b := range maxes.stages {
+		for _, st := range rep.Stages {
+			if stageName(st.Stage) == b.stage && st.Monthly > b.usd {
+				return overBudget{fmt.Sprintf("over budget: idle cost of Stage %s $%.2f/mo is over --max %s=%.2f", b.stage, st.Monthly, b.stage, b.usd)}
+			}
+		}
+	}
 	if d != nil && maxIncrease >= 0 && d.After-d.Before > maxIncrease {
 		return overBudget{fmt.Sprintf("over budget: idle cost grows by $%.2f/mo, over --max-increase $%.2f", d.After-d.Before, maxIncrease)}
 	}
@@ -194,6 +209,51 @@ func checkBudget(rep Report, d *Diff, maxTotal, maxIncrease float64) error {
 		return overBudget{fmt.Sprintf("over budget: %d added or changed resource(s) could not be estimated, so --max-increase can't be checked", d.NewUnknown)}
 	}
 	return nil
+}
+
+// budgetFlag collects --max usd (the total) and --max Stage=usd.
+type budgetFlag struct {
+	total  float64
+	stages []struct {
+		stage string
+		usd   float64
+	}
+}
+
+func (b *budgetFlag) String() string { return "" }
+
+func (b *budgetFlag) Set(s string) error {
+	stage, v, staged := strings.Cut(s, "=")
+	if !staged {
+		v = s
+	}
+	usd, err := strconv.ParseFloat(v, 64)
+	if err != nil || usd < 0 || staged && stage == "" {
+		return fmt.Errorf("--max %q: want usd or Stage=usd", s)
+	}
+	if !staged {
+		b.total = usd
+		return nil
+	}
+	b.stages = append(b.stages, struct {
+		stage string
+		usd   float64
+	}{stage, usd})
+	return nil
+}
+
+// unknownStages returns the --max Stages that are not in the report.
+func (b budgetFlag) unknownStages(rep Report) (unknown []string) {
+	for _, g := range b.stages {
+		found := false
+		for _, st := range rep.Stages {
+			found = found || stageName(st.Stage) == g.stage
+		}
+		if !found {
+			unknown = append(unknown, g.stage)
+		}
+	}
+	return unknown
 }
 
 // paramFlag collects --parameter [Stack:]Key=Value.
