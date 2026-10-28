@@ -393,3 +393,25 @@ func TestBundledPrices(t *testing.T) {
 		}
 	}
 }
+
+// --format sarif: one result per resource at its line in the template, and
+// the resources that could not be estimated as notes.
+func TestSARIF(t *testing.T) {
+	stacks, err := LoadInputs([]string{"testdata/cdk.out"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range stacks {
+		if s.Region == "" {
+			s.Region = "us-east-1"
+		}
+	}
+	var b bytes.Buffer
+	if err := NewReport(stacks, Estimate(stacks, testPrices), testPrices).WriteSARIF(&b, 10); err != nil {
+		t.Fatal(err)
+	}
+	golden(t, "cdk.out.sarif", b.String())
+	if _, ok := run([]string{"testdata/cdk.out", "--base", "testdata/cdk.out", "--format", "sarif"}, io.Discard).(usageError); !ok {
+		t.Error("--format sarif with --base: want a usage error")
+	}
+}

@@ -26,7 +26,9 @@ With --base, prints how the idle cost changes from the base to the inputs.
 Flags:
   --base path          compare against this cdk.out (or template), e.g. one synthesized from main
   --format f           text (default), md (for a pull request comment), json, or html
-                       (a page to open in a browser, without --base)
+                       (a page to open in a browser, without --base), or sarif (for GitHub
+                       code scanning, without --base)
+  --sarif-min usd      with --format sarif: report only resources that idle at usd per month or more
   --max usd            exit 3 if the total idle cost is over usd per month
   --max-increase usd   with --base: exit 3 if the idle cost grows by more than usd per month
   --region r           region for stacks without one (env-agnostic stacks, plain templates)
@@ -75,6 +77,7 @@ func run(args []string, stdout io.Writer) error {
 	region := fs.String("region", "", "")
 	base := fs.String("base", "", "")
 	format := fs.String("format", "text", "")
+	sarifMin := fs.Float64("sarif-min", 0, "")
 	maxTotal := fs.Float64("max", -1, "")
 	maxIncrease := fs.Float64("max-increase", -1, "")
 	live := fs.Bool("live", false, "")
@@ -113,11 +116,11 @@ func run(args []string, stdout io.Writer) error {
 		fmt.Fprintln(stdout, version)
 		return nil
 	}
-	if !in(*format, "text", "md", "json", "html") {
-		return usageError{"--format must be text, md, json or html"}
+	if !in(*format, "text", "md", "json", "html", "sarif") {
+		return usageError{"--format must be text, md, json, html or sarif"}
 	}
-	if *format == "html" && *base != "" {
-		return usageError{"--format html does not support --base yet; use md or text"}
+	if in(*format, "html", "sarif") && *base != "" {
+		return usageError{"--format " + *format + " does not support --base yet; use md or text"}
 	}
 	if *maxIncrease >= 0 && *base == "" {
 		return usageError{"--max-increase needs --base"}
@@ -166,6 +169,8 @@ func run(args []string, stdout io.Writer) error {
 		rep.WriteMarkdown(stdout)
 	case *format == "html":
 		err = rep.WriteHTML(stdout)
+	case *format == "sarif":
+		err = rep.WriteSARIF(stdout, *sarifMin)
 	default:
 		rep.WriteText(stdout)
 	}

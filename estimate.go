@@ -28,6 +28,8 @@ type Item struct {
 	NotCounted bool `json:"-"`
 	// NoRule marks a resource of a type with no rule that is not known to be free.
 	NoRule bool `json:"-"`
+	// File is the template the resource is in, for --format sarif.
+	File string `json:"-"`
 }
 
 // unresolved aborts the estimate of one resource; the message says why.
@@ -57,7 +59,7 @@ func Estimate(stacks []*Stack, prices *Prices) []Item {
 
 func estimateResource(all []*Stack, st *Stack, prices *Prices, id string) (items []Item) {
 	e := &est{st: st, all: all, prices: prices, r: st.Resources[id], id: id}
-	base := Item{Stack: st.Name, Region: st.Region, Path: st.DisplayPath(id), LogicalID: id, Type: e.r.Type}
+	base := Item{Stack: st.Name, Region: st.Region, Path: st.DisplayPath(id), LogicalID: id, Type: e.r.Type, File: st.Path}
 	defer func() {
 		if v := recover(); v != nil {
 			msg, ok := v.(unresolved)
