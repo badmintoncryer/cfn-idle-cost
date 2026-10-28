@@ -138,7 +138,7 @@ jobs:
 | `AWS::ElasticLoadBalancingV2::LoadBalancer` | ALB、NLB、GWLBの時間料金。internet-facingなら、サブネットごとにパブリックIPv4を1つ（`dualstack-without-public-ipv4`なら数えません） |
 | `AWS::ElasticLoadBalancing::LoadBalancer` | Classic Load Balancerの時間料金 |
 | `AWS::EC2::Instance` | インスタンスの時間料金（Linux）、`BlockDeviceMappings`のEBSボリューム、起動時に割り当てられるパブリックIPv4 |
-| `AWS::AutoScaling::AutoScalingGroup` | インスタンスの時間料金×`DesiredCapacity`（なければ`MinSize`）、EBSボリューム、起動時に割り当てられるパブリックIPv4。起動テンプレートか起動設定から読みます |
+| `AWS::AutoScaling::AutoScalingGroup` | インスタンスの時間料金×`DesiredCapacity`（なければ`MinSize`）、EBSボリューム、起動時に割り当てられるパブリックIPv4。起動テンプレートか起動設定から読みます。`MixedInstancesPolicy`ではオンデマンドの分（`OnDemandBaseCapacity`と、残りの`OnDemandPercentageAboveBaseCapacity`、端数は切り上げ）だけを、最初のオーバーライドのタイプで数えます。Spotは数えず、EBSとIPv4は全台分です |
 | `AWS::EC2::Volume` | 容量、gp3の3000 IOPS・125 MiB/sを超える分、io1・io2のIOPS |
 | `AWS::RDS::DBInstance` | インスタンスの時間料金（シングルAZ・マルチAZ。MySQL、PostgreSQL、MariaDBと、ライセンスモデルごとのOracleとSQL Server）、割り当てたストレージ、プロビジョンドIOPS、gp3の基準値を超えるIOPSとスループット。Auroraは、プロビジョンドのインスタンスか、Serverless v2の最小ACU（I/O-Optimizedにも対応） |
 | `AWS::RDS::DBCluster`（マルチAZ DBクラスター） | クラスターの時間料金（ライター1台と読み取り可能なスタンバイ2台）、割り当てたストレージ、プロビジョンドIOPS（gp3のIOPSとスループットにはまだ対応していません） |
@@ -158,7 +158,7 @@ jobs:
 | `AWS::EKS::Nodegroup` | インスタンスの時間料金×`DesiredSize`（なければ`MinSize`）。オンデマンドで、インスタンスタイプが1つの場合 |
 | `AWS::NetworkFirewall::Firewall` | エンドポイントの時間料金×サブネット数。同じテンプレートにあるファイアウォールポリシーがTLSインスペクションの設定を持つときは、Advanced Inspectionの時間料金×サブネット数も加える |
 | `AWS::WAFv2::WebACL` | Web ACLとルール。同じテンプレートのルールグループを参照していれば、そのグループのルールも数える（マネージドルールグループの追加料金は含みません） |
-| `AWS::CloudWatch::Alarm`、`CompositeAlarm` | アラームのメトリクスごとの料金（標準解像度・高解像度）、複合アラームごとの料金 |
+| `AWS::CloudWatch::Alarm`、`CompositeAlarm` | アラームのメトリクスごとの料金（標準解像度・高解像度。異常検出のバンドは2つ分を加えます）、複合アラームごとの料金 |
 | `AWS::Lambda::Alias`、`AWS::Lambda::Version` | プロビジョニング済み同時実行数×関数のメモリ（x86とARM）。バージョンは、同じテンプレートにあるJava以外の関数のSnapStartキャッシュ（メモリ1GBあたり） |
 | `AWS::Lambda::CapacityProvider` | Lambda Managed Instances。EC2の時間料金（Linux）と管理料金×このプロバイダを使う関数に最低限必要なインスタンス数。[前提](#前提)を参照してください。`AllowedInstanceTypes`でタイプを1つに決めている必要があります |
 | `AWS::CloudWatch::Dashboard` | ダッシュボードごとに$3（公開価格。ダッシュボードはPrice Listにありません） |

@@ -1,0 +1,54 @@
+# Cases that were "not supported yet": a MixedInstancesPolicy and an anomaly
+# detection alarm; priced with testPrices["eu-west-1"].
+Resources:
+  Template:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateData:
+        InstanceType: t3.small
+        BlockDeviceMappings: [{ DeviceName: /dev/xvda, Ebs: { VolumeSize: 20, VolumeType: gp3 } }]
+  # 1 base + 25% of the other 5, rounded up: 3 On-Demand t3.medium (the first
+  # override), and EBS for all 6.
+  Mixed:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      MinSize: "2"
+      MaxSize: "10"
+      DesiredCapacity: "6"
+      MixedInstancesPolicy:
+        InstancesDistribution: { OnDemandBaseCapacity: 1, OnDemandPercentageAboveBaseCapacity: 25 }
+        LaunchTemplate:
+          LaunchTemplateSpecification: { LaunchTemplateId: !Ref Template, Version: "1" }
+          Overrides: [{ InstanceType: t3.medium }, { InstanceType: t3.large }]
+  # All Spot: no instance line.
+  AllSpot:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      MinSize: "2"
+      MaxSize: "2"
+      MixedInstancesPolicy:
+        InstancesDistribution: { OnDemandPercentageAboveBaseCapacity: 0 }
+        LaunchTemplate:
+          LaunchTemplateSpecification: { LaunchTemplateId: !Ref Template, Version: "1" }
+          Overrides: [{ InstanceType: t3.medium }]
+  Weighted:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      MinSize: "2"
+      MaxSize: "2"
+      MixedInstancesPolicy:
+        LaunchTemplate:
+          LaunchTemplateSpecification: { LaunchTemplateId: !Ref Template, Version: "1" }
+          Overrides: [{ InstanceType: t3.medium, WeightedCapacity: "2" }]
+  # The metric and the band's upper and lower bounds: 3 alarm metrics.
+  Anomaly:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      ComparisonOperator: LessThanLowerOrGreaterThanUpperThreshold
+      EvaluationPeriods: 1
+      ThresholdMetricId: band
+      Metrics:
+        - Id: m1
+          MetricStat: { Metric: { Namespace: AWS/EC2, MetricName: CPUUtilization }, Period: 300, Stat: Average }
+        - Id: band
+          Expression: ANOMALY_DETECTION_BAND(m1, 2)
