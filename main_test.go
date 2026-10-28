@@ -71,6 +71,12 @@ var testPrices = &Prices{Source: "test prices", AsOf: "2026-10-16", Regions: map
 		"rds|InstanceUsage:db.m5.large|20": 0.438, "rds|RDS:GP3-Storage|20": 0.115, "rds|RDS:GP3-Storage|10": 0.115,
 		"ec2|m5.xlarge": 0.192, "emr|m5.xlarge": 0.048, "ebs|EBS:VolumeUsage.gp2": 0.1,
 		"eks|AmazonEKS-Hours:perCluster": 0.1, "eks|AmazonEKS-Hours:extendedSupport": 0.5},
+	"eu-north-1": {"nat|NatGateway-Hours": 0.046, "vpc|PublicIPv4:InUseAddress": 0.005, "ec2|m5.large": 0.102, "ec2|m6g.large": 0.0816,
+		"ebs|EBS:VolumeUsage.gp2": 0.105, "ebs|EBS:VolumeUsage.gp3": 0.084, "ebs|EBS:VolumeP-IOPS.gp3": 0.005, "ebs|EBS:VolumeP-Throughput.gp3": 0.042,
+		"rds|InstanceUsage:db.m5.large|14": 0.178, "rds|InstanceUsage:db.m6g.large|14": 0.16, "rds|RDS:GP3-Storage|14": 0.121,
+		"elasticache|Redis|cache.t3.micro": 0.018, "elasticache|Redis|cache.t4g.micro": 0.017,
+		"fargate|Fargate-vCPU-Hours:perCPU": 0.04256, "fargate|Fargate-GB-Hours": 0.00467,
+		"fargate|Fargate-ARM-vCPU-Hours:perCPU": 0.03405, "fargate|Fargate-ARM-GB-Hours": 0.00374},
 	"global": {"arc|Global-Cluster-Hours": 2.5, "arc|Global-ReadinessCheck-Hours": 0.045,
 		"r53hc|Health-Check-AWS": 0.5, "r53hc|Health-Check-Non-AWS": 0.75, "r53hc|Health-Check-Option-AWS": 1, "r53hc|Health-Check-Option-Non-AWS": 2},
 }}
@@ -177,6 +183,46 @@ func TestHTML(t *testing.T) {
 
 // Capacity providers sized by the functions that use them across stacks, a
 // dashboard, and a type with no rule next to a free one.
+// Cheaper settings: gp3, Graviton (EC2, RDS, ElastiCache, Fargate) and one NAT
+// Gateway per VPC, in text and Markdown; without --suggest, none.
+func TestSuggest(t *testing.T) {
+	stacks, err := LoadInputs([]string{"testdata/suggest.yaml"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	stacks[0].Region = "eu-north-1"
+	rep := NewReport(stacks, Estimate(stacks, testPrices), testPrices)
+	var text, md bytes.Buffer
+	rep.WriteText(&text)
+	rep.WriteMarkdown(&md)
+	golden(t, "suggest.yaml", text.String())
+	golden(t, "suggest.md", md.String())
+	var out bytes.Buffer
+	if err := run([]string{"--region", "eu-north-1", "testdata/suggest.yaml"}, &out); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out.String(), "→") {
+		t.Errorf("suggestions without --suggest:\n%s", out.String())
+	}
+	if err := run([]string{"--suggest", "--base", "testdata/suggest.yaml", "testdata/suggest.yaml"}, &out); err == nil {
+		t.Error("--suggest with --base: no error")
+	}
+}
+
+func TestGraviton(t *testing.T) {
+	for in, want := range map[string]string{"t3.micro": "t4g.micro", "db.r6i.xlarge": "db.r6g.xlarge",
+		"cache.m5.large": "cache.m6g.large", "m5.large.search": "m6g.large.search", "c6id.2xlarge": "c6gd.2xlarge"} {
+		if got, ok := graviton(in); !ok || got != want {
+			t.Errorf("graviton(%s) = %s, %v; want %s", in, got, ok, want)
+		}
+	}
+	for _, in := range []string{"m6g.large", "p4d.24xlarge", "db.serverless", "x"} {
+		if got, ok := graviton(in); ok {
+			t.Errorf("graviton(%s) = %s", in, got)
+		}
+	}
+}
+
 func TestCapacityProvider(t *testing.T) {
 	golden(t, "lmi", report(t, "us-east-1", "testdata/lmi-provider.yaml", "testdata/lmi-consumer.yaml"))
 }

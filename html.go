@@ -69,6 +69,9 @@ type htmlLine struct {
 	Quantity string  `json:"quantity"`
 	Monthly  float64 `json:"monthly"`
 	Reason   string  `json:"reason"`
+	// Suggestion and Saving are set with --suggest.
+	Suggestion string  `json:"suggestion,omitempty"`
+	Saving     float64 `json:"saving,omitempty"`
 }
 
 type htmlData struct {
@@ -104,7 +107,7 @@ func (rep Report) WriteHTML(w io.Writer) error {
 					d.Items = append(d.Items, res)
 				}
 				res.Monthly += it.Monthly
-				res.Lines = append(res.Lines, htmlLine{it.Quantity, it.Monthly, it.Reason})
+				res.Lines = append(res.Lines, htmlLine{it.Quantity, it.Monthly, it.Reason, it.Suggestion, it.Saving})
 			}
 		}
 		d.Unknown = append(d.Unknown, r.Unknown...)
@@ -310,7 +313,8 @@ function renderRows() {
     (!q || [it.stack, it.path, it.type, it.category, it.region, ...it.lines.map(l => l.reason)].join(" ").toLowerCase().includes(q))).sort(compare);
   const cell = (it, c) => {
     if (c.key === "lines") return '<td class="detail"><ul class="lines">' + it.lines.map(l =>
-      '<li><span class="q">' + esc(l.quantity) + "</span> " + esc(l.reason) + (it.lines.length > 1 ? ' <span class="m">' + money(l.monthly) + "</span>" : "") + "</li>").join("") + "</ul></td>";
+      '<li><span class="q">' + esc(l.quantity) + "</span> " + esc(l.reason) + (it.lines.length > 1 ? ' <span class="m">' + money(l.monthly) + "</span>" : "") +
+      (l.suggestion ? '<div class="m">→ -' + money(l.saving) + "/mo: " + esc(l.suggestion) + "</div>" : "") + "</li>").join("") + "</ul></td>";
     const v = c.key === "monthly" ? money(it.monthly) : it[c.key];
     const cls = c.num ? "num" : c.key === "path" ? "path" : "";
     return "<td" + (cls ? ' class="' + cls + '"' : "") + ">" + esc(v) + "</td>";

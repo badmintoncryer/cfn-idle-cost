@@ -1,0 +1,31 @@
+Resources:
+  Vpc: { Type: AWS::EC2::VPC, Properties: { CidrBlock: 10.0.0.0/16 } }
+  SubnetA: { Type: AWS::EC2::Subnet, Properties: { VpcId: !Ref Vpc, CidrBlock: 10.0.0.0/24 } }
+  SubnetB: { Type: AWS::EC2::Subnet, Properties: { VpcId: !Ref Vpc, CidrBlock: 10.0.1.0/24 } }
+  EipA: { Type: AWS::EC2::EIP }
+  EipB: { Type: AWS::EC2::EIP }
+  # Two NAT Gateways in one VPC: the second can go. A private one is not counted with them.
+  NatA: { Type: AWS::EC2::NatGateway, Properties: { SubnetId: !Ref SubnetA, AllocationId: !GetAtt EipA.AllocationId } }
+  NatB: { Type: AWS::EC2::NatGateway, Properties: { SubnetId: !Ref SubnetB, AllocationId: !GetAtt EipB.AllocationId } }
+  NatPrivate: { Type: AWS::EC2::NatGateway, Properties: { SubnetId: !Ref SubnetB, ConnectivityType: private } }
+  Server:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: m5.large
+      BlockDeviceMappings: [{ DeviceName: /dev/xvda, Ebs: { VolumeSize: 100, VolumeType: gp2 } }]
+  # Already Graviton and gp3: nothing to suggest.
+  ArmServer:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: m6g.large
+      BlockDeviceMappings: [{ DeviceName: /dev/xvda, Ebs: { VolumeSize: 100, VolumeType: gp3 } }]
+  # gp3 has to buy the IOPS and throughput gp2 gives a 2000 GB volume.
+  Big: { Type: AWS::EC2::Volume, Properties: { Size: 2000, VolumeType: gp2 } }
+  Db: { Type: AWS::RDS::DBInstance, Properties: { DBInstanceClass: db.m5.large, Engine: postgres, AllocatedStorage: 20 } }
+  Cache: { Type: AWS::ElastiCache::CacheCluster, Properties: { Engine: redis, CacheNodeType: cache.t3.micro, NumCacheNodes: 2 } }
+  Task:
+    Type: AWS::ECS::TaskDefinition
+    Properties: { Cpu: "1024", Memory: "2048" }
+  Service:
+    Type: AWS::ECS::Service
+    Properties: { LaunchType: FARGATE, DesiredCount: 2, TaskDefinition: !Ref Task }
