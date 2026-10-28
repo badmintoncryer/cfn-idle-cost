@@ -163,7 +163,7 @@ and provisioned storage billed whether you use it or not.
 | `AWS::ElasticLoadBalancingV2::LoadBalancer` | ALB / NLB / GWLB hourly, plus one public IPv4 per subnet when internet-facing (none for `dualstack-without-public-ipv4`) |
 | `AWS::ElasticLoadBalancing::LoadBalancer` | Classic Load Balancer hourly |
 | `AWS::EC2::Instance` | instance hourly (Linux), EBS volumes in `BlockDeviceMappings`, the public IPv4 it gets at launch |
-| `AWS::AutoScaling::AutoScalingGroup` | instance hourly × `DesiredCapacity` (or `MinSize`), EBS volumes and public IPv4 at launch, from its launch template or launch configuration |
+| `AWS::AutoScaling::AutoScalingGroup` | instance hourly × `DesiredCapacity` (or `MinSize`), EBS volumes and public IPv4 at launch, from its launch template or launch configuration. With a `MixedInstancesPolicy`: only the On-Demand part (`OnDemandBaseCapacity`, then `OnDemandPercentageAboveBaseCapacity` of the rest, rounded up) at the first override's type; Spot is not counted, EBS and IPv4 are for all instances |
 | `AWS::EC2::Volume` | size, gp3 IOPS / throughput above 3000 / 125 MiB/s, io1 / io2 IOPS |
 | `AWS::RDS::DBInstance` | instance hourly (Single-AZ / Multi-AZ; MySQL, PostgreSQL, MariaDB, Oracle and SQL Server by license model), allocated storage, provisioned IOPS and throughput above the gp3 baseline. Aurora: provisioned instances, or Serverless v2 minimum ACU (I/O-Optimized aware) |
 | `AWS::RDS::DBCluster` (Multi-AZ DB cluster) | cluster hourly (writer and two readable standbys), allocated storage and provisioned IOPS (gp3 IOPS and throughput not supported yet) |
@@ -183,7 +183,7 @@ and provisioned storage billed whether you use it or not.
 | `AWS::EKS::Nodegroup` | instance hourly × `DesiredSize` (or `MinSize`), on-demand, one instance type |
 | `AWS::NetworkFirewall::Firewall` | endpoint hourly × subnets, plus Advanced Inspection hourly × subnets when its firewall policy (in the same template) has a TLS inspection configuration |
 | `AWS::WAFv2::WebACL` | web ACL, its rules, and the rules of the rule groups in the same template it references (managed rule group fees not counted) |
-| `AWS::CloudWatch::Alarm`, `CompositeAlarm` | per alarm metric (standard or high resolution), per composite alarm |
+| `AWS::CloudWatch::Alarm`, `CompositeAlarm` | per alarm metric (standard or high resolution; an anomaly detection band adds two), per composite alarm |
 | `AWS::Lambda::Alias`, `AWS::Lambda::Version` | provisioned concurrency × function memory (x86 and ARM). Versions: the SnapStart cache per GB of memory, for a non-Java function in the same template |
 | `AWS::Lambda::CapacityProvider` | Lambda Managed Instances: EC2 hourly (Linux) plus the management fee × the instances the functions that use it need at least. See [Assumptions](#assumptions). Needs `AllowedInstanceTypes` with one type |
 | `AWS::CloudWatch::Dashboard` | $3 per dashboard (the list price; dashboards are not in the Price List) |

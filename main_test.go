@@ -35,7 +35,7 @@ var testPrices = &Prices{Source: "test prices", AsOf: "2026-10-16", Regions: map
 		"rdsproxy|RDS:ProxyUsage": 0.015, "rdsproxy|RDS:Proxy-ASv2-Usage": 0.015, "rds|InstanceUsage:db.r6g.large|16": 0.276,
 		"rds|Aurora:ServerlessV2Usage|16": 0.13, "aoss|IndexingOCU": 0.24, "aoss|SearchOCU": 0.24,
 		"memorydb|Redis|db.t4g.small": 0.048, "sagemaker|ml.m5.large": 0.128,
-		"eks|AmazonEKS-Hours:perCluster": 0.1, "ec2|t3.medium": 0.0456, "nfw|Endpoint-Hour": 0.395,
+		"eks|AmazonEKS-Hours:perCluster": 0.1, "ec2|t3.medium": 0.0456, "ebs|EBS:VolumeUsage.gp3": 0.088, "nfw|Endpoint-Hour": 0.395,
 		"waf|WebACLV2": 5, "waf|RuleV2": 1, "cw|CW:AlarmMonitorUsage": 0.1, "cw|CW:HighResAlarmMonitorUsage": 0.3,
 		"lambda|Lambda-Provisioned-Concurrency-ARM": 0.0000033334, "tgw|TransitGatewayVPC": 0.05, "tgw|TransitGatewayVPN": 0.05,
 		"vpc|VPN-Usage-Hours:ipsec.1": 0.05, "resolver|ResolverNetworkInterface": 0.125,
@@ -392,4 +392,8 @@ func TestBundledPrices(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestMixedInstancesAndAnomalyAlarm(t *testing.T) {
+	golden(t, "mixed.yaml", report(t, "eu-west-1", "testdata/mixed.yaml"))
 }

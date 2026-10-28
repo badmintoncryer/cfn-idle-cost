@@ -119,20 +119,54 @@ func blueGreen(e *est, p map[string]any) {
 }
 
 // asgLaunch returns the instance type, block devices and public IP setting of
-// an Auto Scaling group's launch template or configuration.
-func (e *est) asgLaunch(p map[string]any) (t string, bdm, assoc any) {
-	if _, ok := p["MixedInstancesPolicy"]; ok {
-		panic(unresolved("MixedInstancesPolicy is not supported yet"))
+// an Auto Scaling group's launch template or configuration. With a
+// MixedInstancesPolicy, the type is the first override's (the On-Demand
+// priority) and dist is its InstancesDistribution, non-nil.
+func (e *est) asgLaunch(p map[string]any) (t string, bdm, assoc any, dist map[string]any) {
+	if mp, ok := p["MixedInstancesPolicy"]; ok {
+		mip := asMap(mp)
+		lt := asMap(mip["LaunchTemplate"])
+		data := e.launchTemplate(asMap(lt["LaunchTemplateSpecification"]))
+		t = e.str(data, "InstanceType", "")
+		if l, ok := lt["Overrides"].([]any); ok && len(l) > 0 {
+			o := asMap(l[0])
+			if o["InstanceRequirements"] != nil {
+				panic(unresolved("MixedInstancesPolicy with InstanceRequirements: the instance type is chosen at launch"))
+			}
+			for _, x := range l {
+				if w := e.num(asMap(x), "WeightedCapacity", 1); w != 1 {
+					panic(unresolved("MixedInstancesPolicy with WeightedCapacity is not supported yet"))
+				}
+			}
+			t = e.mustStr(o, "InstanceType")
+		}
+		if t == "" {
+			panic(unresolved("MixedInstancesPolicy names no instance type"))
+		}
+		dist = asMap(mip["InstancesDistribution"])
+		if dist == nil {
+			dist = map[string]any{}
+		}
+		return t, data["BlockDeviceMappings"], firstMap(data["NetworkInterfaces"])["AssociatePublicIpAddress"], dist
 	}
 	if lt, ok := p["LaunchTemplate"]; ok {
 		data := e.launchTemplate(asMap(lt))
-		return e.mustStr(data, "InstanceType"), data["BlockDeviceMappings"], firstMap(data["NetworkInterfaces"])["AssociatePublicIpAddress"]
+		return e.mustStr(data, "InstanceType"), data["BlockDeviceMappings"], firstMap(data["NetworkInterfaces"])["AssociatePublicIpAddress"], nil
 	}
 	if _, ok := p["LaunchConfigurationName"]; ok {
 		_, lc := e.ref(p, "LaunchConfigurationName")
-		return e.mustStr(lc.Properties, "InstanceType"), lc.Properties["BlockDeviceMappings"], lc.Properties["AssociatePublicIpAddress"]
+		return e.mustStr(lc.Properties, "InstanceType"), lc.Properties["BlockDeviceMappings"], lc.Properties["AssociatePublicIpAddress"], nil
 	}
 	panic(unresolved("no LaunchTemplate or LaunchConfigurationName"))
+}
+
+// onDemand returns how many of n instances an InstancesDistribution launches
+// On-Demand: OnDemandBaseCapacity, then OnDemandPercentageAboveBaseCapacity
+// of the rest, rounded up (toward On-Demand).
+func (e *est) onDemand(dist map[string]any, n float64) float64 {
+	base := math.Min(n, e.num(dist, "OnDemandBaseCapacity", 0))
+	pct := e.num(dist, "OnDemandPercentageAboveBaseCapacity", 100)
+	return base + math.Ceil((n-base)*pct/100-1e-9)
 }
 
 // warmPool bills the instances an Auto Scaling group keeps prepared: their EBS
@@ -140,7 +174,10 @@ func (e *est) asgLaunch(p map[string]any) (t string, bdm, assoc any) {
 func warmPool(e *est, p map[string]any) {
 	_, asg := e.ref(p, "AutoScalingGroupName")
 	ap := asg.Properties
-	t, bdm, assoc := e.asgLaunch(ap)
+	t, bdm, assoc, dist := e.asgLaunch(ap)
+	if dist != nil {
+		panic(unresolved("its Auto Scaling group has a MixedInstancesPolicy, which warm pools don't support"))
+	}
 	desired := e.num(ap, "DesiredCapacity", -1)
 	if desired < 0 {
 		desired = e.mustNum(ap, "MinSize")
