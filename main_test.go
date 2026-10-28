@@ -393,3 +393,39 @@ func TestBundledPrices(t *testing.T) {
 		}
 	}
 }
+
+// The same stacks priced in two regions; the NAT Gateway and the table have
+// no test price in us-east-1, so they show as "?" there.
+func TestCompareRegions(t *testing.T) {
+	stacks, err := LoadInputs([]string{"testdata/cdk.out"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	before := fmt.Sprint(len(stacks))
+	for _, s := range stacks {
+		before += " " + s.Region
+	}
+	var b bytes.Buffer
+	c := CompareRegions(stacks, []string{"ap-northeast-1", "us-east-1"}, testPrices)
+	c.WriteText(&b)
+	b.WriteString("\n")
+	c.WriteMarkdown(&b)
+	golden(t, "compare", b.String())
+	after := fmt.Sprint(len(stacks))
+	for _, s := range stacks {
+		after += " " + s.Region
+	}
+	if after != before {
+		t.Errorf("regions not restored: %q, want %q", after, before)
+	}
+	for _, args := range [][]string{
+		{"--compare-regions", "us-east-1"},
+		{"--compare-regions", "us-east-1,", "--region", "us-east-1"},
+		{"--compare-regions", "us-east-1,eu-west-1", "--max", "10"},
+		{"--compare-regions", "us-east-1,eu-west-1", "--format", "json"},
+	} {
+		if _, ok := run(append([]string{"testdata/cdk.out"}, args...), io.Discard).(usageError); !ok {
+			t.Errorf("%v: want a usage error", args)
+		}
+	}
+}
