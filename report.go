@@ -25,16 +25,35 @@ type regionReport struct {
 	NoRule  []Item        `json:"noRule"`
 }
 
+// stageReport is the idle cost of one CDK Stage, over all its regions.
+type stageReport struct {
+	Stage   string  `json:"stage"` // "" for the stacks directly in the app
+	Monthly float64 `json:"monthly"`
+}
+
 type Report struct {
 	Regions []regionReport `json:"regions"`
+	Stages  []stageReport  `json:"stages,omitempty"` // only when some stack is in a Stage
 	Prices  string         `json:"prices"`
+}
+
+// stageName labels the stacks outside any Stage.
+func stageName(s string) string {
+	if s == "" {
+		return "(app)"
+	}
+	return s
 }
 
 // NewReport groups items by region and stack, most expensive first.
 func NewReport(stacks []*Stack, items []Item, prices *Prices) Report {
 	byRegion := map[string]*regionReport{}
 	seen := map[string]bool{}
+	stageOf := map[string]string{} // region, stack -> Stage
+	staged := false
 	for _, s := range stacks {
+		stageOf[s.Region+"\x00"+s.Name] = s.Stage()
+		staged = staged || s.Stage() != ""
 		r := byRegion[s.Region]
 		if r == nil {
 			r = &regionReport{Region: s.Region, Unknown: []Item{}, Skipped: []Item{}, NoRule: []Item{}}
@@ -71,6 +90,20 @@ func NewReport(stacks []*Stack, items []Item, prices *Prices) Report {
 		r.Billed[i].Items = append(r.Billed[i].Items, it)
 	}
 	rep := Report{Prices: prices.Source}
+	if staged {
+		byStage := map[string]float64{}
+		for _, st := range stageOf {
+			byStage[st] += 0 // every Stage, even one at $0
+		}
+		for _, it := range items {
+			if !it.Unknown && !it.NotCounted && !it.NoRule {
+				byStage[stageOf[it.Region+"\x00"+it.Stack]] += it.Monthly
+			}
+		}
+		for _, st := range sortedIDs(byStage) {
+			rep.Stages = append(rep.Stages, stageReport{st, byStage[st]})
+		}
+	}
 	for _, region := range sortedIDs(byRegion) {
 		r := byRegion[region]
 		sort.SliceStable(r.Billed, func(i, j int) bool { return r.Billed[i].Monthly > r.Billed[j].Monthly })
@@ -146,6 +179,16 @@ func (rep Report) WriteText(w io.Writer) {
 			}
 		}
 	}
+	if len(rep.Stages) > 0 {
+		nw, mw := 0, 0
+		for _, st := range rep.Stages {
+			nw, mw = max(nw, len([]rune(stageName(st.Stage)))), max(mw, len(money(st.Monthly)))
+		}
+		fmt.Fprintf(w, "\nby Stage\n")
+		for _, st := range rep.Stages {
+			fmt.Fprintf(w, "  %s  %*s/mo\n", pad(stageName(st.Stage), nw), mw, money(st.Monthly))
+		}
+	}
 	fmt.Fprintf(w, "\nprices: %s · on-demand list prices, %d h/mo, USD, free tier ignored\n", rep.Prices, hoursPerMonth)
 }
 
@@ -172,6 +215,9 @@ func (rep Report) WriteJSON(w io.Writer) error {
 				cents(&s.Items[k].Monthly)
 			}
 		}
+	}
+	for i := range rep.Stages {
+		cents(&rep.Stages[i].Monthly)
 	}
 	return writeJSON(w, rep)
 }
@@ -209,6 +255,12 @@ func (rep Report) WriteMarkdown(w io.Writer) {
 	fmt.Fprintln(w, "| Region | Stacks | Idle cost |\n|---|---:|---:|")
 	for _, r := range rep.Regions {
 		fmt.Fprintf(w, "| %s | %d | %s/mo |\n", r.Region, r.Stacks, money(r.Monthly))
+	}
+	if len(rep.Stages) > 0 {
+		fmt.Fprintln(w, "\n| Stage | Idle cost |\n|---|---:|")
+		for _, st := range rep.Stages {
+			fmt.Fprintf(w, "| %s | %s/mo |\n", mdCell(stageName(st.Stage)), money(st.Monthly))
+		}
 	}
 	fmt.Fprint(w, "\n<details><summary>Breakdown by resource</summary>\n\n")
 	for _, r := range rep.Regions {

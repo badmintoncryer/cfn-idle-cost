@@ -303,7 +303,7 @@ func TestDiff(t *testing.T) {
 		max, maxIncrease float64
 		fail             bool
 	}{{-1, 0, true}, {-1, -1, false}, {100, -1, false}, {20, -1, true}} { // Key became "?": --max-increase can't pass
-		if err := checkBudget(head, d, c.max, c.maxIncrease); (err != nil) != c.fail {
+		if err := checkBudget(head, d, budgetFlag{total: c.max}, c.maxIncrease); (err != nil) != c.fail {
 			t.Errorf("--max %v --max-increase %v: err = %v", c.max, c.maxIncrease, err)
 		}
 	}
@@ -390,6 +390,34 @@ func TestBundledPrices(t *testing.T) {
 			if v, ok := p.Get(r, k); !ok || v <= 0 {
 				t.Errorf("%s: %s = %v, %v", r, k, v, ok)
 			}
+		}
+	}
+}
+
+// --max Stage=usd checks one CDK Stage; "(app)" is the stacks outside any.
+// Bundled prices: Prod is about $54/mo and (app) about $97/mo.
+func TestStageBudget(t *testing.T) {
+	for _, c := range []struct {
+		max  []string
+		fail bool
+	}{
+		{[]string{"Prod=80"}, false},
+		{[]string{"Prod=30"}, true},
+		{[]string{"(app)=1", "Prod=80"}, true},
+		{[]string{"1000", "Prod=80"}, false},
+	} {
+		args := []string{"testdata/cdk.out", "--region", "us-east-1"}
+		for _, m := range c.max {
+			args = append(args, "--max", m)
+		}
+		_, over := run(args, io.Discard).(overBudget)
+		if over != c.fail {
+			t.Errorf("%v: over budget = %v", c.max, over)
+		}
+	}
+	for _, m := range []string{"Dev=10", "=10", "Prod=x"} {
+		if _, ok := run([]string{"testdata/cdk.out", "--region", "us-east-1", "--max", m}, io.Discard).(usageError); !ok {
+			t.Errorf("--max %s: want a usage error", m)
 		}
 	}
 }

@@ -24,4 +24,8 @@ us-east-1 · 1 stack · idle ≈ $1.00/mo
 Agnostic        $1.00/mo
   Floating  ×1  $1.00  customer managed key
 
+by Stage
+  (app)  $97/mo
+  Prod   $54/mo
+
 prices: test prices · on-demand list prices, 730 h/mo, USD, free tier ignored
