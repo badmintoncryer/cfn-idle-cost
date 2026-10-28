@@ -75,6 +75,7 @@ type htmlData struct {
 	Total      float64         `json:"total"`
 	Prices     string          `json:"prices"`
 	Hours      int             `json:"hours"`
+	Basis      string          `json:"basis"`
 	Regions    []htmlRegion    `json:"regions"`
 	Items      []*htmlResource `json:"items"`
 	Unknown    []Item          `json:"unknown"`
@@ -91,7 +92,7 @@ type htmlRegion struct {
 // WriteHTML writes a self-contained page: totals, a bar per category, and a
 // table to sort and filter. It needs no network.
 func (rep Report) WriteHTML(w io.Writer) error {
-	d := htmlData{Total: rep.Total(), Prices: rep.Prices, Hours: hoursPerMonth, Regions: []htmlRegion{},
+	d := htmlData{Total: rep.Total(), Prices: rep.Prices, Hours: hoursPerMonth, Basis: priceBasis(), Regions: []htmlRegion{},
 		Items: []*htmlResource{}, Unknown: []Item{}, NotCounted: []Item{}, NoRule: []Item{}}
 	for _, r := range rep.Regions {
 		d.Regions = append(d.Regions, htmlRegion{r.Region, r.Stacks, r.Monthly})
@@ -231,7 +232,7 @@ const multiRegion = D.regions.length > 1;
 
 $("total").textContent = "Idle cost ≈ " + money(D.total) + "/mo";
 $("regions").textContent = D.regions.map(r => r.region + " · " + r.stacks + (r.stacks === 1 ? " stack" : " stacks") + (multiRegion ? " · " + money(r.monthly) + "/mo" : "")).join("   |   ");
-$("foot").textContent = "cfn-idle-cost · prices: " + D.prices + " · on-demand list prices, " + D.hours + " h/mo, USD, free tier ignored";
+$("foot").textContent = "cfn-idle-cost · prices: " + D.prices + " · " + D.basis + ", " + D.hours + " h/mo, USD, free tier ignored";
 
 const cats = {};
 for (const it of D.items) {

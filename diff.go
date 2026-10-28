@@ -260,7 +260,7 @@ func (d *Diff) WriteText(w io.Writer) {
 			fmt.Fprintf(w, "  %s %s  %s  %*s → %*s  %*s  %s\n", changeMark[c.Kind], pad(c.Stack, sw), pad(c.Path, pw), bw, c.amount(true), aw, c.amount(false), dw, c.delta(), c.note())
 		}
 	}
-	fmt.Fprintf(w, "\nprices: %s · on-demand list prices, %d h/mo, USD, free tier ignored\n", d.Prices, hoursPerMonth)
+	fmt.Fprintf(w, "\nprices: %s · %s, %d h/mo, USD, free tier ignored\n", d.Prices, priceBasis(), hoursPerMonth)
 }
 
 func (d *Diff) WriteMarkdown(w io.Writer) {
@@ -287,7 +287,7 @@ func (d *Diff) WriteMarkdown(w io.Writer) {
 		}
 		fmt.Fprintln(w)
 	}
-	fmt.Fprintf(w, "<sub>cfn-idle-cost · prices: %s · on-demand list prices, %d h/mo, USD, free tier ignored</sub>\n", d.Prices, hoursPerMonth)
+	fmt.Fprintf(w, "<sub>cfn-idle-cost · prices: %s · %s, %d h/mo, USD, free tier ignored</sub>\n", d.Prices, priceBasis(), hoursPerMonth)
 }
 
 func (d *Diff) WriteJSON(w io.Writer) error {

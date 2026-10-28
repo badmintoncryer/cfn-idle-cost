@@ -35,6 +35,8 @@ Flags:
                        parameters without one use their Default
   --live               fetch current prices from the AWS Price List Query API
                        (needs credentials with pricing:GetProducts) instead of the bundled snapshot
+  --pricing p          on-demand (default) or reserved-1y: price EC2, RDS, ElastiCache, OpenSearch,
+                       Redshift and MemoryDB instances at 1-year no-upfront Reserved Instance rates
   --version            print the version
 
 Exit codes: 0 ok, 1 error, 2 usage error, 3 over --max or --max-increase.
@@ -78,6 +80,7 @@ func run(args []string, stdout io.Writer) error {
 	maxTotal := fs.Float64("max", -1, "")
 	maxIncrease := fs.Float64("max-increase", -1, "")
 	live := fs.Bool("live", false, "")
+	pricing := fs.String("pricing", "on-demand", "")
 	var params paramFlag
 	fs.Var(&params, "parameter", "")
 	showVersion := fs.Bool("version", false, "")
@@ -119,6 +122,13 @@ func run(args []string, stdout io.Writer) error {
 	if *format == "html" && *base != "" {
 		return usageError{"--format html does not support --base yet; use md or text"}
 	}
+	if !in(*pricing, "on-demand", "reserved-1y") {
+		return usageError{"--pricing must be on-demand or reserved-1y"}
+	}
+	if *pricing == "reserved-1y" && *live {
+		return usageError{"--pricing reserved-1y does not support --live yet; use the bundled snapshot"}
+	}
+	reservedPricing = *pricing == "reserved-1y"
 	if *maxIncrease >= 0 && *base == "" {
 		return usageError{"--max-increase needs --base"}
 	}
