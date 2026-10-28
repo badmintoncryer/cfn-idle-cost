@@ -61,6 +61,7 @@ npx cfn-idle-cost [flags] [cdk.out | template ...]
 | `--format <f>` | 出力形式です。`text`（既定）、`md`（プルリクエストのコメント向け）、`json`、`html`から選びます。`html`を選ぶと、ブラウザで開くページを出します。ページには、カテゴリ別の費用と、並べ替えと絞り込みのできる表が載ります（例: `npx cfn-idle-cost --format html > idle-cost.html`）。`html`はまだ`--base`と一緒に使えません。 |
 | `--max <usd>` | アイドルコストの合計が月`usd`ドルを超えたら、終了コード`3`で終わります。 |
 | `--max-increase <usd>` | `--base`と一緒に使います。アイドルコストの増加が月`usd`ドルを超えたら、終了コード`3`で終わります。 |
+| `--compare-regions <r1,r2,...>` | 同じスタックを各リージョンにデプロイしたとして見積もり、合計を並べて表示します。料金の差が大きいリソースも出します（そのリージョンで見積もれないリソース、たとえば提供されていないタイプは`?`）。最初のリージョンが基準です。`text`か`md`で、`--base`、`--live`、予算のフラグとは併用できません。 |
 | `--region <r>` | リージョンを持たないスタック（envを指定していないCDKスタックと、素のテンプレート）に使うリージョンです。`env`を指定したスタックは、そのリージョンのまま見積もります。リージョンのないスタックがあるのにこのフラグがなければ、エラーになります。 |
 | `--parameter [Stack:]Key=Value` | テンプレートのパラメータの値を指定します。そのパラメータを持つすべてのスタックに効き、`Stack:`を付けるとそのスタックだけに効きます。複数指定できます。指定しなかったパラメータには`Default`を使います。 |
 | `--live` | 同梱のスナップショットではなく、[Price List Query API](https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/using-price-list-query-api.html)から最新の価格を取得します。`pricing:GetProducts`を許可したAWSの認証情報が必要です。 |

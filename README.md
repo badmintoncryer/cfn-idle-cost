@@ -68,6 +68,7 @@ nested stacks) or CloudFormation templates (JSON or YAML).
 | `--format <f>` | `text` (default), `md` (a pull request comment), `json`, or `html`: a page to open in a browser, with the cost by category and a table you can sort and filter (`npx cfn-idle-cost --format html > idle-cost.html`). `html` does not support `--base` yet. |
 | `--max <usd>` | Exit `3` if the total idle cost is over `usd` per month. |
 | `--max-increase <usd>` | With `--base`: exit `3` if the idle cost grows by more than `usd` per month. |
+| `--compare-regions <r1,r2,...>` | Price the same stacks in each region, as if all of them were deployed there, and print the totals side by side with the resources whose price differs most (`?` where a resource can't be estimated in that region, e.g. a type not offered there). The first region is the reference. `text` or `md`; not with `--base`, `--live` or the budget flags. |
 | `--region <r>` | Region for stacks that have none: env-agnostic CDK stacks and plain templates. Stacks with an `env` keep their own region. Without it, such stacks are an error. |
 | `--parameter [Stack:]Key=Value` | Value of a template parameter, for every stack that has it or only `Stack`. Repeat it for more. Parameters without one use their `Default`. |
 | `--live` | Fetch current prices from the [Price List Query API](https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/using-price-list-query-api.html) instead of the bundled snapshot. Needs AWS credentials with `pricing:GetProducts`. |
