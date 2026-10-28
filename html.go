@@ -74,7 +74,7 @@ type htmlLine struct {
 type htmlData struct {
 	Total      float64         `json:"total"`
 	Prices     string          `json:"prices"`
-	Hours      int             `json:"hours"`
+	Hours      float64         `json:"hours"`
 	Regions    []htmlRegion    `json:"regions"`
 	Items      []*htmlResource `json:"items"`
 	Unknown    []Item          `json:"unknown"`

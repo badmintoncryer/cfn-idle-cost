@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -390,6 +391,41 @@ func TestBundledPrices(t *testing.T) {
 			if v, ok := p.Get(r, k); !ok || v <= 0 {
 				t.Errorf("%s: %s = %v, %v", r, k, v, ok)
 			}
+		}
+	}
+}
+
+// --hours prices hour-based charges for fewer hours; storage and monthly fees stay whole.
+func TestHours(t *testing.T) {
+	defer func(h float64) { hoursPerMonth = h }(hoursPerMonth)
+	hoursPerMonth = 365
+	stacks, err := LoadInputs([]string{"testdata/hours.yaml"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	stacks[0].Region = "ap-northeast-1"
+	got := map[string]float64{}
+	for _, it := range Estimate(stacks, testPrices) {
+		got[it.LogicalID+" "+it.Reason] += it.Monthly
+	}
+	for k, want := range map[string]float64{
+		"Nat NAT Gateway":                   0.062 * 365,
+		"Server t3.micro on-demand (Linux)": 0.0136 * 365,
+		"Data EBS gp3 storage":              100 * 0.096,
+		"Key customer managed key":          1,
+	} {
+		if math.Abs(got[k]-want) > 1e-9 {
+			t.Errorf("%s = %g, want %g", k, got[k], want)
+		}
+	}
+	var b bytes.Buffer
+	NewReport(stacks, Estimate(stacks, testPrices), testPrices).WriteText(&b)
+	if !strings.Contains(b.String(), "365 h/mo") {
+		t.Errorf("footer: %s", b.String())
+	}
+	for _, h := range []string{"0", "745", "-1"} {
+		if err := run([]string{"--hours", h, "testdata/hours.yaml"}, io.Discard); !errors.As(err, new(usageError)) {
+			t.Errorf("--hours %s: %v", h, err)
 		}
 	}
 }

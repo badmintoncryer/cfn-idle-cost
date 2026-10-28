@@ -10,7 +10,8 @@ import (
 	"time"
 )
 
-const hoursPerMonth = 730
+// hoursPerMonth is how many hours a month hour-based charges run: 730, or --hours.
+var hoursPerMonth = 730.0
 
 // Item is one billed line of a resource, or (Unknown != "") a resource whose
 // idle cost could not be estimated.
