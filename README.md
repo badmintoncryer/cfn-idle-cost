@@ -65,7 +65,8 @@ nested stacks) or CloudFormation templates (JSON or YAML).
 | Flag | What it does |
 |---|---|
 | `--base <path>` | Compare against another `cdk.out` (or template), e.g. one synthesized from `main`, and print only what changes. See [In pull requests](#in-pull-requests). |
-| `--format <f>` | `text` (default), `md` (a pull request comment), `json`, or `html`: a page to open in a browser, with the cost by category and a table you can sort and filter (`npx cfn-idle-cost --format html > idle-cost.html`). `html` does not support `--base` yet. |
+| `--format <f>` | `text` (default), `md` (a pull request comment), `json`, or `html`: a page to open in a browser, with the cost by category and a table you can sort and filter (`npx cfn-idle-cost --format html > idle-cost.html`). `html` does not support `--base` yet. Also `sarif`, see [Code scanning](#code-scanning). |
+| `--sarif-min <usd>` | With `--format sarif`: report only resources that idle at `usd` per month or more. |
 | `--max <usd>` | Exit `3` if the total idle cost is over `usd` per month. |
 | `--max-increase <usd>` | With `--base`: exit `3` if the idle cost grows by more than `usd` per month. |
 | `--region <r>` | Region for stacks that have none: env-agnostic CDK stacks and plain templates. Stacks with an `env` keep their own region. Without it, such stacks are an error. |
@@ -149,6 +150,26 @@ packages have no Windows binary yet.
 
 `cdk synth` reads context from `cdk.context.json`; commit it, or the synth
 needs AWS credentials for lookups.
+
+### Code scanning
+
+`--format sarif` writes the resources that idle at `--sarif-min` dollars a
+month or more (default: every one that costs anything) as
+[SARIF](https://docs.github.com/en/code-security/code-scanning/integrating-with-code-scanning/sarif-support-for-code-scanning),
+at the line of their logical ID in the template, plus notes for the ones that
+could not be estimated or are not counted yet. Upload it to GitHub code scanning:
+
+```yaml
+      - run: npx cdk synth
+      - run: npx cfn-idle-cost --format sarif --sarif-min 10 > idle-cost.sarif
+      - uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: idle-cost.sarif
+          category: idle-cost
+```
+
+The locations point at `cdk.out`, so code scanning shows the alerts but can
+link to the file only if `cdk.out` is in the repository.
 
 ## What is counted
 

@@ -58,7 +58,8 @@ npx cfn-idle-cost [flags] [cdk.out | template ...]
 | フラグ | 内容 |
 |---|---|
 | `--base <path>` | 別の`cdk.out`（またはテンプレート）と比べて、変わった分だけを表示します。たとえば`main`ブランチからsynthした`cdk.out`を指定します。詳しくは「[プルリクエストで使う](#プルリクエストで使う)」を見てください。 |
-| `--format <f>` | 出力形式です。`text`（既定）、`md`（プルリクエストのコメント向け）、`json`、`html`から選びます。`html`を選ぶと、ブラウザで開くページを出します。ページには、カテゴリ別の費用と、並べ替えと絞り込みのできる表が載ります（例: `npx cfn-idle-cost --format html > idle-cost.html`）。`html`はまだ`--base`と一緒に使えません。 |
+| `--format <f>` | 出力形式です。`text`（既定）、`md`（プルリクエストのコメント向け）、`json`、`html`から選びます。`html`を選ぶと、ブラウザで開くページを出します。ページには、カテゴリ別の費用と、並べ替えと絞り込みのできる表が載ります（例: `npx cfn-idle-cost --format html > idle-cost.html`）。`html`はまだ`--base`と一緒に使えません。`sarif`もあります（[コードスキャン](#コードスキャン)）。 |
+| `--sarif-min <usd>` | `--format sarif`で、アイドルコストが月`usd`ドル以上のリソースだけを出します。 |
 | `--max <usd>` | アイドルコストの合計が月`usd`ドルを超えたら、終了コード`3`で終わります。 |
 | `--max-increase <usd>` | `--base`と一緒に使います。アイドルコストの増加が月`usd`ドルを超えたら、終了コード`3`で終わります。 |
 | `--region <r>` | リージョンを持たないスタック（envを指定していないCDKスタックと、素のテンプレート）に使うリージョンです。`env`を指定したスタックは、そのリージョンのまま見積もります。リージョンのないスタックがあるのにこのフラグがなければ、エラーになります。 |
@@ -125,6 +126,21 @@ jobs:
 `@v1`は1.xの最新のリリースを使います。`@v1.0.0`のように書くと、そのバージョンに固定できます。
 
 `cdk synth`は`cdk.context.json`からコンテキストを読みます。このファイルをコミットしておかないと、lookupのためにsynthでAWSの認証情報が必要になります。
+
+### コードスキャン
+
+`--format sarif`は、月`--sarif-min`ドル以上（既定では費用のかかるすべて）のアイドルコストがかかるリソースを、テンプレートの論理IDの行を指す[SARIF](https://docs.github.com/ja/code-security/code-scanning/integrating-with-code-scanning/sarif-support-for-code-scanning)で出力します。見積もれなかったリソースと、まだ数えていないリソースはnoteとして出します。GitHubのコードスキャンにアップロードできます。
+
+```yaml
+      - run: npx cdk synth
+      - run: npx cfn-idle-cost --format sarif --sarif-min 10 > idle-cost.sarif
+      - uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: idle-cost.sarif
+          category: idle-cost
+```
+
+場所は`cdk.out`内のファイルを指すので、`cdk.out`がリポジトリにない場合、アラートは出ますがファイルへのリンクは開けません。
 
 ## 見積もる費用
 
