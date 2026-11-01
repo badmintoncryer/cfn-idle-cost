@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -43,7 +44,7 @@ var testPrices = &Prices{Source: "test prices", AsOf: "2026-10-16", Regions: map
 		"mq|RabbitMQ|Multi-AZ|m5.large": 0.906, "transfer|ProtocolHours": 0.3, "codepipeline|activePipeline": 1,
 	},
 	"us-east-1": {"rds|Aurora:ServerlessV2IOOptimizedUsage|21": 0.16, "kms|KMS-Keys": 1, "ebs|EBS:VolumeUsage.gp3": 0.08, "ebs|EBS:VolumeP-IOPS.gp3": 0.005, "secrets|AWSSecretsManager-Secrets": 0.4,
-		"ec2|t3.micro": 0.0104, "vpc|PublicIPv4:InUseAddress": 0.005, "fargate|Fargate-vCPU-Hours:perCPU": 0.04048, "fargate|Fargate-GB-Hours": 0.004445,
+		"ec2|t3.micro": 0.0104, "ec2|t3.micro|ri1y": 0.0065, "vpc|PublicIPv4:InUseAddress": 0.005, "fargate|Fargate-vCPU-Hours:perCPU": 0.04048, "fargate|Fargate-GB-Hours": 0.004445,
 		"fsx|ONTAP|Storage.SAZ_2N:SSD": 0.125, "fsx|ONTAP|ThroughputCapacity.SAZ_2N": 0.72, "fsx|ONTAP|Storage.SAZ_2N2:SSD": 0.125,
 		"fsx|ONTAP|ThroughputCapacity.SAZ_2N2": 1.6, "fsx|ONTAP|ProvisionedSSDIOPS.SAZ_2N2": 0.017,
 		"ddb|ReadCapacityUnit-Hrs": 0.00013, "ddb|ReplWriteCapacityUnit-Hrs": 0.00065, "ddb|IA-ReadCapacityUnit-Hrs": 0.00016, "ddb|IA-WriteCapacityUnit-Hrs": 0.00081,
@@ -71,6 +72,12 @@ var testPrices = &Prices{Source: "test prices", AsOf: "2026-10-16", Regions: map
 		"rds|InstanceUsage:db.m5.large|20": 0.438, "rds|RDS:GP3-Storage|20": 0.115, "rds|RDS:GP3-Storage|10": 0.115,
 		"ec2|m5.xlarge": 0.192, "emr|m5.xlarge": 0.048, "ebs|EBS:VolumeUsage.gp2": 0.1,
 		"eks|AmazonEKS-Hours:perCluster": 0.1, "eks|AmazonEKS-Hours:extendedSupport": 0.5},
+	"eu-north-1": {"nat|NatGateway-Hours": 0.046, "vpc|PublicIPv4:InUseAddress": 0.005, "ec2|m5.large": 0.102, "ec2|m6g.large": 0.0816,
+		"ebs|EBS:VolumeUsage.gp2": 0.105, "ebs|EBS:VolumeUsage.gp3": 0.084, "ebs|EBS:VolumeP-IOPS.gp3": 0.005, "ebs|EBS:VolumeP-Throughput.gp3": 0.042,
+		"rds|InstanceUsage:db.m5.large|14": 0.178, "rds|InstanceUsage:db.m6g.large|14": 0.16, "rds|RDS:GP3-Storage|14": 0.121,
+		"elasticache|Redis|cache.t3.micro": 0.018, "elasticache|Redis|cache.t4g.micro": 0.017,
+		"fargate|Fargate-vCPU-Hours:perCPU": 0.04256, "fargate|Fargate-GB-Hours": 0.00467,
+		"fargate|Fargate-ARM-vCPU-Hours:perCPU": 0.03405, "fargate|Fargate-ARM-GB-Hours": 0.00374},
 	"global": {"arc|Global-Cluster-Hours": 2.5, "arc|Global-ReadinessCheck-Hours": 0.045,
 		"r53hc|Health-Check-AWS": 0.5, "r53hc|Health-Check-Non-AWS": 0.75, "r53hc|Health-Check-Option-AWS": 1, "r53hc|Health-Check-Option-Non-AWS": 2},
 }}
@@ -177,6 +184,46 @@ func TestHTML(t *testing.T) {
 
 // Capacity providers sized by the functions that use them across stacks, a
 // dashboard, and a type with no rule next to a free one.
+// Cheaper settings: gp3, Graviton (EC2, RDS, ElastiCache, Fargate) and one NAT
+// Gateway per VPC, in text and Markdown; without --suggest, none.
+func TestSuggest(t *testing.T) {
+	stacks, err := LoadInputs([]string{"testdata/suggest.yaml"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	stacks[0].Region = "eu-north-1"
+	rep := NewReport(stacks, Estimate(stacks, testPrices), testPrices)
+	var text, md bytes.Buffer
+	rep.WriteText(&text)
+	rep.WriteMarkdown(&md)
+	golden(t, "suggest.yaml", text.String())
+	golden(t, "suggest.md", md.String())
+	var out bytes.Buffer
+	if err := run([]string{"--region", "eu-north-1", "testdata/suggest.yaml"}, &out); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out.String(), "→") {
+		t.Errorf("suggestions without --suggest:\n%s", out.String())
+	}
+	if err := run([]string{"--suggest", "--base", "testdata/suggest.yaml", "testdata/suggest.yaml"}, &out); err == nil {
+		t.Error("--suggest with --base: no error")
+	}
+}
+
+func TestGraviton(t *testing.T) {
+	for in, want := range map[string]string{"t3.micro": "t4g.micro", "db.r6i.xlarge": "db.r6g.xlarge",
+		"cache.m5.large": "cache.m6g.large", "m5.large.search": "m6g.large.search", "c6id.2xlarge": "c6gd.2xlarge"} {
+		if got, ok := graviton(in); !ok || got != want {
+			t.Errorf("graviton(%s) = %s, %v; want %s", in, got, ok, want)
+		}
+	}
+	for _, in := range []string{"m6g.large", "p4d.24xlarge", "db.serverless", "x"} {
+		if got, ok := graviton(in); ok {
+			t.Errorf("graviton(%s) = %s", in, got)
+		}
+	}
+}
+
 func TestCapacityProvider(t *testing.T) {
 	golden(t, "lmi", report(t, "us-east-1", "testdata/lmi-provider.yaml", "testdata/lmi-consumer.yaml"))
 }
@@ -303,7 +350,7 @@ func TestDiff(t *testing.T) {
 		max, maxIncrease float64
 		fail             bool
 	}{{-1, 0, true}, {-1, -1, false}, {100, -1, false}, {20, -1, true}} { // Key became "?": --max-increase can't pass
-		if err := checkBudget(head, d, c.max, c.maxIncrease); (err != nil) != c.fail {
+		if err := checkBudget(head, d, budgetFlag{total: c.max}, c.maxIncrease); (err != nil) != c.fail {
 			t.Errorf("--max %v --max-increase %v: err = %v", c.max, c.maxIncrease, err)
 		}
 	}
@@ -324,7 +371,13 @@ func TestParseOffer(t *testing.T) {
 	  "E":{"E.1":{"priceDimensions":{"E.1.1":{"unit":"Hrs","pricePerUnit":{"USD":"0.02"}}}}},
 	  "C":{"C.1":{"priceDimensions":{"C.1.1":{"unit":"GiBps-mo","pricePerUnit":{"USD":"49.152"}}}}},
 	  "D":{"D.1":{"priceDimensions":{"D.1.1":{"unit":"ReadCapacityUnit-Hrs","pricePerUnit":{"USD":"0"}},"D.1.2":{"unit":"ReadCapacityUnit-Hrs","pricePerUnit":{"USD":"0.0001484"}}}}}
-	},"Reserved":{"A":{}}}}`
+	},"Reserved":{
+	  "A":{"A.R1":{"termAttributes":{"LeaseContractLength":"1yr","PurchaseOption":"No Upfront","OfferingClass":"standard"},"priceDimensions":{"A.R1.1":{"unit":"Hrs","pricePerUnit":{"USD":"0.0086"}}}},
+	       "A.R2":{"termAttributes":{"LeaseContractLength":"1yr","PurchaseOption":"No Upfront","OfferingClass":"convertible"},"priceDimensions":{"A.R2.1":{"unit":"Hrs","pricePerUnit":{"USD":"0.0099"}}}},
+	       "A.R3":{"termAttributes":{"LeaseContractLength":"3yr","PurchaseOption":"No Upfront","OfferingClass":"standard"},"priceDimensions":{"A.R3.1":{"unit":"Hrs","pricePerUnit":{"USD":"0.006"}}}},
+	       "A.R4":{"termAttributes":{"LeaseContractLength":"1yr","PurchaseOption":"Partial Upfront","OfferingClass":"standard"},"priceDimensions":{"A.R4.1":{"unit":"Quantity","pricePerUnit":{"USD":"36"}},"A.R4.2":{"unit":"Hrs","pricePerUnit":{"USD":"0.004"}}}}},
+	  "D":{"D.R1":{"termAttributes":{"LeaseContractLength":"1yr","PurchaseOption":"No Upfront"},"priceDimensions":{"D.R1.1":{"unit":"Hrs","pricePerUnit":{"USD":"0.00005"}}}}}
+	}}}`
 	all := map[string]map[string]float64{}
 	var ec2Sels []selector
 	for _, s := range selectors {
@@ -339,6 +392,7 @@ func TestParseOffer(t *testing.T) {
 	}
 	want := map[string]float64{
 		"ec2|t3.micro":                   0.0136, // Linux only; the Local Zone SKU E is dropped
+		"ec2|t3.micro|ri1y":              0.0086, // 1-yr, no upfront, standard; DynamoDB's reserved capacity is not kept
 		"ebs|EBS:VolumeP-Throughput.gp3": 0.048,  // per MiB/s
 		"ddb|ReadCapacityUnit-Hrs":       0.0001484,
 	}
@@ -396,4 +450,93 @@ func TestBundledPrices(t *testing.T) {
 
 func TestMixedInstancesAndAnomalyAlarm(t *testing.T) {
 	golden(t, "mixed.yaml", report(t, "eu-west-1", "testdata/mixed.yaml"))
+}
+
+// --max Stage=usd checks one CDK Stage; "(app)" is the stacks outside any.
+// Bundled prices: Prod is about $54/mo and (app) about $97/mo.
+func TestStageBudget(t *testing.T) {
+	for _, c := range []struct {
+		max  []string
+		fail bool
+	}{
+		{[]string{"Prod=80"}, false},
+		{[]string{"Prod=30"}, true},
+		{[]string{"(app)=1", "Prod=80"}, true},
+		{[]string{"1000", "Prod=80"}, false},
+	} {
+		args := []string{"testdata/cdk.out", "--region", "us-east-1"}
+		for _, m := range c.max {
+			args = append(args, "--max", m)
+		}
+		_, over := run(args, io.Discard).(overBudget)
+		if over != c.fail {
+			t.Errorf("%v: over budget = %v", c.max, over)
+		}
+	}
+	for _, m := range []string{"Dev=10", "=10", "Prod=x"} {
+		if _, ok := run([]string{"testdata/cdk.out", "--region", "us-east-1", "--max", m}, io.Discard).(usageError); !ok {
+			t.Errorf("--max %s: want a usage error", m)
+		}
+	}
+}
+
+// --pricing reserved-1y prices instances at their RI rate where there is one
+// and leaves the rest (the public IPv4 address) at on-demand.
+func TestReservedPricing(t *testing.T) {
+	path := t.TempDir() + "/box.yaml"
+	os.WriteFile(path, []byte("Resources: {Box: {Type: AWS::EC2::Instance, Properties: {ImageId: ami-1, InstanceType: t3.micro}}}\n"), 0o644)
+	stacks, err := LoadInputs([]string{path})
+	if err != nil {
+		t.Fatal(err)
+	}
+	stacks[0].Region = "us-east-1"
+	reservedPricing = true
+	defer func() { reservedPricing = false }()
+	var b bytes.Buffer
+	NewReport(stacks, Estimate(stacks, testPrices), testPrices).WriteText(&b)
+	for _, want := range []string{"$4.75  t3.micro 1-yr RI (Linux)", "1-yr no-upfront Reserved Instance rates"} {
+		if !strings.Contains(b.String(), want) {
+			t.Errorf("no %q in\n%s", want, b.String())
+		}
+	}
+	for _, args := range [][]string{{"--pricing", "3y"}, {"--pricing", "reserved-1y", "--live"}} {
+		if _, ok := run(append([]string{path, "--region", "us-east-1"}, args...), io.Discard).(usageError); !ok {
+			t.Errorf("%v: want a usage error", args)
+		}
+	}
+}
+
+// --hours prices hour-based charges for fewer hours; storage and monthly fees stay whole.
+func TestHours(t *testing.T) {
+	defer func(h float64) { hoursPerMonth = h }(hoursPerMonth)
+	hoursPerMonth = 365
+	stacks, err := LoadInputs([]string{"testdata/hours.yaml"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	stacks[0].Region = "ap-northeast-1"
+	got := map[string]float64{}
+	for _, it := range Estimate(stacks, testPrices) {
+		got[it.LogicalID+" "+it.Reason] += it.Monthly
+	}
+	for k, want := range map[string]float64{
+		"Nat NAT Gateway":                   0.062 * 365,
+		"Server t3.micro on-demand (Linux)": 0.0136 * 365,
+		"Data EBS gp3 storage":              100 * 0.096,
+		"Key customer managed key":          1,
+	} {
+		if math.Abs(got[k]-want) > 1e-9 {
+			t.Errorf("%s = %g, want %g", k, got[k], want)
+		}
+	}
+	var b bytes.Buffer
+	NewReport(stacks, Estimate(stacks, testPrices), testPrices).WriteText(&b)
+	if !strings.Contains(b.String(), "365 h/mo") {
+		t.Errorf("footer: %s", b.String())
+	}
+	for _, h := range []string{"0", "745", "-1"} {
+		if err := run([]string{"--hours", h, "testdata/hours.yaml"}, io.Discard); !errors.As(err, new(usageError)) {
+			t.Errorf("--hours %s: %v", h, err)
+		}
+	}
 }

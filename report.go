@@ -25,16 +25,35 @@ type regionReport struct {
 	NoRule  []Item        `json:"noRule"`
 }
 
+// stageReport is the idle cost of one CDK Stage, over all its regions.
+type stageReport struct {
+	Stage   string  `json:"stage"` // "" for the stacks directly in the app
+	Monthly float64 `json:"monthly"`
+}
+
 type Report struct {
 	Regions []regionReport `json:"regions"`
+	Stages  []stageReport  `json:"stages,omitempty"` // only when some stack is in a Stage
 	Prices  string         `json:"prices"`
+}
+
+// stageName labels the stacks outside any Stage.
+func stageName(s string) string {
+	if s == "" {
+		return "(app)"
+	}
+	return s
 }
 
 // NewReport groups items by region and stack, most expensive first.
 func NewReport(stacks []*Stack, items []Item, prices *Prices) Report {
 	byRegion := map[string]*regionReport{}
 	seen := map[string]bool{}
+	stageOf := map[string]string{} // region, stack -> Stage
+	staged := false
 	for _, s := range stacks {
+		stageOf[s.Region+"\x00"+s.Name] = s.Stage()
+		staged = staged || s.Stage() != ""
 		r := byRegion[s.Region]
 		if r == nil {
 			r = &regionReport{Region: s.Region, Unknown: []Item{}, Skipped: []Item{}, NoRule: []Item{}}
@@ -71,6 +90,20 @@ func NewReport(stacks []*Stack, items []Item, prices *Prices) Report {
 		r.Billed[i].Items = append(r.Billed[i].Items, it)
 	}
 	rep := Report{Prices: prices.Source}
+	if staged {
+		byStage := map[string]float64{}
+		for _, st := range stageOf {
+			byStage[st] += 0 // every Stage, even one at $0
+		}
+		for _, it := range items {
+			if !it.Unknown && !it.NotCounted && !it.NoRule {
+				byStage[stageOf[it.Region+"\x00"+it.Stack]] += it.Monthly
+			}
+		}
+		for _, st := range sortedIDs(byStage) {
+			rep.Stages = append(rep.Stages, stageReport{st, byStage[st]})
+		}
+	}
 	for _, region := range sortedIDs(byRegion) {
 		r := byRegion[region]
 		sort.SliceStable(r.Billed, func(i, j int) bool { return r.Billed[i].Monthly > r.Billed[j].Monthly })
@@ -125,7 +158,13 @@ func (rep Report) WriteText(w io.Writer) {
 			fmt.Fprintf(w, "\n%s%s/mo\n", pad(s.Name+" ", 6+pw+qw+mw-len(tot)), tot)
 			for _, it := range s.Items {
 				fmt.Fprintf(w, "  %s  %s  %*s  %s\n", pad(it.Path, pw), pad(it.Quantity, qw), mw, money(it.Monthly), it.Reason)
+				if it.Suggestion != "" {
+					fmt.Fprintf(w, "  %s  → -%s/mo: %s\n", pad("", pw+qw+mw+2), money(it.Saving), it.Suggestion)
+				}
 			}
+		}
+		if n, saving := r.suggestions(); n > 0 {
+			fmt.Fprintf(w, "\n→ %s save %s/mo\n", count(float64(n), "suggestion"), money(saving))
 		}
 		if len(r.Unknown) > 0 {
 			fmt.Fprintf(w, "\n? could not estimate: %d\n", len(r.Unknown))
@@ -146,7 +185,17 @@ func (rep Report) WriteText(w io.Writer) {
 			}
 		}
 	}
-	fmt.Fprintf(w, "\nprices: %s · on-demand list prices, %d h/mo, USD, free tier ignored\n", rep.Prices, hoursPerMonth)
+	if len(rep.Stages) > 0 {
+		nw, mw := 0, 0
+		for _, st := range rep.Stages {
+			nw, mw = max(nw, len([]rune(stageName(st.Stage)))), max(mw, len(money(st.Monthly)))
+		}
+		fmt.Fprintf(w, "\nby Stage\n")
+		for _, st := range rep.Stages {
+			fmt.Fprintf(w, "  %s  %*s/mo\n", pad(stageName(st.Stage), nw), mw, money(st.Monthly))
+		}
+	}
+	fmt.Fprintf(w, "\nprices: %s · %s, %g h/mo, USD, free tier ignored\n", rep.Prices, priceBasis(), hoursPerMonth)
 }
 
 // count: "1 task", "2 tasks".
@@ -170,8 +219,12 @@ func (rep Report) WriteJSON(w io.Writer) error {
 			cents(&s.Monthly)
 			for k := range s.Items {
 				cents(&s.Items[k].Monthly)
+				cents(&s.Items[k].Saving)
 			}
 		}
+	}
+	for i := range rep.Stages {
+		cents(&rep.Stages[i].Monthly)
 	}
 	return writeJSON(w, rep)
 }
@@ -210,6 +263,12 @@ func (rep Report) WriteMarkdown(w io.Writer) {
 	for _, r := range rep.Regions {
 		fmt.Fprintf(w, "| %s | %d | %s/mo |\n", r.Region, r.Stacks, money(r.Monthly))
 	}
+	if len(rep.Stages) > 0 {
+		fmt.Fprintln(w, "\n| Stage | Idle cost |\n|---|---:|")
+		for _, st := range rep.Stages {
+			fmt.Fprintf(w, "| %s | %s/mo |\n", mdCell(stageName(st.Stage)), money(st.Monthly))
+		}
+	}
 	fmt.Fprint(w, "\n<details><summary>Breakdown by resource</summary>\n\n")
 	for _, r := range rep.Regions {
 		if len(rep.Regions) > 1 {
@@ -224,8 +283,44 @@ func (rep Report) WriteMarkdown(w io.Writer) {
 		fmt.Fprintln(w)
 	}
 	fmt.Fprint(w, "</details>\n\n")
+	writeMarkdownSuggestions(w, rep)
 	writeMarkdownUnknown(w, rep)
-	fmt.Fprintf(w, "<sub>cfn-idle-cost · prices: %s · on-demand list prices, %d h/mo, USD, free tier ignored</sub>\n", rep.Prices, hoursPerMonth)
+	fmt.Fprintf(w, "<sub>cfn-idle-cost · prices: %s · %s, %g h/mo, USD, free tier ignored</sub>\n", rep.Prices, priceBasis(), hoursPerMonth)
+}
+
+// suggestions counts the region's suggestions and what they save a month.
+func (r regionReport) suggestions() (n int, saving float64) {
+	for _, s := range r.Billed {
+		for _, it := range s.Items {
+			if it.Suggestion != "" {
+				n++
+				saving += it.Saving
+			}
+		}
+	}
+	return n, saving
+}
+
+func writeMarkdownSuggestions(w io.Writer, rep Report) {
+	n, saving := 0, 0.0
+	for _, r := range rep.Regions {
+		rn, rs := r.suggestions()
+		n, saving = n+rn, saving+rs
+	}
+	if n == 0 {
+		return
+	}
+	fmt.Fprintf(w, "**Suggestions (%d, -%s/mo)**\n\n", n, money(saving))
+	for _, r := range rep.Regions {
+		for _, s := range r.Billed {
+			for _, it := range s.Items {
+				if it.Suggestion != "" {
+					fmt.Fprintf(w, "- %s `%s`: -%s/mo, %s (now %s)\n", mdCell(s.Name), mdCell(it.Path), money(it.Saving), it.Suggestion, it.Reason)
+				}
+			}
+		}
+	}
+	fmt.Fprintln(w)
 }
 
 func writeMarkdownUnknown(w io.Writer, rep Report) {
