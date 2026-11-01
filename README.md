@@ -69,6 +69,7 @@ nested stacks) or CloudFormation templates (JSON or YAML).
 | `--max <usd>` | Exit `3` if the total idle cost is over `usd` per month. |
 | `--max <Stage>=<usd>` | Exit `3` if the idle cost of one CDK Stage (all its stacks, in every region) is over `usd` per month. Repeatable, and can be combined with the overall `--max`, e.g. `--max Dev=100 --max Prod=2000`. `(app)` is the stacks outside any Stage. When the inputs have Stages, the report also prints a subtotal per Stage. |
 | `--max-increase <usd>` | With `--base`: exit `3` if the idle cost grows by more than `usd` per month. |
+| `--compare-regions <r1,r2,...>` | Price the same stacks in each region, as if all of them were deployed there, and print the totals side by side with the resources whose price differs most (`?` where a resource can't be estimated in that region, e.g. a type not offered there). The first region is the reference. `text` or `md`; not with `--base`, `--live` or the budget flags. |
 | `--region <r>` | Region for stacks that have none: env-agnostic CDK stacks and plain templates. Stacks with an `env` keep their own region. Without it, such stacks are an error. |
 | `--parameter [Stack:]Key=Value` | Value of a template parameter, for every stack that has it or only `Stack`. Repeat it for more. Parameters without one use their `Default`. |
 | `--hours <n>` | Price hour-based charges (instances, NAT Gateways, load balancers, …) for `n` hours a month instead of 730, for environments that only run part of the time: `220` is weekdays 8:00–18:00. Monthly fees and storage stay whole. |

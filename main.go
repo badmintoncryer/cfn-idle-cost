@@ -32,6 +32,9 @@ Flags:
   --max Stage=usd      exit 3 if the idle cost of a CDK Stage is over usd per month (repeatable;
                        "(app)" is the stacks outside any Stage)
   --max-increase usd   with --base: exit 3 if the idle cost grows by more than usd per month
+  --compare-regions r1,r2,...
+                       price the same stacks in each region and print the totals side by side
+                       (text or md; not with --base, --live or the budget flags)
   --region r           region for stacks without one (env-agnostic stacks, plain templates)
   --parameter [Stack:]Key=Value
                        value of a template parameter, for every stack or only Stack (repeatable);
@@ -89,6 +92,7 @@ func run(args []string, stdout io.Writer) error {
 	fs.Var(&maxes, "max", "")
 	maxIncrease := fs.Float64("max-increase", -1, "")
 	live := fs.Bool("live", false, "")
+	compare := fs.String("compare-regions", "", "")
 	pricing := fs.String("pricing", "on-demand", "")
 	hours := fs.Float64("hours", 730, "")
 	suggest := fs.Bool("suggest", false, "")
@@ -149,6 +153,42 @@ func run(args []string, stdout io.Writer) error {
 	}
 	if *maxIncrease >= 0 && *base == "" {
 		return usageError{"--max-increase needs --base"}
+	}
+	if *compare != "" {
+		regions := strings.Split(*compare, ",")
+		for i := range regions {
+			regions[i] = strings.TrimSpace(regions[i])
+		}
+		switch {
+		case len(regions) < 2 || in("", regions...):
+			return usageError{"--compare-regions needs two or more regions, e.g. ap-northeast-1,us-east-1"}
+		case *base != "" || *live || maxes.total >= 0 || len(maxes.stages) > 0 || *maxIncrease >= 0:
+			return usageError{"--compare-regions does not support --base, --live, --max or --max-increase"}
+		case !in(*format, "text", "md"):
+			return usageError{"--compare-regions supports --format text or md"}
+		}
+		r := *region
+		if r == "" {
+			r = regions[0] // every stack is priced in each region anyway
+		}
+		stacks, err := loadStacks(inputs, r)
+		if err != nil {
+			return err
+		}
+		if unused := params.apply(stacks); len(unused) > 0 {
+			return usageError{"no stack has parameter " + strings.Join(unused, ", ")}
+		}
+		prices, err := BundledPrices()
+		if err != nil {
+			return err
+		}
+		c := CompareRegions(stacks, regions, prices)
+		if *format == "md" {
+			c.WriteMarkdown(stdout)
+		} else {
+			c.WriteText(stdout)
+		}
+		return nil
 	}
 	head, err := loadStacks(inputs, *region)
 	if err != nil {
