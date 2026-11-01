@@ -1,6 +1,7 @@
-us-east-1 · 1 stack · idle ≈ $499/mo
+us-east-1 · 1 stack · idle ≈ $773/mo
 
-review                       $499/mo
+review                       $773/mo
+  WinNodes     ×2            $274  m5.large on-demand (Windows, license included), DesiredSize
   Search       ×1            $122  r6g.large.search data nodes
   Search       ×500 GB gp3    $61  EBS storage
   Search       ×50 MiB/s    $3.20  gp3 throughput above 250 MiB/s
@@ -20,10 +21,9 @@ review                       $499/mo
   Secret       ×3           $1.20  secret and its replicas
   AllSpot      ×1           $0.00  no tasks on FARGATE (2 tasks; FARGATE_SPOT not counted here)
 
-? could not estimate: 3
+? could not estimate: 2
   review  Endpoint  SubnetIds has an item that uses Fn::If
   review  V1  Aurora Serverless v1 reached end of support on 2025-03-31 and can no longer be created; use Serverless v2
-  review  WinNodes  Windows node groups (WINDOWS_CORE_2022_x86_64) are not supported yet
 
 ! not counted yet: 1 (these may cost money idle; cfn-idle-cost has no rule for them)
   review  Desk  AWS::WorkSpaces::Workspace

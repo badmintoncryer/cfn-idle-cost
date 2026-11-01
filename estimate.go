@@ -1247,8 +1247,9 @@ func init() {
 			if e.str(p, "CapacityType", "ON_DEMAND") != "ON_DEMAND" {
 				panic(unresolved("Spot node groups are not supported"))
 			}
-			if at := e.str(p, "AmiType", ""); strings.HasPrefix(at, "WINDOWS_") {
-				panic(unresolved("Windows node groups (" + at + ") are not supported yet"))
+			key, os := "ec2|", "Linux"
+			if strings.HasPrefix(e.str(p, "AmiType", ""), "WINDOWS_") {
+				key, os = "ec2win|", "Windows, license included" // Windows AMIs carry the license
 			}
 			sc := asMap(p["ScalingConfig"])
 			n, why := e.num(sc, "DesiredSize", -1), "DesiredSize"
@@ -1263,7 +1264,7 @@ func init() {
 			} else {
 				panic(unresolved("InstanceTypes must name exactly one type"))
 			}
-			e.hourly(n, "", "ec2|"+t, fmt.Sprintf("%s on-demand (Linux), %s", t, why))
+			e.hourly(n, "", key+t, fmt.Sprintf("%s on-demand (%s), %s", t, os, why))
 		},
 		"AWS::NetworkFirewall::Firewall": networkFirewall,
 		"AWS::WAFv2::WebACL":             webACL,

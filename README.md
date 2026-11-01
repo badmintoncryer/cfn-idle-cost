@@ -180,7 +180,7 @@ and provisioned storage billed whether you use it or not.
 | `AWS::SecretsManager::Secret` | per secret and per replica |
 | `AWS::Route53::HostedZone` | per hosted zone |
 | `AWS::EKS::Cluster` | cluster hourly, plus the extended support fee when `Version` is past the end of standard support on the date of the prices (the snapshot date, or today with `--live`) |
-| `AWS::EKS::Nodegroup` | instance hourly × `DesiredSize` (or `MinSize`), on-demand, one instance type |
+| `AWS::EKS::Nodegroup` | instance hourly × `DesiredSize` (or `MinSize`), on-demand, one instance type. Windows AMI types are priced at Windows license-included rates |
 | `AWS::NetworkFirewall::Firewall` | endpoint hourly × subnets, plus Advanced Inspection hourly × subnets when its firewall policy (in the same template) has a TLS inspection configuration |
 | `AWS::WAFv2::WebACL` | web ACL, its rules, and the rules of the rule groups in the same template it references (managed rule group fees not counted) |
 | `AWS::CloudWatch::Alarm`, `CompositeAlarm` | per alarm metric (standard or high resolution), per composite alarm |
@@ -384,8 +384,8 @@ resources are matched by prefix, so a new type in a service that is otherwise
 free still gets a line.
 Every other type with no rule is listed under `? no rule` and assumed $0 idle,
 so a resource that may cost money never disappears without a line.
-Partly supported types (Spot and
-Windows node groups, EMR instance fleets with Spot capacity or several instance
+Partly supported types (Spot
+node groups, EMR instance fleets with Spot capacity or several instance
 types, Aurora Serverless v1 (past end of support), instances in
 Local Zones, canaries on a cron schedule, Spot-only fleets and fleets of several
 instance types, Batch compute environments with `MinvCpus` above 0, and

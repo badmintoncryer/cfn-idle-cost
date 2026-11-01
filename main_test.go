@@ -42,7 +42,7 @@ var testPrices = &Prices{Source: "test prices", AsOf: "2026-10-16", Regions: map
 		"docdb|InstanceUsageIOOptimized:db.t4g.medium": 0.0975, "msk|Kafka.m5.large": 0.226, "msk|Kafka.Storage.GP2": 0.11,
 		"mq|RabbitMQ|Multi-AZ|m5.large": 0.906, "transfer|ProtocolHours": 0.3, "codepipeline|activePipeline": 1,
 	},
-	"us-east-1": {"rds|Aurora:ServerlessV2IOOptimizedUsage|21": 0.16, "kms|KMS-Keys": 1, "ebs|EBS:VolumeUsage.gp3": 0.08, "ebs|EBS:VolumeP-IOPS.gp3": 0.005, "secrets|AWSSecretsManager-Secrets": 0.4,
+	"us-east-1": {"ec2win|m5.large": 0.188, "rds|Aurora:ServerlessV2IOOptimizedUsage|21": 0.16, "kms|KMS-Keys": 1, "ebs|EBS:VolumeUsage.gp3": 0.08, "ebs|EBS:VolumeP-IOPS.gp3": 0.005, "secrets|AWSSecretsManager-Secrets": 0.4,
 		"ec2|t3.micro": 0.0104, "vpc|PublicIPv4:InUseAddress": 0.005, "fargate|Fargate-vCPU-Hours:perCPU": 0.04048, "fargate|Fargate-GB-Hours": 0.004445,
 		"fsx|ONTAP|Storage.SAZ_2N:SSD": 0.125, "fsx|ONTAP|ThroughputCapacity.SAZ_2N": 0.72, "fsx|ONTAP|Storage.SAZ_2N2:SSD": 0.125,
 		"fsx|ONTAP|ThroughputCapacity.SAZ_2N2": 1.6, "fsx|ONTAP|ProvisionedSSDIOPS.SAZ_2N2": 0.017,
