@@ -194,7 +194,8 @@ function renderRows() {
     (!q || [it.stack, it.path, it.type, it.category, it.region, ...it.lines.map(l => l.reason)].join(" ").toLowerCase().includes(q))).sort(compare);
   const cell = (it, c) => {
     if (c.key === "lines") return '<td class="detail"><ul class="lines">' + it.lines.map(l =>
-      '<li><span class="q">' + esc(l.quantity) + "</span> " + esc(l.reason) + (it.lines.length > 1 ? ' <span class="m">' + money(l.monthly) + "</span>" : "") + "</li>").join("") + "</ul></td>";
+      '<li><span class="q">' + esc(l.quantity) + "</span> " + esc(l.reason) + (it.lines.length > 1 ? ' <span class="m">' + money(l.monthly) + "</span>" : "") +
+      (l.suggestion ? '<div class="m">→ -' + money(l.saving) + "/mo: " + esc(l.suggestion) + "</div>" : "") + "</li>").join("") + "</ul></td>";
     const v = c.key === "monthly" ? money(it.monthly) : it[c.key];
     const cls = c.num ? "num" : c.key === "path" ? "path" : "";
     return "<td" + (cls ? ' class="' + cls + '"' : "") + ">" + esc(v) + "</td>";

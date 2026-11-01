@@ -33,6 +33,11 @@ Flags:
   --parameter [Stack:]Key=Value
                        value of a template parameter, for every stack or only Stack (repeatable);
                        parameters without one use their Default
+  --hours n            price hour-based charges (instances, NAT Gateways, load balancers, …) for
+                       n hours a month instead of 730, e.g. 220 for weekdays 8:00-18:00;
+                       monthly fees and storage stay whole
+  --suggest            show cheaper settings the template could use, with what each saves
+                       (gp3, Graviton, one NAT Gateway per VPC); without --base
   --live               fetch current prices from the AWS Price List Query API
                        (needs credentials with pricing:GetProducts) instead of the bundled snapshot
   --pricing p          on-demand (default) or reserved-1y: price EC2, RDS, ElastiCache, OpenSearch,
@@ -81,6 +86,8 @@ func run(args []string, stdout io.Writer) error {
 	maxIncrease := fs.Float64("max-increase", -1, "")
 	live := fs.Bool("live", false, "")
 	pricing := fs.String("pricing", "on-demand", "")
+	hours := fs.Float64("hours", 730, "")
+	suggest := fs.Bool("suggest", false, "")
 	var params paramFlag
 	fs.Var(&params, "parameter", "")
 	showVersion := fs.Bool("version", false, "")
@@ -129,6 +136,13 @@ func run(args []string, stdout io.Writer) error {
 		return usageError{"--pricing reserved-1y does not support --live yet; use the bundled snapshot"}
 	}
 	reservedPricing = *pricing == "reserved-1y"
+	if *hours <= 0 || *hours > 744 {
+		return usageError{"--hours must be more than 0 and at most 744 (31 days)"}
+	}
+	hoursPerMonth = *hours
+	if *suggest && *base != "" {
+		return usageError{"--suggest does not support --base yet"}
+	}
 	if *maxIncrease >= 0 && *base == "" {
 		return usageError{"--max-increase needs --base"}
 	}
@@ -156,6 +170,11 @@ func run(args []string, stdout io.Writer) error {
 		return err
 	}
 	headItems := Estimate(head, prices)
+	if !*suggest {
+		for i := range headItems {
+			headItems[i].Suggestion, headItems[i].Saving = "", 0
+		}
+	}
 	rep := NewReport(head, headItems, prices)
 	var d *Diff
 	if *base != "" {

@@ -10,7 +10,8 @@ import (
 	"time"
 )
 
-const hoursPerMonth = 730
+// hoursPerMonth is how many hours a month hour-based charges run: 730, or --hours.
+var hoursPerMonth = 730.0
 
 // Item is one billed line of a resource, or (Unknown != "") a resource whose
 // idle cost could not be estimated.
@@ -28,6 +29,9 @@ type Item struct {
 	NotCounted bool `json:"-"`
 	// NoRule marks a resource of a type with no rule that is not known to be free.
 	NoRule bool `json:"-"`
+	// Suggestion is a cheaper setting for this line, and Saving what it saves a month (--suggest).
+	Suggestion string  `json:"suggestion,omitempty"`
+	Saving     float64 `json:"saving,omitempty"`
 }
 
 // unresolved aborts the estimate of one resource; the message says why.
@@ -109,6 +113,7 @@ func estimateResource(all []*Stack, st *Stack, prices *Prices, id string) (items
 	for _, it := range e.items {
 		b := base
 		b.Quantity, b.Monthly, b.Reason = it.Quantity, it.Monthly, it.Reason
+		b.Suggestion, b.Saving = it.Suggestion, it.Saving
 		if len(e.notes) > 0 {
 			b.Reason += " (default of " + strings.Join(e.notes, ", ") + ")"
 		}
@@ -448,6 +453,7 @@ func init() {
 	rules = map[string]func(e *est, p map[string]any){
 		"AWS::EC2::NatGateway": func(e *est, p map[string]any) {
 			e.hourly(1, "", "nat|NatGateway-Hours", "NAT Gateway")
+			e.suggestOneNAT(p)
 		},
 		"AWS::EC2::EIP": func(e *est, p map[string]any) {
 			e.hourly(1, "", "vpc|PublicIPv4:InUseAddress", "public IPv4 address")
@@ -525,6 +531,7 @@ func init() {
 			}
 			e.notLocalZone(p)
 			e.hourly(1, "", "ec2|"+t, t+" on-demand (Linux)")
+			e.suggestGraviton(t, 1, ec2Key, armCaveat)
 			e.blockDevices(bdm, 1)
 			nic := firstMap(nics)
 			subnet := p["SubnetId"]
@@ -542,6 +549,7 @@ func init() {
 				n, why = e.mustNum(p, "MinSize"), "MinSize"
 			}
 			e.hourly(n, "", "ec2|"+t, fmt.Sprintf("%s on-demand (Linux), %s", t, why))
+			e.suggestGraviton(t, n, ec2Key, armCaveat)
 			e.blockDevices(bdm, n)
 			subnets, _ := p["VPCZoneIdentifier"].([]any)
 			if e.autoPublicIP(assoc, subnets) {
@@ -765,6 +773,9 @@ func (e *est) ebs(t string, size, iops, tput, n float64) {
 		key += "." + u
 	}
 	e.monthly(size*n, "GB "+t, key, "EBS "+t+" storage")
+	if t == "gp2" {
+		e.suggestGP3(size, n)
+	}
 	switch t {
 	case "gp3":
 		e.monthly(math.Max(0, iops-3000)*n, "IOPS", "ebs|EBS:VolumeP-IOPS.gp3", "gp3 IOPS above 3000")
@@ -833,6 +844,7 @@ func rdsInstance(e *est, p map[string]any) {
 			usage = "InstanceUsageIOOptimized"
 		}
 		e.hourly(1, "", "rds|"+usage+":"+class+"|"+code, class+" "+engine+suffix)
+		e.suggestGraviton(class, 1, func(c string) string { return "rds|" + usage + ":" + c + "|" + code }, "")
 		return
 	}
 	multi := e.flag(p, "MultiAZ")
@@ -844,6 +856,7 @@ func rdsInstance(e *est, p map[string]any) {
 		}
 	}
 	e.hourly(1, "", "rds|"+usage+":"+class+"|"+code, class+" "+engine+" "+az)
+	e.suggestGraviton(class, 1, func(c string) string { return "rds|" + usage + ":" + c + "|" + code }, "")
 	size := e.mustNum(p, "AllocatedStorage")
 	iops, tput := e.num(p, "Iops", 0), e.num(p, "StorageThroughput", 0)
 	def := "gp3" // CloudFormation's default
@@ -954,6 +967,7 @@ func (e *est) searchDomain(cc map[string]any, ccName string, p map[string]any) {
 	t := norm(e.mustStr(cc, "InstanceType"))
 	n := e.mustNum(cc, "InstanceCount")
 	e.hourly(n, "", "es|"+t, t+" data nodes")
+	e.suggestGraviton(t, n, func(t string) string { return "es|" + t }, "")
 	if e.flag(cc, "DedicatedMasterEnabled") {
 		m := norm(e.mustStr(cc, "DedicatedMasterType"))
 		e.hourly(e.mustNum(cc, "DedicatedMasterCount"), "", "es|"+m, m+" dedicated master nodes")
@@ -1006,6 +1020,7 @@ func cacheEngine(engine string) string {
 func (e *est) cacheNodes(engine, nodeType string, n float64) {
 	en := cacheEngine(engine)
 	e.hourly(n, "nodes", "elasticache|"+en+"|"+nodeType, nodeType+" "+en)
+	e.suggestGraviton(nodeType, n, func(t string) string { return "elasticache|" + en + "|" + t }, "")
 }
 
 func fsx(e *est, p map[string]any) {
@@ -1178,6 +1193,9 @@ func ecsService(e *est, p map[string]any) {
 	vcpu := e.mustNum(tp, "Cpu") / 1024
 	gb := e.mustNum(tp, "Memory") / 1024
 	e.hourly(n*vcpu, "vCPU", "fargate|Fargate-"+pre+"vCPU-Hours:perCPU", "Fargate vCPU ("+count(n, "task")+")")
+	if pre == "" {
+		e.suggestFargateARM(n*vcpu, n*gb)
+	}
 	if pre == "Windows-" {
 		e.hourly(n*vcpu, "vCPU", "fargate|Fargate-Windows-OS-Hours:perCPU", "Fargate Windows OS license ("+count(n, "task")+")")
 	}
@@ -1253,6 +1271,7 @@ func init() {
 				panic(unresolved("InstanceTypes must name exactly one type"))
 			}
 			e.hourly(n, "", "ec2|"+t, fmt.Sprintf("%s on-demand (Linux), %s", t, why))
+			e.suggestGraviton(t, n, ec2Key, armCaveat)
 		},
 		"AWS::NetworkFirewall::Firewall": networkFirewall,
 		"AWS::WAFv2::WebACL":             webACL,
