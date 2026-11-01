@@ -34,13 +34,14 @@ JSON
   OPT="$OPT\"$name\":\"$VERSION\","
 done
 for p in cfn-idle-cost cdk-idle-cost; do
-  cp -R "npm/$p" "$OUT/$p"; cp README.md LICENSE "$OUT/$p/"
+  cp -R "npm/$p" "$OUT/$p"; rm -rf "$OUT/$p/test"; cp README.md LICENSE "$OUT/$p/"
 done
 deps="{${OPT%,}}"
 cat >"$OUT/cfn-idle-cost/package.json" <<JSON
 {"name":"cfn-idle-cost","version":"$VERSION","description":"Monthly idle cost (what you pay with zero traffic) of an AWS CDK app or CloudFormation template",
  "license":"Apache-2.0","repository":{"type":"git","url":"git+https://github.com/badmintoncryer/cfn-idle-cost.git"},"keywords":["aws","aws-cdk","cdk","cloudformation","cost","pricing","finops"],
- "bin":{"cfn-idle-cost":"bin/cfn-idle-cost.js"},"optionalDependencies":$deps}
+ "main":"index.js","bin":{"cfn-idle-cost":"bin/cfn-idle-cost.js"},"optionalDependencies":$deps,
+ "peerDependencies":{"aws-cdk-lib":"^2.0.0"},"peerDependenciesMeta":{"aws-cdk-lib":{"optional":true}}}
 JSON
 publish "$OUT/cfn-idle-cost" "$@"
 cat >"$OUT/cdk-idle-cost/package.json" <<JSON
