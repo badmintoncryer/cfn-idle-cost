@@ -40,6 +40,8 @@ Flags:
                        (gp3, Graviton, one NAT Gateway per VPC); without --base
   --live               fetch current prices from the AWS Price List Query API
                        (needs credentials with pricing:GetProducts) instead of the bundled snapshot
+  --pricing p          on-demand (default) or reserved-1y: price EC2, RDS, ElastiCache, OpenSearch,
+                       Redshift and MemoryDB instances at 1-year no-upfront Reserved Instance rates
   --version            print the version
 
 Exit codes: 0 ok, 1 error, 2 usage error, 3 over --max or --max-increase.
@@ -83,6 +85,7 @@ func run(args []string, stdout io.Writer) error {
 	maxTotal := fs.Float64("max", -1, "")
 	maxIncrease := fs.Float64("max-increase", -1, "")
 	live := fs.Bool("live", false, "")
+	pricing := fs.String("pricing", "on-demand", "")
 	hours := fs.Float64("hours", 730, "")
 	suggest := fs.Bool("suggest", false, "")
 	var params paramFlag
@@ -126,6 +129,13 @@ func run(args []string, stdout io.Writer) error {
 	if *format == "html" && *base != "" {
 		return usageError{"--format html does not support --base yet; use md or text"}
 	}
+	if !in(*pricing, "on-demand", "reserved-1y") {
+		return usageError{"--pricing must be on-demand or reserved-1y"}
+	}
+	if *pricing == "reserved-1y" && *live {
+		return usageError{"--pricing reserved-1y does not support --live yet; use the bundled snapshot"}
+	}
+	reservedPricing = *pricing == "reserved-1y"
 	if *hours <= 0 || *hours > 744 {
 		return usageError{"--hours must be more than 0 and at most 744 (31 days)"}
 	}

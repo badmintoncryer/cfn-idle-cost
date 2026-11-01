@@ -22,7 +22,13 @@ func (e *est) suggest(saving float64, text string) {
 }
 
 // tryPrice is price without giving up on the resource when the key is missing.
+// Like hourly, it takes the Reserved Instance rate with --pricing reserved-1y.
 func (e *est) tryPrice(key string) (float64, bool) {
+	if reservedPricing {
+		if ri, ok := e.prices.Get(e.st.Region, key+riSuffix); ok {
+			return ri, true
+		}
+	}
 	return e.prices.Get(e.st.Region, key)
 }
 

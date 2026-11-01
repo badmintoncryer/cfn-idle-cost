@@ -152,7 +152,7 @@ func (rep Report) WriteText(w io.Writer) {
 			}
 		}
 	}
-	fmt.Fprintf(w, "\nprices: %s · on-demand list prices, %g h/mo, USD, free tier ignored\n", rep.Prices, hoursPerMonth)
+	fmt.Fprintf(w, "\nprices: %s · %s, %g h/mo, USD, free tier ignored\n", rep.Prices, priceBasis(), hoursPerMonth)
 }
 
 // count: "1 task", "2 tasks".
@@ -233,7 +233,7 @@ func (rep Report) WriteMarkdown(w io.Writer) {
 	fmt.Fprint(w, "</details>\n\n")
 	writeMarkdownSuggestions(w, rep)
 	writeMarkdownUnknown(w, rep)
-	fmt.Fprintf(w, "<sub>cfn-idle-cost · prices: %s · on-demand list prices, %g h/mo, USD, free tier ignored</sub>\n", rep.Prices, hoursPerMonth)
+	fmt.Fprintf(w, "<sub>cfn-idle-cost · prices: %s · %s, %g h/mo, USD, free tier ignored</sub>\n", rep.Prices, priceBasis(), hoursPerMonth)
 }
 
 // suggestions counts the region's suggestions and what they save a month.
