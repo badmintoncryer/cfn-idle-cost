@@ -1,0 +1,39 @@
+idle cost of the same stacks in each region
+
+  ap-northeast-1  $151/mo  (1 could not estimate)
+  us-east-1        $83/mo  -$68 (-45%)  (3 could not estimate)
+
+largest differences ($/mo; ? = could not estimate there)
+                              ap-northeast-1  us-east-1
+  App        Table                     $3.79          ?
+  App        Vpc/NatGateway              $45          ?
+  Prod-Edge  Stream                      $28        $22
+  App        Vpc/SsmEndpoint             $20        $15
+  App        Server                      $13      $9.99
+  App        Spare                     $9.93      $7.59
+  Prod-Edge  LoadBalancer                $25        $24
+
+prices: test prices · on-demand list prices, 730 h/mo, USD, free tier ignored
+
+### Idle cost by region
+
+| Region | Idle cost | vs ap-northeast-1 | Could not estimate |
+|---|---:|---:|---:|
+| ap-northeast-1 | $151/mo |  | 1 |
+| us-east-1 | $83/mo | -$68 (-45%) | 3 |
+
+<details><summary>Largest differences</summary>
+
+| Stack | Resource | ap-northeast-1 | us-east-1 |
+|---|---|---:|---:|
+| App | `Table` | $3.79 | ? |
+| App | `Vpc/NatGateway` | $45 | ? |
+| Prod-Edge | `Stream` | $28 | $22 |
+| App | `Vpc/SsmEndpoint` | $20 | $15 |
+| App | `Server` | $13 | $9.99 |
+| App | `Spare` | $9.93 | $7.59 |
+| Prod-Edge | `LoadBalancer` | $25 | $24 |
+
+</details>
+
+<sub>cfn-idle-cost · prices: test prices · on-demand list prices, 730 h/mo, USD, free tier ignored</sub>
