@@ -60,11 +60,15 @@ npx cfn-idle-cost [flags] [cdk.out | template ...]
 | `--base <path>` | 別の`cdk.out`（またはテンプレート）と比べて、変わった分だけを表示します。たとえば`main`ブランチからsynthした`cdk.out`を指定します。詳しくは「[プルリクエストで使う](#プルリクエストで使う)」を見てください。 |
 | `--format <f>` | 出力形式です。`text`（既定）、`md`（プルリクエストのコメント向け）、`json`、`html`から選びます。`html`を選ぶと、ブラウザで開くページを出します。ページには、カテゴリ別の費用と、並べ替えと絞り込みのできる表が載ります（例: `npx cfn-idle-cost --format html > idle-cost.html`）。`html`はまだ`--base`と一緒に使えません。 |
 | `--max <usd>` | アイドルコストの合計が月`usd`ドルを超えたら、終了コード`3`で終わります。 |
+| `--max <Stage>=<usd>` | CDKのStage（そのStageの全スタック、全リージョン）のアイドルコストが月`usd`ドルを超えたら、終了コード`3`で終わります。繰り返し指定でき、全体の`--max`とも併用できます（例: `--max Dev=100 --max Prod=2000`）。`(app)`はどのStageにも入っていないスタックです。入力にStageがあると、レポートにStageごとの小計も出します。 |
 | `--max-increase <usd>` | `--base`と一緒に使います。アイドルコストの増加が月`usd`ドルを超えたら、終了コード`3`で終わります。 |
 | `--compare-regions <r1,r2,...>` | 同じスタックを各リージョンにデプロイしたとして見積もり、合計を並べて表示します。料金の差が大きいリソースも出します（そのリージョンで見積もれないリソース、たとえば提供されていないタイプは`?`）。最初のリージョンが基準です。`text`か`md`で、`--base`、`--live`、予算のフラグとは併用できません。 |
 | `--region <r>` | リージョンを持たないスタック（envを指定していないCDKスタックと、素のテンプレート）に使うリージョンです。`env`を指定したスタックは、そのリージョンのまま見積もります。リージョンのないスタックがあるのにこのフラグがなければ、エラーになります。 |
 | `--parameter [Stack:]Key=Value` | テンプレートのパラメータの値を指定します。そのパラメータを持つすべてのスタックに効き、`Stack:`を付けるとそのスタックだけに効きます。複数指定できます。指定しなかったパラメータには`Default`を使います。 |
+| `--hours <n>` | 時間で課金される料金（インスタンス、NAT Gateway、ロードバランサーなど）を、730時間ではなく月`n`時間で計算します。一部の時間だけ動かす環境向けで、平日8時〜18時なら`220`です。月額の料金とストレージは丸1か月分のままです。 |
+| `--suggest` | テンプレートで選べる安い設定と、それぞれで減る金額を表示します。[安くする設定](#安くする設定)を参照。`--base`とは併用できません。 |
 | `--live` | 同梱のスナップショットではなく、[Price List Query API](https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/using-price-list-query-api.html)から最新の価格を取得します。`pricing:GetProducts`を許可したAWSの認証情報が必要です。 |
+| `--pricing reserved-1y` | EC2、RDS、ElastiCache、OpenSearch Service、Redshift、MemoryDBのインスタンスを、1年・前払いなし・スタンダードのリザーブドインスタンスの料金で見積もります。コミットした場合のアイドルコストの目安です。その行には`1-yr RI`と付き、ほかはオンデマンドのままです。同梱のスナップショットでのみ使えます（`--live`とは併用不可）。既定は`on-demand`。 |
 | `--version` | バージョンを表示します。 |
 
 終了コードは、成功が`0`、エラーが`1`、使い方の誤り（リージョンのないスタックを含みます）が`2`、`--max`か`--max-increase`の超過が`3`です。見積もれなかったリソースがあっても、成功なら`0`を返します。予算のフラグを付けたときに見積もれなかったリソースがあると、実際のアイドルコストはもっと高いかもしれないという警告を出します。`--max`はこの場合も失敗にしません。一方、`--max-increase`は、見積もれないリソースが追加されたときや、見積もれていたリソースが見積もれなくなったときに失敗します。増加額を確かめられないためです。`? no rule`のリソースは警告の件数に含めますが、予算のチェックを失敗させることはありません。
@@ -127,6 +131,30 @@ jobs:
 
 `cdk synth`は`cdk.context.json`からコンテキストを読みます。このファイルをコミットしておかないと、lookupのためにsynthでAWSの認証情報が必要になります。
 
+## 安くする設定
+
+`--suggest`を付けると、行の下に、より安くなる設定と月に減る金額を表示します。価格は同じスナップショットから計算します。合計は今の設定のままの金額です。
+
+```
+  Server      ×1              $74  m5.large on-demand (Linux)
+                                 → -$15/mo: m6g.large (Graviton), if the AMI and software run on arm64
+  Server      ×100 GB gp2     $10  EBS gp2 storage
+                                 → -$2.10/mo: gp3
+  NatB        ×1              $34  NAT Gateway
+                                 → -$37/mo: one NAT Gateway for the VPC instead of 2 (CDK natGateways: 1); egress then depends on one AZ
+
+→ 3 suggestions save $54/mo
+```
+
+| 提案 | 対象 |
+|---|---|
+| gp3 | EBSのgp2ボリューム（インスタンス、起動テンプレート、`AWS::EC2::Volume`）。gp2がそのサイズで出すIOPSとスループットをgp3で買う前提で計算します |
+| Graviton | EC2インスタンス、Auto Scalingグループ、EKSノードグループ、RDS（Auroraも）、ElastiCache、OpenSearchのx86のタイプ。同じサイズのGravitonのタイプがそのリージョンにあり、安いときだけです。EC2ではAMIとソフトウェアがarm64で動く必要があります |
+| ARM64のFargate | ECSサービスのx86 Linuxのタスク。イメージがarm64向けにビルドされている必要があります |
+| VPCにNAT Gatewayを1つ | VPCの2つ目以降のパブリックNAT Gateway（とテンプレート内のElastic IP）。全AZの外向き通信が1つを通るので、開発用のスタック向けです |
+
+`--format md`では内訳の下に一覧で、`json`では各項目の`suggestion`と`saving`に、`html`では各行の下に表示します。
+
 ## 見積もる費用
 
 アクセスがゼロでもかかる費用だけを見積もります。時間単位で課金されるリソース、月額の固定料金、使っていなくても課金されるプロビジョニング済みのストレージの3種類です。
@@ -139,7 +167,7 @@ jobs:
 | `AWS::ElasticLoadBalancingV2::LoadBalancer` | ALB、NLB、GWLBの時間料金。internet-facingなら、サブネットごとにパブリックIPv4を1つ（`dualstack-without-public-ipv4`なら数えません） |
 | `AWS::ElasticLoadBalancing::LoadBalancer` | Classic Load Balancerの時間料金 |
 | `AWS::EC2::Instance` | インスタンスの時間料金（Linux）、`BlockDeviceMappings`のEBSボリューム、起動時に割り当てられるパブリックIPv4 |
-| `AWS::AutoScaling::AutoScalingGroup` | インスタンスの時間料金×`DesiredCapacity`（なければ`MinSize`）、EBSボリューム、起動時に割り当てられるパブリックIPv4。起動テンプレートか起動設定から読みます |
+| `AWS::AutoScaling::AutoScalingGroup` | インスタンスの時間料金×`DesiredCapacity`（なければ`MinSize`）、EBSボリューム、起動時に割り当てられるパブリックIPv4。起動テンプレートか起動設定から読みます。`MixedInstancesPolicy`ではオンデマンドの分（`OnDemandBaseCapacity`と、残りの`OnDemandPercentageAboveBaseCapacity`、端数は切り上げ）だけを、最初のオーバーライドのタイプで数えます。Spotは数えず、EBSとIPv4は全台分です |
 | `AWS::EC2::Volume` | 容量、gp3の3000 IOPS・125 MiB/sを超える分、io1・io2のIOPS |
 | `AWS::RDS::DBInstance` | インスタンスの時間料金（シングルAZ・マルチAZ。MySQL、PostgreSQL、MariaDBと、ライセンスモデルごとのOracleとSQL Server）、割り当てたストレージ、プロビジョンドIOPS、gp3の基準値を超えるIOPSとスループット。Auroraは、プロビジョンドのインスタンスか、Serverless v2の最小ACU（I/O-Optimizedにも対応） |
 | `AWS::RDS::DBCluster`（マルチAZ DBクラスター） | クラスターの時間料金（ライター1台と読み取り可能なスタンバイ2台）、割り当てたストレージ、プロビジョンドIOPS（gp3のIOPSとスループットにはまだ対応していません） |
@@ -159,7 +187,7 @@ jobs:
 | `AWS::EKS::Nodegroup` | インスタンスの時間料金×`DesiredSize`（なければ`MinSize`）。オンデマンドで、インスタンスタイプが1つの場合 |
 | `AWS::NetworkFirewall::Firewall` | エンドポイントの時間料金×サブネット数。同じテンプレートにあるファイアウォールポリシーがTLSインスペクションの設定を持つときは、Advanced Inspectionの時間料金×サブネット数も加える |
 | `AWS::WAFv2::WebACL` | Web ACLとルール。同じテンプレートのルールグループを参照していれば、そのグループのルールも数える（マネージドルールグループの追加料金は含みません） |
-| `AWS::CloudWatch::Alarm`、`CompositeAlarm` | アラームのメトリクスごとの料金（標準解像度・高解像度）、複合アラームごとの料金 |
+| `AWS::CloudWatch::Alarm`、`CompositeAlarm` | アラームのメトリクスごとの料金（標準解像度・高解像度。異常検出のバンドは2つ分を加えます）、複合アラームごとの料金 |
 | `AWS::Lambda::Alias`、`AWS::Lambda::Version` | プロビジョニング済み同時実行数×関数のメモリ（x86とARM）。バージョンは、同じテンプレートにあるJava以外の関数のSnapStartキャッシュ（メモリ1GBあたり） |
 | `AWS::Lambda::CapacityProvider` | Lambda Managed Instances。EC2の時間料金（Linux）と管理料金×このプロバイダを使う関数に最低限必要なインスタンス数。[前提](#前提)を参照してください。`AllowedInstanceTypes`でタイプを1つに決めている必要があります |
 | `AWS::CloudWatch::Dashboard` | ダッシュボードごとに$3（公開価格。ダッシュボードはPrice Listにありません） |
@@ -335,7 +363,7 @@ jobs:
 
 ## 前提
 
-- オンデマンドの定価（USD）で、1か月を730時間として計算します。Savings Plans、リザーブドインスタンス、無料利用枠は考慮しません。
+- オンデマンドの定価（USD）で、1か月を730時間（`--hours`ならその時間）として計算します。Savings Plansと無料利用枠は考慮しません。リザーブドインスタンスは`--pricing reserved-1y`のときだけ使います。
 - EC2インスタンスは、Linux・共有テナンシーの料金で見積もります（AMIは読みません）。AMIから決まるルートボリューム（`BlockDeviceMappings`に`VolumeSize`がないもの）は数えません。
 - インスタンス、Auto Scalingグループ、Fargateのタスクに起動時に割り当てられるパブリックIPv4は、`AssociatePublicIpAddress`（Fargateは`AssignPublicIp`）で割り当てると指定しているときに数えます。指定がなければ、すべてのサブネットが同じテンプレートにあり、`MapPublicIpOnLaunch`がtrueのときに数えます。サブネットが別のスタックなどにあって決まらないときは、IPの行を出さず、リソースのほかの費用だけを見積もります。同じテンプレートでElastic IPを関連付けたインスタンスは、IPを二重に数えません。
 - Lambda Managed Instancesのキャパシティプロバイダは、関数が最低限必要とするインスタンス数で見積もります。関数ごとの実行環境は`MinExecutionEnvironments`（既定は3）個で、1つあたりのメモリは`MemorySize`、vCPUは`MemorySize`÷`ExecutionEnvironmentMemoryGiBPerVCpu`（既定はvCPUあたり2GiB）です。この実行環境をインスタンスタイプに詰め込んだ台数と、実行環境の数（上限3、AZごとに1台）の大きいほうを使います。トラフィックが倍になっても耐えられるようにLambdaが確保する余裕は数えないので、実際の費用はもっと高くなることがあります。どの関数も使っていないプロバイダは3台で見積もります。関数は同じリージョンのすべての入力スタックから探します。プロバイダを指す方法は`Ref`か`Fn::GetAtt`、エクスポートを読む`Fn::ImportValue`（CDKのstrong参照）、`Fn::GetStackOutput`（CDKのweak参照）、ARNのどれでもかまいません。`AWS::Lambda::Version`の`FunctionScalingConfig`は読みません。関数のインスタンスはキャパシティプロバイダの側で課金されるため、プロバイダがどの入力にもない関数（別のアプリのARNを指すものなど）は`? could not estimate`に載ります。

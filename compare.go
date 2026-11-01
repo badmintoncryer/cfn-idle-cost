@@ -177,7 +177,7 @@ func (c RegionCompare) WriteText(w io.Writer) {
 			fmt.Fprintln(w, line)
 		}
 	}
-	fmt.Fprintf(w, "\nprices: %s · on-demand list prices, %d h/mo, USD, free tier ignored\n", c.Prices, hoursPerMonth)
+	fmt.Fprintf(w, "\nprices: %s · %s, %g h/mo, USD, free tier ignored\n", c.Prices, priceBasis(), hoursPerMonth)
 }
 
 func (c RegionCompare) WriteMarkdown(w io.Writer) {
@@ -200,5 +200,5 @@ func (c RegionCompare) WriteMarkdown(w io.Writer) {
 		}
 		fmt.Fprint(w, "\n</details>\n")
 	}
-	fmt.Fprintf(w, "\n<sub>cfn-idle-cost · prices: %s · on-demand list prices, %d h/mo, USD, free tier ignored</sub>\n", c.Prices, hoursPerMonth)
+	fmt.Fprintf(w, "\n<sub>cfn-idle-cost · prices: %s · %s, %g h/mo, USD, free tier ignored</sub>\n", c.Prices, priceBasis(), hoursPerMonth)
 }

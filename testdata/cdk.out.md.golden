@@ -5,6 +5,11 @@
 | ap-northeast-1 | 2 | $150/mo |
 | us-east-1 | 1 | $1.00/mo |
 
+| Stage | Idle cost |
+|---|---:|
+| (app) | $97/mo |
+| Prod | $54/mo |
+
 <details><summary>Breakdown by resource</summary>
 
 #### ap-northeast-1
