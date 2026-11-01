@@ -67,6 +67,7 @@ nested stacks) or CloudFormation templates (JSON or YAML).
 | `--base <path>` | Compare against another `cdk.out` (or template), e.g. one synthesized from `main`, and print only what changes. See [In pull requests](#in-pull-requests). |
 | `--format <f>` | `text` (default), `md` (a pull request comment), `json`, or `html`: a page to open in a browser, with the cost by category and a table you can sort and filter (`npx cfn-idle-cost --format html > idle-cost.html`). `html` does not support `--base` yet. |
 | `--max <usd>` | Exit `3` if the total idle cost is over `usd` per month. |
+| `--max <Stage>=<usd>` | Exit `3` if the idle cost of one CDK Stage (all its stacks, in every region) is over `usd` per month. Repeatable, and can be combined with the overall `--max`, e.g. `--max Dev=100 --max Prod=2000`. `(app)` is the stacks outside any Stage. When the inputs have Stages, the report also prints a subtotal per Stage. |
 | `--max-increase <usd>` | With `--base`: exit `3` if the idle cost grows by more than `usd` per month. |
 | `--region <r>` | Region for stacks that have none: env-agnostic CDK stacks and plain templates. Stacks with an `env` keep their own region. Without it, such stacks are an error. |
 | `--parameter [Stack:]Key=Value` | Value of a template parameter, for every stack that has it or only `Stack`. Repeat it for more. Parameters without one use their `Default`. |
