@@ -36,8 +36,15 @@ Flags:
   --parameter [Stack:]Key=Value
                        value of a template parameter, for every stack or only Stack (repeatable);
                        parameters without one use their Default
+  --hours n            price hour-based charges (instances, NAT Gateways, load balancers, …) for
+                       n hours a month instead of 730, e.g. 220 for weekdays 8:00-18:00;
+                       monthly fees and storage stay whole
+  --suggest            show cheaper settings the template could use, with what each saves
+                       (gp3, Graviton, one NAT Gateway per VPC); without --base
   --live               fetch current prices from the AWS Price List Query API
                        (needs credentials with pricing:GetProducts) instead of the bundled snapshot
+  --pricing p          on-demand (default) or reserved-1y: price EC2, RDS, ElastiCache, OpenSearch,
+                       Redshift and MemoryDB instances at 1-year no-upfront Reserved Instance rates
   --version            print the version
 
 Exit codes: 0 ok, 1 error, 2 usage error, 3 over --max or --max-increase.
@@ -82,6 +89,9 @@ func run(args []string, stdout io.Writer) error {
 	fs.Var(&maxes, "max", "")
 	maxIncrease := fs.Float64("max-increase", -1, "")
 	live := fs.Bool("live", false, "")
+	pricing := fs.String("pricing", "on-demand", "")
+	hours := fs.Float64("hours", 730, "")
+	suggest := fs.Bool("suggest", false, "")
 	var params paramFlag
 	fs.Var(&params, "parameter", "")
 	showVersion := fs.Bool("version", false, "")
@@ -123,6 +133,20 @@ func run(args []string, stdout io.Writer) error {
 	if *format == "html" && *base != "" {
 		return usageError{"--format html does not support --base yet; use md or text"}
 	}
+	if !in(*pricing, "on-demand", "reserved-1y") {
+		return usageError{"--pricing must be on-demand or reserved-1y"}
+	}
+	if *pricing == "reserved-1y" && *live {
+		return usageError{"--pricing reserved-1y does not support --live yet; use the bundled snapshot"}
+	}
+	reservedPricing = *pricing == "reserved-1y"
+	if *hours <= 0 || *hours > 744 {
+		return usageError{"--hours must be more than 0 and at most 744 (31 days)"}
+	}
+	hoursPerMonth = *hours
+	if *suggest && *base != "" {
+		return usageError{"--suggest does not support --base yet"}
+	}
 	if *maxIncrease >= 0 && *base == "" {
 		return usageError{"--max-increase needs --base"}
 	}
@@ -150,6 +174,11 @@ func run(args []string, stdout io.Writer) error {
 		return err
 	}
 	headItems := Estimate(head, prices)
+	if !*suggest {
+		for i := range headItems {
+			headItems[i].Suggestion, headItems[i].Saving = "", 0
+		}
+	}
 	rep := NewReport(head, headItems, prices)
 	var d *Diff
 	if *base != "" {

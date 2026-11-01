@@ -1,0 +1,5 @@
+Resources:
+  Nat: { Type: AWS::EC2::NatGateway, Properties: { SubnetId: subnet-1 } }
+  Data: { Type: AWS::EC2::Volume, Properties: { Size: 100, VolumeType: gp3 } }
+  Server: { Type: AWS::EC2::Instance, Properties: { InstanceType: t3.micro } }
+  Key: { Type: AWS::KMS::Key }
