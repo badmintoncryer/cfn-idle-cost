@@ -1,0 +1,239 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "runs": [
+    {
+      "properties": {
+        "hoursPerMonth": 730,
+        "prices": "test prices"
+      },
+      "results": [
+        {
+          "level": "warning",
+          "locations": [
+            {
+              "logicalLocations": [
+                {
+                  "fullyQualifiedName": "App/Vpc/NatGateway",
+                  "kind": "resource",
+                  "name": "VpcNatGateway"
+                }
+              ],
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "testdata/cdk.out/App.template.json"
+                },
+                "region": {
+                  "startLine": 10
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Vpc/NatGateway (AWS::EC2::NatGateway) idles at ≈ $45/mo in ap-northeast-1: $45 NAT Gateway (×1)"
+          },
+          "partialFingerprints": {
+            "resource/v1": "ap-northeast-1/App/VpcNatGateway"
+          },
+          "properties": {
+            "monthlyUSD": 45.26
+          },
+          "ruleId": "idle-cost"
+        },
+        {
+          "level": "warning",
+          "locations": [
+            {
+              "logicalLocations": [
+                {
+                  "fullyQualifiedName": "App/Vpc/SsmEndpoint",
+                  "kind": "resource",
+                  "name": "SsmEndpoint"
+                }
+              ],
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "testdata/cdk.out/App.template.json"
+                },
+                "region": {
+                  "startLine": 12
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Vpc/SsmEndpoint (AWS::EC2::VPCEndpoint) idles at ≈ $20/mo in ap-northeast-1: $20 interface endpoint (×2 AZ)"
+          },
+          "partialFingerprints": {
+            "resource/v1": "ap-northeast-1/App/SsmEndpoint"
+          },
+          "properties": {
+            "monthlyUSD": 20.44
+          },
+          "ruleId": "idle-cost"
+        },
+        {
+          "level": "warning",
+          "locations": [
+            {
+              "logicalLocations": [
+                {
+                  "fullyQualifiedName": "App/Server",
+                  "kind": "resource",
+                  "name": "Server"
+                }
+              ],
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "testdata/cdk.out/App.template.json"
+                },
+                "region": {
+                  "startLine": 14
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Server (AWS::EC2::Instance) idles at ≈ $13/mo in ap-northeast-1: $9.93 t3.micro on-demand (Linux) (default of ServerType) (×1); $2.88 EBS gp3 storage (default of ServerType) (×30 GB gp3)"
+          },
+          "partialFingerprints": {
+            "resource/v1": "ap-northeast-1/App/Server"
+          },
+          "properties": {
+            "monthlyUSD": 12.81
+          },
+          "ruleId": "idle-cost"
+        },
+        {
+          "level": "warning",
+          "locations": [
+            {
+              "logicalLocations": [
+                {
+                  "fullyQualifiedName": "Prod-Edge/Stream",
+                  "kind": "resource",
+                  "name": "Stream"
+                }
+              ],
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "testdata/cdk.out/assembly-Prod/ProdEdge.template.json"
+                },
+                "region": {
+                  "startLine": 4
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Stream (AWS::Kinesis::Stream) idles at ≈ $28/mo in ap-northeast-1: $28 provisioned shards (×2 shards)"
+          },
+          "partialFingerprints": {
+            "resource/v1": "ap-northeast-1/Prod-Edge/Stream"
+          },
+          "properties": {
+            "monthlyUSD": 28.47
+          },
+          "ruleId": "idle-cost"
+        },
+        {
+          "level": "warning",
+          "locations": [
+            {
+              "logicalLocations": [
+                {
+                  "fullyQualifiedName": "Prod-Edge/LoadBalancer",
+                  "kind": "resource",
+                  "name": "Alb"
+                }
+              ],
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "testdata/cdk.out/assembly-Prod/ProdEdge.template.json"
+                },
+                "region": {
+                  "startLine": 3
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "LoadBalancer (AWS::ElasticLoadBalancingV2::LoadBalancer) idles at ≈ $25/mo in ap-northeast-1: $18 Application Load Balancer (×1); $7.30 public IPv4 per AZ (internet-facing) (×2 IPv4)"
+          },
+          "partialFingerprints": {
+            "resource/v1": "ap-northeast-1/Prod-Edge/Alb"
+          },
+          "properties": {
+            "monthlyUSD": 25.04
+          },
+          "ruleId": "idle-cost"
+        },
+        {
+          "level": "note",
+          "locations": [
+            {
+              "logicalLocations": [
+                {
+                  "fullyQualifiedName": "App/Worker",
+                  "kind": "resource",
+                  "name": "Worker"
+                }
+              ],
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "testdata/cdk.out/App.template.json"
+                },
+                "region": {
+                  "startLine": 22
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Worker (AWS::EC2::Instance): idle cost could not be estimated: InstanceType is Parameter WorkerType"
+          },
+          "partialFingerprints": {
+            "resource/v1": "ap-northeast-1/App/Worker"
+          },
+          "ruleId": "could-not-estimate"
+        }
+      ],
+      "tool": {
+        "driver": {
+          "informationUri": "https://github.com/badmintoncryer/cfn-idle-cost",
+          "name": "cfn-idle-cost",
+          "rules": [
+            {
+              "help": {
+                "text": "Its idle cost is in the total. Delete it, size it down, or check that it is needed in this environment."
+              },
+              "id": "idle-cost",
+              "shortDescription": {
+                "text": "Resource that costs money while idle"
+              }
+            },
+            {
+              "help": {
+                "text": "A value the template doesn't say (a Parameter, a reference to another stack) or a case cfn-idle-cost does not support yet. It is not in the total."
+              },
+              "id": "could-not-estimate",
+              "shortDescription": {
+                "text": "Resource whose idle cost could not be estimated"
+              }
+            },
+            {
+              "help": {
+                "text": "cfn-idle-cost has no rule for this type yet. It is not in the total."
+              },
+              "id": "not-counted",
+              "shortDescription": {
+                "text": "Resource that may cost money idle and has no rule yet"
+              }
+            }
+          ],
+          "version": "dev"
+        }
+      }
+    }
+  ],
+  "version": "2.1.0"
+}

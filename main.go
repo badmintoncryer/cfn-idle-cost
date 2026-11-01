@@ -27,7 +27,9 @@ With --base, prints how the idle cost changes from the base to the inputs.
 Flags:
   --base path          compare against this cdk.out (or template), e.g. one synthesized from main
   --format f           text (default), md (for a pull request comment), json, or html
-                       (a page to open in a browser, without --base)
+                       (a page to open in a browser, without --base), or sarif (for GitHub
+                       code scanning, without --base)
+  --sarif-min usd      with --format sarif: report only resources that idle at usd per month or more
   --max usd            exit 3 if the total idle cost is over usd per month
   --max Stage=usd      exit 3 if the idle cost of a CDK Stage is over usd per month (repeatable;
                        "(app)" is the stacks outside any Stage)
@@ -88,6 +90,7 @@ func run(args []string, stdout io.Writer) error {
 	region := fs.String("region", "", "")
 	base := fs.String("base", "", "")
 	format := fs.String("format", "text", "")
+	sarifMin := fs.Float64("sarif-min", 0, "")
 	maxes := budgetFlag{total: -1}
 	fs.Var(&maxes, "max", "")
 	maxIncrease := fs.Float64("max-increase", -1, "")
@@ -131,11 +134,11 @@ func run(args []string, stdout io.Writer) error {
 		fmt.Fprintln(stdout, version)
 		return nil
 	}
-	if !in(*format, "text", "md", "json", "html") {
-		return usageError{"--format must be text, md, json or html"}
+	if !in(*format, "text", "md", "json", "html", "sarif") {
+		return usageError{"--format must be text, md, json, html or sarif"}
 	}
-	if *format == "html" && *base != "" {
-		return usageError{"--format html does not support --base yet; use md or text"}
+	if in(*format, "html", "sarif") && *base != "" {
+		return usageError{"--format " + *format + " does not support --base yet; use md or text"}
 	}
 	if !in(*pricing, "on-demand", "reserved-1y") {
 		return usageError{"--pricing must be on-demand or reserved-1y"}
@@ -242,6 +245,8 @@ func run(args []string, stdout io.Writer) error {
 		rep.WriteMarkdown(stdout)
 	case *format == "html":
 		err = rep.WriteHTML(stdout)
+	case *format == "sarif":
+		err = rep.WriteSARIF(stdout, *sarifMin)
 	default:
 		rep.WriteText(stdout)
 	}
