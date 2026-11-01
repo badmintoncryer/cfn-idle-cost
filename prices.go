@@ -117,6 +117,15 @@ var selectors = []selector{
 			return ""
 		},
 		liveFilter: byInstanceType},
+	{name: "ec2win", service: "AmazonEC2", families: []string{"Compute Instance", "Compute Instance (bare metal)"},
+		filters: map[string]string{"operatingSystem": "Windows", "licenseModel": "No License required", "tenancy": "Shared", "preInstalledSw": "NA", "capacitystatus": "Used", "operation": "RunInstances:0002"},
+		key: func(a map[string]string, u string) string {
+			if strings.HasPrefix(u, "BoxUsage:") {
+				return a["instanceType"]
+			}
+			return ""
+		},
+		liveFilter: byInstanceType},
 	{name: "nat", service: "AmazonEC2", families: []string{"NAT Gateway"},
 		key: func(a map[string]string, u string) string { return keep(u, "NatGateway-Hours") }},
 	{name: "ebs", service: "AmazonEC2", families: []string{"Storage", "System Operation", "Provisioned Throughput"},

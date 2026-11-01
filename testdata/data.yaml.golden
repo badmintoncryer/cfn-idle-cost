@@ -55,6 +55,8 @@ data                                      $15411/mo
   DataMigration            ×0              $0.00  not started by CloudFormation; once started, CDC bills hourly until it is stopped
   GenAISource2             ×1              $0.00  shares the connector fee of GenAISource1
   InGroup                  ×1              $0.00  OCUs billed on collection group Group
+  NextGenGroup             ×1              $0.00  indexing OCUs scale to zero when idle (NextGen group, minimum 0)
+  NextGenGroup             ×1              $0.00  search OCUs scale to zero when idle (NextGen group, minimum 0)
   ReplicationConfig        ×0              $0.00  not started by CloudFormation; once started, CDC keeps at least 2 DCU running
   ServerlessAlwaysOn       ×0              $0.00  not started by CloudFormation; once a job starts it, the pre-initialized capacity bills until it is stopped (auto-stop is off)
   V2Service                ×0              $0.00  billed monthly after its first failure mode assessment, which is not started by CloudFormation
@@ -65,7 +67,7 @@ data                                      $15411/mo
   data  Campaign  bills 2 minimum TPS (MinProvisionedTPS) at a rate set by the recipe of its solution version
   data  DefaultTypeApp  ResourceSpec.InstanceType is not set; the domain's default applies
   data  Flow  runs on rate(5minutes); each run is billed, even when it finds no new data
-  data  GroupNoMin  CapacityLimits.MinIndexingCapacityInOcu is not set; the default minimum is not documented
+  data  GroupNoMin  CapacityLimits.MinIndexingCapacityInOcu is not set; the default minimum is documented only for NextGen groups
   data  ImagePipeline  builds on cron(0 0 * * ? *); build instance time per run is not known
   data  InvitedMember  joins an existing network, whose edition is not in the template
   data  ManyTypesFleet  EMR chooses among several InstanceTypeConfigs

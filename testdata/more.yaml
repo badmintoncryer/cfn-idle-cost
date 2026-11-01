@@ -85,6 +85,32 @@ Resources:
   Logs2:
     Type: AWS::OpenSearchServerless::Collection
     Properties: { Name: logs2, Type: SEARCH }
+  # Search and time series collections share OCUs when their KMS key is the same.
+  Series:
+    Type: AWS::OpenSearchServerless::Collection
+    Properties: { Name: series, Type: TIMESERIES }
+  Keyed:
+    Type: AWS::OpenSearchServerless::Collection
+    Properties: { Name: keyed, Type: SEARCH, EncryptionConfig: { KmsKeyArn: "arn:aws:kms:us-east-1:111122223333:key/a" } }
+  Secure:
+    Type: AWS::OpenSearchServerless::Collection
+    Properties: { Name: secure-1, Type: SEARCH }
+  SecureKey:
+    Type: AWS::OpenSearchServerless::SecurityPolicy
+    Properties:
+      Name: secure
+      Type: encryption
+      Policy: '{"Rules":[{"ResourceType":"collection","Resource":["collection/secure*"]}],"AWSOwnedKey":false,"KmsARN":"arn:aws:kms:us-east-1:111122223333:key/b"}'
+  # RDS Proxy bills at least 2 vCPUs per instance.
+  SmallProxy:
+    Type: AWS::RDS::DBProxy
+    Properties: { DBProxyName: sp, EngineFamily: MYSQL, Auth: [], RoleArn: arn, VpcSubnetIds: [a] }
+  SmallProxyTargets:
+    Type: AWS::RDS::DBProxyTargetGroup
+    Properties: { DBProxyName: !Ref SmallProxy, TargetGroupName: default, DBInstanceIdentifiers: [!Ref SmallDb] }
+  SmallDb:
+    Type: AWS::RDS::DBInstance
+    Properties: { Engine: mysql, DBInstanceClass: db.t2.small, AllocatedStorage: 20 }
   Vectors:
     Type: AWS::OpenSearchServerless::Collection
     Properties: { Name: vectors, Type: VECTORSEARCH, StandbyReplicas: DISABLED }

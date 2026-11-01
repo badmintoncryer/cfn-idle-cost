@@ -45,6 +45,9 @@ Resources:
   GroupNoMin:
     Type: AWS::OpenSearchServerless::CollectionGroup
     Properties: { Name: g2, StandbyReplicas: ENABLED }
+  NextGenGroup:
+    Type: AWS::OpenSearchServerless::CollectionGroup
+    Properties: { Name: g3, Generation: NEXTGEN, StandbyReplicas: ENABLED }
   InGroup:
     Type: AWS::OpenSearchServerless::Collection
     Properties: { Name: c, CollectionGroupName: g }

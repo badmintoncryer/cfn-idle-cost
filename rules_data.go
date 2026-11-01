@@ -46,12 +46,17 @@ func init() {
 	}
 	rules["AWS::OpenSearchServerless::CollectionGroup"] = func(e *est, p map[string]any) {
 		cl := asMap(p["CapacityLimits"])
+		nextGen := e.str(p, "Generation", "") == "NEXTGEN"
 		for _, k := range []string{"Indexing", "Search"} {
 			key := "Min" + k + "CapacityInOcu"
-			if cl[key] == nil {
-				panic(unresolved("CapacityLimits." + key + " is not set; the default minimum is not documented"))
+			if cl[key] == nil && !nextGen {
+				panic(unresolved("CapacityLimits." + key + " is not set; the default minimum is documented only for NextGen groups"))
 			}
-			e.hourly(e.num(cl, key, 0), "OCU", "aoss|"+k+"OCU", strings.ToLower(k)+" minimum OCUs of the group")
+			if min := e.num(cl, key, 0); min > 0 {
+				e.hourly(min, "OCU", "aoss|"+k+"OCU", strings.ToLower(k)+" minimum OCUs of the group")
+			} else {
+				e.add(1, "", 0, strings.ToLower(k)+" OCUs scale to zero when idle (NextGen group, minimum 0)")
+			}
 		}
 	}
 	rules["AWS::Comprehend::DocumentClassifierEndpoint"] = comprehendEndpoint
