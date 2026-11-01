@@ -65,12 +65,18 @@ nested stacks) or CloudFormation templates (JSON or YAML).
 | Flag | What it does |
 |---|---|
 | `--base <path>` | Compare against another `cdk.out` (or template), e.g. one synthesized from `main`, and print only what changes. See [In pull requests](#in-pull-requests). |
-| `--format <f>` | `text` (default), `md` (a pull request comment), `json`, or `html`: a page to open in a browser, with the cost by category and a table you can sort and filter (`npx cfn-idle-cost --format html > idle-cost.html`). `html` does not support `--base` yet. |
+| `--format <f>` | `text` (default), `md` (a pull request comment), `json`, or `html`: a page to open in a browser, with the cost by category and a table you can sort and filter (`npx cfn-idle-cost --format html > idle-cost.html`). `html` does not support `--base` yet. Also `sarif`, see [Code scanning](#code-scanning). |
+| `--sarif-min <usd>` | With `--format sarif`: report only resources that idle at `usd` per month or more. |
 | `--max <usd>` | Exit `3` if the total idle cost is over `usd` per month. |
+| `--max <Stage>=<usd>` | Exit `3` if the idle cost of one CDK Stage (all its stacks, in every region) is over `usd` per month. Repeatable, and can be combined with the overall `--max`, e.g. `--max Dev=100 --max Prod=2000`. `(app)` is the stacks outside any Stage. When the inputs have Stages, the report also prints a subtotal per Stage. |
 | `--max-increase <usd>` | With `--base`: exit `3` if the idle cost grows by more than `usd` per month. |
+| `--compare-regions <r1,r2,...>` | Price the same stacks in each region, as if all of them were deployed there, and print the totals side by side with the resources whose price differs most (`?` where a resource can't be estimated in that region, e.g. a type not offered there). The first region is the reference. `text` or `md`; not with `--base`, `--live` or the budget flags. |
 | `--region <r>` | Region for stacks that have none: env-agnostic CDK stacks and plain templates. Stacks with an `env` keep their own region. Without it, such stacks are an error. |
 | `--parameter [Stack:]Key=Value` | Value of a template parameter, for every stack that has it or only `Stack`. Repeat it for more. Parameters without one use their `Default`. |
+| `--hours <n>` | Price hour-based charges (instances, NAT Gateways, load balancers, …) for `n` hours a month instead of 730, for environments that only run part of the time: `220` is weekdays 8:00–18:00. Monthly fees and storage stay whole. |
+| `--suggest` | Show cheaper settings the template could use and what each saves. See [Cheaper settings](#cheaper-settings). Not with `--base`. |
 | `--live` | Fetch current prices from the [Price List Query API](https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/using-price-list-query-api.html) instead of the bundled snapshot. Needs AWS credentials with `pricing:GetProducts`. |
+| `--pricing reserved-1y` | Price EC2, RDS, ElastiCache, OpenSearch Service, Redshift and MemoryDB instances at the 1-year, no-upfront, standard Reserved Instance rate, to see the idle cost you would commit to. Those lines say `1-yr RI`; everything else stays on-demand. Uses the bundled snapshot only (not with `--live`). Default `on-demand`. |
 | `--version` | Print the version. |
 
 Exit codes: `0` success (even when some resources could not be estimated), `1`
@@ -80,6 +86,31 @@ estimated, a warning says the real idle cost may be higher. `--max` does not
 fail on them, but `--max-increase` does when the pull request adds a resource
 that can't be estimated or makes one unresolvable, since its increase can't be
 checked. Resources under `? no rule` are in the warning but never fail a budget.
+
+## At `cdk synth`
+
+The npm package also has a CDK
+[validation plugin](https://docs.aws.amazon.com/cdk/v2/guide/policy-validation-synthesis.html),
+so the idle cost shows up at every `cdk synth`, with no CI to set up:
+
+```ts
+import { IdleCost } from 'cfn-idle-cost';
+
+const app = new App();
+// ... your stacks
+IdleCost.apply(app, { max: 200, warnAbove: 20 });
+```
+
+- `max`: fail the synth when the total idle cost is over this many USD a month.
+- `warnAbove`: report each resource that idles at this many USD a month or
+  more as a warning, at its construct.
+- `region`: region for env-agnostic stacks (default `CDK_DEFAULT_REGION`, then `AWS_REGION`).
+- `args`: more flags, e.g. `['--parameter', 'Env=prod']`.
+
+`IdleCost.apply` needs an aws-cdk-lib with `Validations`; on older versions pass
+`new IdleCostValidation({ ... })` in `new App({ policyValidationBeta1: [...] })`.
+The plugin sees each stack's template, so resources in nested stacks are not
+counted at synth; run the CLI on `cdk.out` for those.
 
 ## In pull requests
 
@@ -150,6 +181,53 @@ packages have no Windows binary yet.
 `cdk synth` reads context from `cdk.context.json`; commit it, or the synth
 needs AWS credentials for lookups.
 
+### Code scanning
+
+`--format sarif` writes the resources that idle at `--sarif-min` dollars a
+month or more (default: every one that costs anything) as
+[SARIF](https://docs.github.com/en/code-security/code-scanning/integrating-with-code-scanning/sarif-support-for-code-scanning),
+at the line of their logical ID in the template, plus notes for the ones that
+could not be estimated or are not counted yet. Upload it to GitHub code scanning:
+
+```yaml
+      - run: npx cdk synth
+      - run: npx cfn-idle-cost --format sarif --sarif-min 10 > idle-cost.sarif
+      - uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: idle-cost.sarif
+          category: idle-cost
+```
+
+The locations point at `cdk.out`, so code scanning shows the alerts but can
+link to the file only if `cdk.out` is in the repository.
+
+## Cheaper settings
+
+`--suggest` adds, under a line, a setting that would cost less and what it
+saves a month, priced from the same snapshot. The total stays the current
+cost.
+
+```
+  Server      ×1              $74  m5.large on-demand (Linux)
+                                 → -$15/mo: m6g.large (Graviton), if the AMI and software run on arm64
+  Server      ×100 GB gp2     $10  EBS gp2 storage
+                                 → -$2.10/mo: gp3
+  NatB        ×1              $34  NAT Gateway
+                                 → -$37/mo: one NAT Gateway for the VPC instead of 2 (CDK natGateways: 1); egress then depends on one AZ
+
+→ 3 suggestions save $54/mo
+```
+
+| Suggestion | When |
+|---|---|
+| gp3 | EBS gp2 volumes (instances, launch templates, `AWS::EC2::Volume`), with the IOPS and throughput gp2 gives the size as its baseline |
+| Graviton | x86 types of EC2 instances and Auto Scaling groups, EKS node groups, RDS (Aurora too), ElastiCache and OpenSearch, when the Graviton type of the same size exists in the region and costs less. For EC2 the AMI and software have to run on arm64 |
+| ARM64 Fargate | x86 Linux tasks of ECS services, if the image is built for arm64 |
+| One NAT Gateway per VPC | the second and later public NAT Gateways of a VPC (and their Elastic IPs in the template). Egress of every AZ then goes through one, so it suits development stacks |
+
+In `--format md` they are listed under the breakdown, in `json` each item has
+`suggestion` and `saving`, and in `html` they are under their lines.
+
 ## What is counted
 
 Only charges that run with zero traffic: hourly resources, fixed monthly fees,
@@ -163,7 +241,7 @@ and provisioned storage billed whether you use it or not.
 | `AWS::ElasticLoadBalancingV2::LoadBalancer` | ALB / NLB / GWLB hourly, plus one public IPv4 per subnet when internet-facing (none for `dualstack-without-public-ipv4`) |
 | `AWS::ElasticLoadBalancing::LoadBalancer` | Classic Load Balancer hourly |
 | `AWS::EC2::Instance` | instance hourly (Linux), EBS volumes in `BlockDeviceMappings`, the public IPv4 it gets at launch |
-| `AWS::AutoScaling::AutoScalingGroup` | instance hourly × `DesiredCapacity` (or `MinSize`), EBS volumes and public IPv4 at launch, from its launch template or launch configuration |
+| `AWS::AutoScaling::AutoScalingGroup` | instance hourly × `DesiredCapacity` (or `MinSize`), EBS volumes and public IPv4 at launch, from its launch template or launch configuration. With a `MixedInstancesPolicy`: only the On-Demand part (`OnDemandBaseCapacity`, then `OnDemandPercentageAboveBaseCapacity` of the rest, rounded up) at the first override's type; Spot is not counted, EBS and IPv4 are for all instances |
 | `AWS::EC2::Volume` | size, gp3 IOPS / throughput above 3000 / 125 MiB/s, io1 / io2 IOPS |
 | `AWS::RDS::DBInstance` | instance hourly (Single-AZ / Multi-AZ; MySQL, PostgreSQL, MariaDB, Oracle and SQL Server by license model), allocated storage, provisioned IOPS and throughput above the gp3 baseline. Aurora: provisioned instances, or Serverless v2 minimum ACU (I/O-Optimized aware) |
 | `AWS::RDS::DBCluster` (Multi-AZ DB cluster) | cluster hourly (writer and two readable standbys), allocated storage and provisioned IOPS (gp3 IOPS and throughput not supported yet) |
@@ -183,7 +261,7 @@ and provisioned storage billed whether you use it or not.
 | `AWS::EKS::Nodegroup` | instance hourly × `DesiredSize` (or `MinSize`), on-demand, one instance type. Windows AMI types are priced at Windows license-included rates |
 | `AWS::NetworkFirewall::Firewall` | endpoint hourly × subnets, plus Advanced Inspection hourly × subnets when its firewall policy (in the same template) has a TLS inspection configuration |
 | `AWS::WAFv2::WebACL` | web ACL, its rules, and the rules of the rule groups in the same template it references (managed rule group fees not counted) |
-| `AWS::CloudWatch::Alarm`, `CompositeAlarm` | per alarm metric (standard or high resolution), per composite alarm |
+| `AWS::CloudWatch::Alarm`, `CompositeAlarm` | per alarm metric (standard or high resolution; an anomaly detection band adds two), per composite alarm |
 | `AWS::Lambda::Alias`, `AWS::Lambda::Version` | provisioned concurrency × function memory (x86 and ARM). Versions: the SnapStart cache per GB of memory, for a non-Java function in the same template |
 | `AWS::Lambda::CapacityProvider` | Lambda Managed Instances: EC2 hourly (Linux) plus the management fee × the instances the functions that use it need at least. See [Assumptions](#assumptions). Needs `AllowedInstanceTypes` with one type |
 | `AWS::CloudWatch::Dashboard` | $3 per dashboard (the list price; dashboards are not in the Price List) |
@@ -398,8 +476,9 @@ and Timestream scheduled queries that run on a schedule) are listed under
 
 ## Assumptions
 
-- On-demand list prices in USD, 730 hours a month. Savings Plans, Reserved
-  Instances and the free tier are ignored.
+- On-demand list prices in USD, 730 hours a month (or `--hours`). Savings Plans
+  and the free tier are ignored, and Reserved Instances are used only with
+  `--pricing reserved-1y`.
 - EC2 instances are priced as Linux with shared tenancy (the AMI is not read).
   A root volume that comes from the AMI (no `VolumeSize` in
   `BlockDeviceMappings`) is not counted.

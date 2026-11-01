@@ -12,6 +12,8 @@ jobs:
       - run: test -z "$(gofmt -l .)"
       - run: go vet ./...
       - run: go test ./...
+      # The cdk synth plugin in the npm package, against the binary just built.
+      - run: go build -o /tmp/cfn-idle-cost . && CFN_IDLE_COST_BINARY=/tmp/cfn-idle-cost node --test npm/cfn-idle-cost/test/plugin.test.js
   action:
     runs-on: ubuntu-latest
     steps:

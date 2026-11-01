@@ -336,6 +336,15 @@ type cdkMetadata struct {
 	Data any    `json:"data"`
 }
 
+// Stage is the construct path of the CDK Stage that holds the stack ("Prod",
+// "Prod/Eu"), or "" for a stack directly in the app or a plain template.
+func (s *Stack) Stage() string {
+	if i := strings.LastIndex(s.cdkPath, "/"); i >= 0 {
+		return s.cdkPath[:i]
+	}
+	return ""
+}
+
 // DisplayPath is the CDK construct path without the stack and the trailing
 // "/Resource", or the logical ID for plain templates.
 func (s *Stack) DisplayPath(logicalID string) string {
