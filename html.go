@@ -69,12 +69,16 @@ type htmlLine struct {
 	Quantity string  `json:"quantity"`
 	Monthly  float64 `json:"monthly"`
 	Reason   string  `json:"reason"`
+	// Suggestion and Saving are set with --suggest.
+	Suggestion string  `json:"suggestion,omitempty"`
+	Saving     float64 `json:"saving,omitempty"`
 }
 
 type htmlData struct {
 	Total      float64         `json:"total"`
 	Prices     string          `json:"prices"`
-	Hours      int             `json:"hours"`
+	Hours      float64         `json:"hours"`
+	Basis      string          `json:"basis"`
 	Regions    []htmlRegion    `json:"regions"`
 	Items      []*htmlResource `json:"items"`
 	Unknown    []Item          `json:"unknown"`
@@ -91,7 +95,7 @@ type htmlRegion struct {
 // WriteHTML writes a self-contained page: totals, a bar per category, and a
 // table to sort and filter. It needs no network.
 func (rep Report) WriteHTML(w io.Writer) error {
-	d := htmlData{Total: rep.Total(), Prices: rep.Prices, Hours: hoursPerMonth, Regions: []htmlRegion{},
+	d := htmlData{Total: rep.Total(), Prices: rep.Prices, Hours: hoursPerMonth, Basis: priceBasis(), Regions: []htmlRegion{},
 		Items: []*htmlResource{}, Unknown: []Item{}, NotCounted: []Item{}, NoRule: []Item{}}
 	for _, r := range rep.Regions {
 		d.Regions = append(d.Regions, htmlRegion{r.Region, r.Stacks, r.Monthly})
@@ -104,7 +108,7 @@ func (rep Report) WriteHTML(w io.Writer) error {
 					d.Items = append(d.Items, res)
 				}
 				res.Monthly += it.Monthly
-				res.Lines = append(res.Lines, htmlLine{it.Quantity, it.Monthly, it.Reason})
+				res.Lines = append(res.Lines, htmlLine{it.Quantity, it.Monthly, it.Reason, it.Suggestion, it.Saving})
 			}
 		}
 		d.Unknown = append(d.Unknown, r.Unknown...)
@@ -231,7 +235,7 @@ const multiRegion = D.regions.length > 1;
 
 $("total").textContent = "Idle cost ≈ " + money(D.total) + "/mo";
 $("regions").textContent = D.regions.map(r => r.region + " · " + r.stacks + (r.stacks === 1 ? " stack" : " stacks") + (multiRegion ? " · " + money(r.monthly) + "/mo" : "")).join("   |   ");
-$("foot").textContent = "cfn-idle-cost · prices: " + D.prices + " · on-demand list prices, " + D.hours + " h/mo, USD, free tier ignored";
+$("foot").textContent = "cfn-idle-cost · prices: " + D.prices + " · " + D.basis + ", " + D.hours + " h/mo, USD, free tier ignored";
 
 const cats = {};
 for (const it of D.items) {
@@ -310,7 +314,8 @@ function renderRows() {
     (!q || [it.stack, it.path, it.type, it.category, it.region, ...it.lines.map(l => l.reason)].join(" ").toLowerCase().includes(q))).sort(compare);
   const cell = (it, c) => {
     if (c.key === "lines") return '<td class="detail"><ul class="lines">' + it.lines.map(l =>
-      '<li><span class="q">' + esc(l.quantity) + "</span> " + esc(l.reason) + (it.lines.length > 1 ? ' <span class="m">' + money(l.monthly) + "</span>" : "") + "</li>").join("") + "</ul></td>";
+      '<li><span class="q">' + esc(l.quantity) + "</span> " + esc(l.reason) + (it.lines.length > 1 ? ' <span class="m">' + money(l.monthly) + "</span>" : "") +
+      (l.suggestion ? '<div class="m">→ -' + money(l.saving) + "/mo: " + esc(l.suggestion) + "</div>" : "") + "</li>").join("") + "</ul></td>";
     const v = c.key === "monthly" ? money(it.monthly) : it[c.key];
     const cls = c.num ? "num" : c.key === "path" ? "path" : "";
     return "<td" + (cls ? ' class="' + cls + '"' : "") + ">" + esc(v) + "</td>";

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -30,13 +31,25 @@ Flags:
                        code scanning, without --base)
   --sarif-min usd      with --format sarif: report only resources that idle at usd per month or more
   --max usd            exit 3 if the total idle cost is over usd per month
+  --max Stage=usd      exit 3 if the idle cost of a CDK Stage is over usd per month (repeatable;
+                       "(app)" is the stacks outside any Stage)
   --max-increase usd   with --base: exit 3 if the idle cost grows by more than usd per month
+  --compare-regions r1,r2,...
+                       price the same stacks in each region and print the totals side by side
+                       (text or md; not with --base, --live or the budget flags)
   --region r           region for stacks without one (env-agnostic stacks, plain templates)
   --parameter [Stack:]Key=Value
                        value of a template parameter, for every stack or only Stack (repeatable);
                        parameters without one use their Default
+  --hours n            price hour-based charges (instances, NAT Gateways, load balancers, …) for
+                       n hours a month instead of 730, e.g. 220 for weekdays 8:00-18:00;
+                       monthly fees and storage stay whole
+  --suggest            show cheaper settings the template could use, with what each saves
+                       (gp3, Graviton, one NAT Gateway per VPC); without --base
   --live               fetch current prices from the AWS Price List Query API
                        (needs credentials with pricing:GetProducts) instead of the bundled snapshot
+  --pricing p          on-demand (default) or reserved-1y: price EC2, RDS, ElastiCache, OpenSearch,
+                       Redshift and MemoryDB instances at 1-year no-upfront Reserved Instance rates
   --version            print the version
 
 Exit codes: 0 ok, 1 error, 2 usage error, 3 over --max or --max-increase.
@@ -78,9 +91,14 @@ func run(args []string, stdout io.Writer) error {
 	base := fs.String("base", "", "")
 	format := fs.String("format", "text", "")
 	sarifMin := fs.Float64("sarif-min", 0, "")
-	maxTotal := fs.Float64("max", -1, "")
+	maxes := budgetFlag{total: -1}
+	fs.Var(&maxes, "max", "")
 	maxIncrease := fs.Float64("max-increase", -1, "")
 	live := fs.Bool("live", false, "")
+	compare := fs.String("compare-regions", "", "")
+	pricing := fs.String("pricing", "on-demand", "")
+	hours := fs.Float64("hours", 730, "")
+	suggest := fs.Bool("suggest", false, "")
 	var params paramFlag
 	fs.Var(&params, "parameter", "")
 	showVersion := fs.Bool("version", false, "")
@@ -122,8 +140,58 @@ func run(args []string, stdout io.Writer) error {
 	if in(*format, "html", "sarif") && *base != "" {
 		return usageError{"--format " + *format + " does not support --base yet; use md or text"}
 	}
+	if !in(*pricing, "on-demand", "reserved-1y") {
+		return usageError{"--pricing must be on-demand or reserved-1y"}
+	}
+	if *pricing == "reserved-1y" && *live {
+		return usageError{"--pricing reserved-1y does not support --live yet; use the bundled snapshot"}
+	}
+	reservedPricing = *pricing == "reserved-1y"
+	if *hours <= 0 || *hours > 744 {
+		return usageError{"--hours must be more than 0 and at most 744 (31 days)"}
+	}
+	hoursPerMonth = *hours
+	if *suggest && *base != "" {
+		return usageError{"--suggest does not support --base yet"}
+	}
 	if *maxIncrease >= 0 && *base == "" {
 		return usageError{"--max-increase needs --base"}
+	}
+	if *compare != "" {
+		regions := strings.Split(*compare, ",")
+		for i := range regions {
+			regions[i] = strings.TrimSpace(regions[i])
+		}
+		switch {
+		case len(regions) < 2 || in("", regions...):
+			return usageError{"--compare-regions needs two or more regions, e.g. ap-northeast-1,us-east-1"}
+		case *base != "" || *live || maxes.total >= 0 || len(maxes.stages) > 0 || *maxIncrease >= 0:
+			return usageError{"--compare-regions does not support --base, --live, --max or --max-increase"}
+		case !in(*format, "text", "md"):
+			return usageError{"--compare-regions supports --format text or md"}
+		}
+		r := *region
+		if r == "" {
+			r = regions[0] // every stack is priced in each region anyway
+		}
+		stacks, err := loadStacks(inputs, r)
+		if err != nil {
+			return err
+		}
+		if unused := params.apply(stacks); len(unused) > 0 {
+			return usageError{"no stack has parameter " + strings.Join(unused, ", ")}
+		}
+		prices, err := BundledPrices()
+		if err != nil {
+			return err
+		}
+		c := CompareRegions(stacks, regions, prices)
+		if *format == "md" {
+			c.WriteMarkdown(stdout)
+		} else {
+			c.WriteText(stdout)
+		}
+		return nil
 	}
 	head, err := loadStacks(inputs, *region)
 	if err != nil {
@@ -149,13 +217,21 @@ func run(args []string, stdout io.Writer) error {
 		return err
 	}
 	headItems := Estimate(head, prices)
+	if !*suggest {
+		for i := range headItems {
+			headItems[i].Suggestion, headItems[i].Saving = "", 0
+		}
+	}
 	rep := NewReport(head, headItems, prices)
 	var d *Diff
 	if *base != "" {
 		d = NewDiff(NewReport(baseStacks, Estimate(baseStacks, prices), prices), rep)
 	}
 	// Before writing: WriteJSON rounds the totals to cents in place.
-	budget := checkBudget(rep, d, *maxTotal, *maxIncrease)
+	if unknown := maxes.unknownStages(rep); len(unknown) > 0 {
+		return usageError{"--max: no Stage " + strings.Join(unknown, ", ")}
+	}
+	budget := checkBudget(rep, d, maxes, *maxIncrease)
 	switch {
 	case d != nil && *format == "json":
 		err = d.WriteJSON(stdout)
@@ -181,8 +257,9 @@ func run(args []string, stdout io.Writer) error {
 }
 
 // checkBudget returns overBudget when a --max or --max-increase gate fails.
-func checkBudget(rep Report, d *Diff, maxTotal, maxIncrease float64) error {
-	if maxTotal < 0 && maxIncrease < 0 {
+func checkBudget(rep Report, d *Diff, maxes budgetFlag, maxIncrease float64) error {
+	maxTotal := maxes.total
+	if maxTotal < 0 && maxIncrease < 0 && len(maxes.stages) == 0 {
 		return nil
 	}
 	if n := rep.unknownCount(); n > 0 {
@@ -192,6 +269,13 @@ func checkBudget(rep Report, d *Diff, maxTotal, maxIncrease float64) error {
 	if total := rep.Total(); maxTotal >= 0 && total > maxTotal {
 		return overBudget{fmt.Sprintf("over budget: idle cost $%.2f/mo is over --max $%.2f", total, maxTotal)}
 	}
+	for _, b := range maxes.stages {
+		for _, st := range rep.Stages {
+			if stageName(st.Stage) == b.stage && st.Monthly > b.usd {
+				return overBudget{fmt.Sprintf("over budget: idle cost of Stage %s $%.2f/mo is over --max %s=%.2f", b.stage, st.Monthly, b.stage, b.usd)}
+			}
+		}
+	}
 	if d != nil && maxIncrease >= 0 && d.After-d.Before > maxIncrease {
 		return overBudget{fmt.Sprintf("over budget: idle cost grows by $%.2f/mo, over --max-increase $%.2f", d.After-d.Before, maxIncrease)}
 	}
@@ -199,6 +283,51 @@ func checkBudget(rep Report, d *Diff, maxTotal, maxIncrease float64) error {
 		return overBudget{fmt.Sprintf("over budget: %d added or changed resource(s) could not be estimated, so --max-increase can't be checked", d.NewUnknown)}
 	}
 	return nil
+}
+
+// budgetFlag collects --max usd (the total) and --max Stage=usd.
+type budgetFlag struct {
+	total  float64
+	stages []struct {
+		stage string
+		usd   float64
+	}
+}
+
+func (b *budgetFlag) String() string { return "" }
+
+func (b *budgetFlag) Set(s string) error {
+	stage, v, staged := strings.Cut(s, "=")
+	if !staged {
+		v = s
+	}
+	usd, err := strconv.ParseFloat(v, 64)
+	if err != nil || usd < 0 || staged && stage == "" {
+		return fmt.Errorf("--max %q: want usd or Stage=usd", s)
+	}
+	if !staged {
+		b.total = usd
+		return nil
+	}
+	b.stages = append(b.stages, struct {
+		stage string
+		usd   float64
+	}{stage, usd})
+	return nil
+}
+
+// unknownStages returns the --max Stages that are not in the report.
+func (b budgetFlag) unknownStages(rep Report) (unknown []string) {
+	for _, g := range b.stages {
+		found := false
+		for _, st := range rep.Stages {
+			found = found || stageName(st.Stage) == g.stage
+		}
+		if !found {
+			unknown = append(unknown, g.stage)
+		}
+	}
+	return unknown
 }
 
 // paramFlag collects --parameter [Stack:]Key=Value.
