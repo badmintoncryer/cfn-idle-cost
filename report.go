@@ -125,7 +125,13 @@ func (rep Report) WriteText(w io.Writer) {
 			fmt.Fprintf(w, "\n%s%s/mo\n", pad(s.Name+" ", 6+pw+qw+mw-len(tot)), tot)
 			for _, it := range s.Items {
 				fmt.Fprintf(w, "  %s  %s  %*s  %s\n", pad(it.Path, pw), pad(it.Quantity, qw), mw, money(it.Monthly), it.Reason)
+				if it.Suggestion != "" {
+					fmt.Fprintf(w, "  %s  → -%s/mo: %s\n", pad("", pw+qw+mw+2), money(it.Saving), it.Suggestion)
+				}
 			}
+		}
+		if n, saving := r.suggestions(); n > 0 {
+			fmt.Fprintf(w, "\n→ %s save %s/mo\n", count(float64(n), "suggestion"), money(saving))
 		}
 		if len(r.Unknown) > 0 {
 			fmt.Fprintf(w, "\n? could not estimate: %d\n", len(r.Unknown))
@@ -170,6 +176,7 @@ func (rep Report) WriteJSON(w io.Writer) error {
 			cents(&s.Monthly)
 			for k := range s.Items {
 				cents(&s.Items[k].Monthly)
+				cents(&s.Items[k].Saving)
 			}
 		}
 	}
@@ -224,8 +231,44 @@ func (rep Report) WriteMarkdown(w io.Writer) {
 		fmt.Fprintln(w)
 	}
 	fmt.Fprint(w, "</details>\n\n")
+	writeMarkdownSuggestions(w, rep)
 	writeMarkdownUnknown(w, rep)
 	fmt.Fprintf(w, "<sub>cfn-idle-cost · prices: %s · on-demand list prices, %d h/mo, USD, free tier ignored</sub>\n", rep.Prices, hoursPerMonth)
+}
+
+// suggestions counts the region's suggestions and what they save a month.
+func (r regionReport) suggestions() (n int, saving float64) {
+	for _, s := range r.Billed {
+		for _, it := range s.Items {
+			if it.Suggestion != "" {
+				n++
+				saving += it.Saving
+			}
+		}
+	}
+	return n, saving
+}
+
+func writeMarkdownSuggestions(w io.Writer, rep Report) {
+	n, saving := 0, 0.0
+	for _, r := range rep.Regions {
+		rn, rs := r.suggestions()
+		n, saving = n+rn, saving+rs
+	}
+	if n == 0 {
+		return
+	}
+	fmt.Fprintf(w, "**Suggestions (%d, -%s/mo)**\n\n", n, money(saving))
+	for _, r := range rep.Regions {
+		for _, s := range r.Billed {
+			for _, it := range s.Items {
+				if it.Suggestion != "" {
+					fmt.Fprintf(w, "- %s `%s`: -%s/mo, %s (now %s)\n", mdCell(s.Name), mdCell(it.Path), money(it.Saving), it.Suggestion, it.Reason)
+				}
+			}
+		}
+	}
+	fmt.Fprintln(w)
 }
 
 func writeMarkdownUnknown(w io.Writer, rep Report) {

@@ -70,6 +70,7 @@ nested stacks) or CloudFormation templates (JSON or YAML).
 | `--max-increase <usd>` | With `--base`: exit `3` if the idle cost grows by more than `usd` per month. |
 | `--region <r>` | Region for stacks that have none: env-agnostic CDK stacks and plain templates. Stacks with an `env` keep their own region. Without it, such stacks are an error. |
 | `--parameter [Stack:]Key=Value` | Value of a template parameter, for every stack that has it or only `Stack`. Repeat it for more. Parameters without one use their `Default`. |
+| `--suggest` | Show cheaper settings the template could use and what each saves. See [Cheaper settings](#cheaper-settings). Not with `--base`. |
 | `--live` | Fetch current prices from the [Price List Query API](https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/using-price-list-query-api.html) instead of the bundled snapshot. Needs AWS credentials with `pricing:GetProducts`. |
 | `--version` | Print the version. |
 
@@ -149,6 +150,33 @@ packages have no Windows binary yet.
 
 `cdk synth` reads context from `cdk.context.json`; commit it, or the synth
 needs AWS credentials for lookups.
+
+## Cheaper settings
+
+`--suggest` adds, under a line, a setting that would cost less and what it
+saves a month, priced from the same snapshot. The total stays the current
+cost.
+
+```
+  Server      ×1              $74  m5.large on-demand (Linux)
+                                 → -$15/mo: m6g.large (Graviton), if the AMI and software run on arm64
+  Server      ×100 GB gp2     $10  EBS gp2 storage
+                                 → -$2.10/mo: gp3
+  NatB        ×1              $34  NAT Gateway
+                                 → -$37/mo: one NAT Gateway for the VPC instead of 2 (CDK natGateways: 1); egress then depends on one AZ
+
+→ 3 suggestions save $54/mo
+```
+
+| Suggestion | When |
+|---|---|
+| gp3 | EBS gp2 volumes (instances, launch templates, `AWS::EC2::Volume`), with the IOPS and throughput gp2 gives the size as its baseline |
+| Graviton | x86 types of EC2 instances and Auto Scaling groups, EKS node groups, RDS (Aurora too), ElastiCache and OpenSearch, when the Graviton type of the same size exists in the region and costs less. For EC2 the AMI and software have to run on arm64 |
+| ARM64 Fargate | x86 Linux tasks of ECS services, if the image is built for arm64 |
+| One NAT Gateway per VPC | the second and later public NAT Gateways of a VPC (and their Elastic IPs in the template). Egress of every AZ then goes through one, so it suits development stacks |
+
+In `--format md` they are listed under the breakdown, in `json` each item has
+`suggestion` and `saving`, and in `html` they are under their lines.
 
 ## What is counted
 

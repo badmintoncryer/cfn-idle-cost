@@ -63,6 +63,7 @@ npx cfn-idle-cost [flags] [cdk.out | template ...]
 | `--max-increase <usd>` | `--base`と一緒に使います。アイドルコストの増加が月`usd`ドルを超えたら、終了コード`3`で終わります。 |
 | `--region <r>` | リージョンを持たないスタック（envを指定していないCDKスタックと、素のテンプレート）に使うリージョンです。`env`を指定したスタックは、そのリージョンのまま見積もります。リージョンのないスタックがあるのにこのフラグがなければ、エラーになります。 |
 | `--parameter [Stack:]Key=Value` | テンプレートのパラメータの値を指定します。そのパラメータを持つすべてのスタックに効き、`Stack:`を付けるとそのスタックだけに効きます。複数指定できます。指定しなかったパラメータには`Default`を使います。 |
+| `--suggest` | テンプレートで選べる安い設定と、それぞれで減る金額を表示します。[安くする設定](#安くする設定)を参照。`--base`とは併用できません。 |
 | `--live` | 同梱のスナップショットではなく、[Price List Query API](https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/using-price-list-query-api.html)から最新の価格を取得します。`pricing:GetProducts`を許可したAWSの認証情報が必要です。 |
 | `--version` | バージョンを表示します。 |
 
@@ -125,6 +126,30 @@ jobs:
 `@v1`は1.xの最新のリリースを使います。`@v1.0.0`のように書くと、そのバージョンに固定できます。
 
 `cdk synth`は`cdk.context.json`からコンテキストを読みます。このファイルをコミットしておかないと、lookupのためにsynthでAWSの認証情報が必要になります。
+
+## 安くする設定
+
+`--suggest`を付けると、行の下に、より安くなる設定と月に減る金額を表示します。価格は同じスナップショットから計算します。合計は今の設定のままの金額です。
+
+```
+  Server      ×1              $74  m5.large on-demand (Linux)
+                                 → -$15/mo: m6g.large (Graviton), if the AMI and software run on arm64
+  Server      ×100 GB gp2     $10  EBS gp2 storage
+                                 → -$2.10/mo: gp3
+  NatB        ×1              $34  NAT Gateway
+                                 → -$37/mo: one NAT Gateway for the VPC instead of 2 (CDK natGateways: 1); egress then depends on one AZ
+
+→ 3 suggestions save $54/mo
+```
+
+| 提案 | 対象 |
+|---|---|
+| gp3 | EBSのgp2ボリューム（インスタンス、起動テンプレート、`AWS::EC2::Volume`）。gp2がそのサイズで出すIOPSとスループットをgp3で買う前提で計算します |
+| Graviton | EC2インスタンス、Auto Scalingグループ、EKSノードグループ、RDS（Auroraも）、ElastiCache、OpenSearchのx86のタイプ。同じサイズのGravitonのタイプがそのリージョンにあり、安いときだけです。EC2ではAMIとソフトウェアがarm64で動く必要があります |
+| ARM64のFargate | ECSサービスのx86 Linuxのタスク。イメージがarm64向けにビルドされている必要があります |
+| VPCにNAT Gatewayを1つ | VPCの2つ目以降のパブリックNAT Gateway（とテンプレート内のElastic IP）。全AZの外向き通信が1つを通るので、開発用のスタック向けです |
+
+`--format md`では内訳の下に一覧で、`json`では各項目の`suggestion`と`saving`に、`html`では各行の下に表示します。
 
 ## 見積もる費用
 
