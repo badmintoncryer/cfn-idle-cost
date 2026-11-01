@@ -33,6 +33,9 @@ Flags:
   --parameter [Stack:]Key=Value
                        value of a template parameter, for every stack or only Stack (repeatable);
                        parameters without one use their Default
+  --hours n            price hour-based charges (instances, NAT Gateways, load balancers, …) for
+                       n hours a month instead of 730, e.g. 220 for weekdays 8:00-18:00;
+                       monthly fees and storage stay whole
   --suggest            show cheaper settings the template could use, with what each saves
                        (gp3, Graviton, one NAT Gateway per VPC); without --base
   --live               fetch current prices from the AWS Price List Query API
@@ -80,6 +83,7 @@ func run(args []string, stdout io.Writer) error {
 	maxTotal := fs.Float64("max", -1, "")
 	maxIncrease := fs.Float64("max-increase", -1, "")
 	live := fs.Bool("live", false, "")
+	hours := fs.Float64("hours", 730, "")
 	suggest := fs.Bool("suggest", false, "")
 	var params paramFlag
 	fs.Var(&params, "parameter", "")
@@ -122,6 +126,10 @@ func run(args []string, stdout io.Writer) error {
 	if *format == "html" && *base != "" {
 		return usageError{"--format html does not support --base yet; use md or text"}
 	}
+	if *hours <= 0 || *hours > 744 {
+		return usageError{"--hours must be more than 0 and at most 744 (31 days)"}
+	}
+	hoursPerMonth = *hours
 	if *suggest && *base != "" {
 		return usageError{"--suggest does not support --base yet"}
 	}
