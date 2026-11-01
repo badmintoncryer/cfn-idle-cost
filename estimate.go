@@ -543,13 +543,17 @@ func init() {
 			}
 		},
 		"AWS::AutoScaling::AutoScalingGroup": func(e *est, p map[string]any) {
-			t, bdm, assoc := e.asgLaunch(p)
+			t, bdm, assoc, dist := e.asgLaunch(p)
 			n, why := e.num(p, "DesiredCapacity", -1), "DesiredCapacity"
 			if n < 0 {
 				n, why = e.mustNum(p, "MinSize"), "MinSize"
 			}
-			e.hourly(n, "", "ec2|"+t, fmt.Sprintf("%s on-demand (Linux), %s", t, why))
-			e.suggestGraviton(t, n, ec2Key, armCaveat)
+			od, odWhy := n, why
+			if dist != nil { // the Spot instances' EBS volumes and IPv4 addresses are still billed
+				od, odWhy = e.onDemand(dist, n), fmt.Sprintf("On-Demand part of %s %g (Spot not counted)", why, n)
+			}
+			e.hourly(od, "", "ec2|"+t, fmt.Sprintf("%s on-demand (Linux), %s", t, odWhy))
+			e.suggestGraviton(t, od, ec2Key, armCaveat)
 			e.blockDevices(bdm, n)
 			subnets, _ := p["VPCZoneIdentifier"].([]any)
 			if e.autoPublicIP(assoc, subnets) {
@@ -1282,7 +1286,7 @@ func init() {
 				for _, m := range l {
 					mm := asMap(m)
 					if strings.Contains(fmt.Sprint(mm["Expression"]), "ANOMALY_DETECTION_BAND") {
-						panic(unresolved("anomaly detection alarms are not supported yet"))
+						n += 2 // billed as 3 alarm metrics: the metric and the band's two bounds
 					}
 					if ms := asMap(mm["MetricStat"]); ms != nil {
 						n++
