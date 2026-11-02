@@ -37,6 +37,10 @@
 
 </details>
 
+**Suggestions (1, -$10/mo)**
+
+- App `Vpc/SsmEndpoint`: -$10/mo, one subnet instead of 2, for development stacks: clients in the other AZs then cross AZs and lose the endpoint if its AZ fails (now interface endpoint)
+
 **Could not estimate (1)**
 
 - App `Worker`: InstanceType is Parameter WorkerType

@@ -70,6 +70,8 @@ npx cfn-idle-cost [flags] [cdk.out | template ...]
 | `--suggest` | テンプレートで選べる安い設定と、それぞれで減る金額を表示します。[安くする設定](#安くする設定)を参照。`--base`とは併用できません。 |
 | `--live` | 同梱のスナップショットではなく、[Price List Query API](https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/using-price-list-query-api.html)から最新の価格を取得します。`pricing:GetProducts`を許可したAWSの認証情報が必要です。 |
 | `--pricing reserved-1y` | EC2、RDS、ElastiCache、OpenSearch Service、Redshift、MemoryDBのインスタンスを、1年・前払いなし・スタンダードのリザーブドインスタンスの料金で見積もります。コミットした場合のアイドルコストの目安です。その行には`1-yr RI`と付き、ほかはオンデマンドのままです。同梱のスナップショットでのみ使えます（`--live`とは併用不可）。既定は`on-demand`。 |
+| `--discount <pct>` | すべての価格から`pct`%を引きます。EDPなどの個別の割引向けです（例: `--discount 10`）。どの割引を引いたかはフッターに出ます。 |
+| `--discount <Service>=<pct>` | 1つのCloudFormationサービスのリソース（`RDS`なら`AWS::RDS::*`）だけから`pct`%を引きます（例: `--discount EC2=30`）。繰り返し指定でき、そのサービスでは全体の割引より優先します。提案の削減額も同じように割り引きます。 |
 | `--version` | バージョンを表示します。 |
 
 終了コードは、成功が`0`、エラーが`1`、使い方の誤り（リージョンのないスタックを含みます）が`2`、`--max`か`--max-increase`の超過が`3`です。見積もれなかったリソースがあっても、成功なら`0`を返します。予算のフラグを付けたときに見積もれなかったリソースがあると、実際のアイドルコストはもっと高いかもしれないという警告を出します。`--max`はこの場合も失敗にしません。一方、`--max-increase`は、見積もれないリソースが追加されたときや、見積もれていたリソースが見積もれなくなったときに失敗します。増加額を確かめられないためです。`? no rule`のリソースは警告の件数に含めますが、予算のチェックを失敗させることはありません。
@@ -188,6 +190,8 @@ jobs:
 | Graviton | EC2インスタンス、Auto Scalingグループ、EKSノードグループ、RDS（Auroraも）、ElastiCache、OpenSearchのx86のタイプ。同じサイズのGravitonのタイプがそのリージョンにあり、安いときだけです。EC2ではAMIとソフトウェアがarm64で動く必要があります |
 | ARM64のFargate | ECSサービスのx86 Linuxのタスク。イメージがarm64向けにビルドされている必要があります |
 | VPCにNAT Gatewayを1つ | VPCの2つ目以降のパブリックNAT Gateway（とテンプレート内のElastic IP）。全AZの外向き通信が1つを通るので、開発用のスタック向けです |
+| データベースをシングルAZに | マルチAZのRDSインスタンス（AuroraとマルチAZ DBクラスターを除く）。インスタンスとストレージをシングルAZの価格で計算します。スタンバイが無くなるので、開発用のスタック向けです |
+| インターフェイスエンドポイントを1つのAZに | 2つ以上のサブネットに置いたインターフェイスVPCエンドポイント。他のAZのクライアントはAZをまたいで使うことになるので、開発用のスタック向けです |
 
 `--format md`では内訳の下に一覧で、`json`では各項目の`suggestion`と`saving`に、`html`では各行の下に表示します。
 
@@ -399,7 +403,7 @@ jobs:
 
 ## 前提
 
-- オンデマンドの定価（USD）で、1か月を730時間（`--hours`ならその時間）として計算します。Savings Plansと無料利用枠は考慮しません。リザーブドインスタンスは`--pricing reserved-1y`のときだけ使います。
+- オンデマンドの定価（USD）で、1か月を730時間（`--hours`ならその時間）として計算します。Savings Plansと無料利用枠は考慮しません。リザーブドインスタンスは`--pricing reserved-1y`のときだけ、割引は`--discount`のときだけ使います。
 - EC2インスタンスは、Linux・共有テナンシーの料金で見積もります（AMIは読みません）。AMIから決まるルートボリューム（`BlockDeviceMappings`に`VolumeSize`がないもの）は数えません。
 - インスタンス、Auto Scalingグループ、Fargateのタスクに起動時に割り当てられるパブリックIPv4は、`AssociatePublicIpAddress`（Fargateは`AssignPublicIp`）で割り当てると指定しているときに数えます。指定がなければ、すべてのサブネットが同じテンプレートにあり、`MapPublicIpOnLaunch`がtrueのときに数えます。サブネットが別のスタックなどにあって決まらないときは、IPの行を出さず、リソースのほかの費用だけを見積もります。同じテンプレートでElastic IPを関連付けたインスタンスは、IPを二重に数えません。
 - Lambda Managed Instancesのキャパシティプロバイダは、関数が最低限必要とするインスタンス数で見積もります。関数ごとの実行環境は`MinExecutionEnvironments`（既定は3）個で、1つあたりのメモリは`MemorySize`、vCPUは`MemorySize`÷`ExecutionEnvironmentMemoryGiBPerVCpu`（既定はvCPUあたり2GiB）です。この実行環境をインスタンスタイプに詰め込んだ台数と、実行環境の数（上限3、AZごとに1台）の大きいほうを使います。トラフィックが倍になっても耐えられるようにLambdaが確保する余裕は数えないので、実際の費用はもっと高くなることがあります。どの関数も使っていないプロバイダは3台で見積もります。関数は同じリージョンのすべての入力スタックから探します。プロバイダを指す方法は`Ref`か`Fn::GetAtt`、エクスポートを読む`Fn::ImportValue`（CDKのstrong参照）、`Fn::GetStackOutput`（CDKのweak参照）、ARNのどれでもかまいません。`AWS::Lambda::Version`の`FunctionScalingConfig`は読みません。関数のインスタンスはキャパシティプロバイダの側で課金されるため、プロバイダがどの入力にもない関数（別のアプリのARNを指すものなど）は`? could not estimate`に載ります。
@@ -408,6 +412,22 @@ jobs:
 - `Conditions`（`Fn::Equals`、`Fn::And`、`Fn::Or`、`Fn::Not`）と`Fn::If`は、パラメータと`AWS::Region`だけで決まるときに評価します。`Condition`がfalseのリソースは作られないので、一覧に載せません。`AWS::AccountId`など、それ以外の値で決まる条件を持つリソースは`? could not estimate`に載ります。ただし、作られても$0のリソース（ふつうのLambda関数やVPCなど）は一覧に載せません。
 - Auto Scalingグループは、`DesiredCapacity`があればその値を、なければ`MinSize`を使います。DynamoDBは、Auto Scalingの最小値ではなく、テーブルに設定したプロビジョニング容量を使います。ただしグローバルテーブルは、書き込み容量をAuto Scalingの範囲でしか指定できないため、その最小値を使います。
 - 素のテンプレートにはコンストラクトのパスがないため、行には論理IDを表示します。
+
+## AIエージェントから使う
+
+`cfn-idle-cost mcp`は、標準入出力で[Model Context Protocol](https://modelcontextprotocol.io)のサーバーとして動き、`idle_cost`というツールを1つ提供します。CLIと同じ入力（`inputs`、`base`、`region`、`suggest`、`hours`、`parameters`、`discount`）を受け取り、`--format json`のレポートを返します。CDKを書くエージェントが、`cdk synth`のたびに変更の待機コストを確かめられます。Claude Codeなら次のとおりです。
+
+```sh
+claude mcp add idle-cost -- npx -y cfn-idle-cost mcp
+```
+
+ほかのクライアントでは、MCPの設定に次を書きます。
+
+```json
+{ "mcpServers": { "idle-cost": { "command": "npx", "args": ["-y", "cfn-idle-cost", "mcp"] } } }
+```
+
+サーバーはクライアントの作業ディレクトリで動くので、`inputs`の既定はそこの`./cdk.out`です。AWSの認証情報は要りません。
 
 ## インストール
 

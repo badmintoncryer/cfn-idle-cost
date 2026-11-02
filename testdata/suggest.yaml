@@ -32,3 +32,7 @@ Resources:
   Service:
     Type: AWS::ECS::Service
     Properties: { LaunchType: FARGATE, DesiredCount: 2, TaskDefinition: !Ref Task }
+  # Two subnets: one would do for a development stack.
+  Endpoint: { Type: AWS::EC2::VPCEndpoint, Properties: { VpcId: !Ref Vpc, ServiceName: com.amazonaws.eu-north-1.ssm, VpcEndpointType: Interface, SubnetIds: [!Ref SubnetA, !Ref SubnetB] } }
+  # One subnet: nothing to suggest.
+  EndpointOne: { Type: AWS::EC2::VPCEndpoint, Properties: { VpcId: !Ref Vpc, ServiceName: com.amazonaws.eu-north-1.sqs, VpcEndpointType: Interface, SubnetIds: [!Ref SubnetA] } }

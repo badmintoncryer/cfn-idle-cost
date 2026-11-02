@@ -72,7 +72,7 @@ var testPrices = &Prices{Source: "test prices", AsOf: "2026-10-16", Regions: map
 		"rds|InstanceUsage:db.m5.large|20": 0.438, "rds|RDS:GP3-Storage|20": 0.115, "rds|RDS:GP3-Storage|10": 0.115,
 		"ec2|m5.xlarge": 0.192, "emr|m5.xlarge": 0.048, "ebs|EBS:VolumeUsage.gp2": 0.1,
 		"eks|AmazonEKS-Hours:perCluster": 0.1, "eks|AmazonEKS-Hours:extendedSupport": 0.5},
-	"eu-north-1": {"nat|NatGateway-Hours": 0.046, "vpc|PublicIPv4:InUseAddress": 0.005, "ec2|m5.large": 0.102, "ec2|m6g.large": 0.0816,
+	"eu-north-1": {"nat|NatGateway-Hours": 0.046, "vpc|VpcEndpoint-Hours": 0.011, "vpc|PublicIPv4:InUseAddress": 0.005, "ec2|m5.large": 0.102, "ec2|m6g.large": 0.0816,
 		"ebs|EBS:VolumeUsage.gp2": 0.105, "ebs|EBS:VolumeUsage.gp3": 0.084, "ebs|EBS:VolumeP-IOPS.gp3": 0.005, "ebs|EBS:VolumeP-Throughput.gp3": 0.042,
 		"rds|InstanceUsage:db.m5.large|14": 0.178, "rds|InstanceUsage:db.m6g.large|14": 0.16, "rds|RDS:GP3-Storage|14": 0.121,
 		"rds|RDS:GP2-Storage|14": 0.121, "rds|RDS:GP3-PIOPS|14": 0.024, "rds|RDS:GP3-Throughput|14": 0.096,
@@ -599,5 +599,57 @@ func TestSARIF(t *testing.T) {
 	golden(t, "cdk.out.sarif", b.String())
 	if _, ok := run([]string{"testdata/cdk.out", "--base", "testdata/cdk.out", "--format", "sarif"}, io.Discard).(usageError); !ok {
 		t.Error("--format sarif with --base: want a usage error")
+	}
+}
+
+// --discount takes a percentage off every line, or off one service's lines
+// (overriding the overall one), and says so in the footer.
+func TestDiscount(t *testing.T) {
+	stacks, err := LoadInputs([]string{"testdata/suggest.yaml"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	stacks[0].Region = "eu-north-1"
+	total := func(items []Item, typ string) (sum, saving float64) {
+		for _, it := range items {
+			if typ == "" || it.Type == typ {
+				sum += it.Monthly
+				saving += it.Saving
+			}
+		}
+		return
+	}
+	defer func() { clear(discounts); clear(discountNames) }()
+	full, fullSaving := total(Estimate(stacks, testPrices), "")
+	fullRDS, _ := total(Estimate(stacks, testPrices), "AWS::RDS::DBInstance")
+	if err := (discountFlag{}).Set("10"); err != nil {
+		t.Fatal(err)
+	}
+	if err := (discountFlag{}).Set("RDS=25%"); err != nil {
+		t.Fatal(err)
+	}
+	items := Estimate(stacks, testPrices)
+	rds, _ := total(items, "AWS::RDS::DBInstance")
+	all, saving := total(items, "")
+	if d := rds - fullRDS*0.75; d > 1e-9 || d < -1e-9 {
+		t.Errorf("RDS: %v, want %v", rds, fullRDS*0.75)
+	}
+	if d := all - (fullRDS*0.75 + (full-fullRDS)*0.9); d > 1e-9 || d < -1e-9 {
+		t.Errorf("total: %v, want %v", all, fullRDS*0.75+(full-fullRDS)*0.9)
+	}
+	if saving >= fullSaving {
+		t.Errorf("savings not discounted: %v >= %v", saving, fullSaving)
+	}
+	if got := priceBasis(); got != "on-demand list prices, 10% off, 25% off RDS" {
+		t.Errorf("basis: %q", got)
+	}
+	for _, bad := range []string{"100", "-1", "x", "=5", "AWS::RDS=5"} {
+		if err := (discountFlag{}).Set(bad); err == nil {
+			t.Errorf("--discount %s: no error", bad)
+		}
+	}
+	var out bytes.Buffer
+	if err := run([]string{"--region", "eu-north-1", "--discount", "200", "testdata/suggest.yaml"}, &out); err == nil {
+		t.Error("--discount 200: no error")
 	}
 }
