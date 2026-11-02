@@ -75,6 +75,9 @@ var testPrices = &Prices{Source: "test prices", AsOf: "2026-10-16", Regions: map
 	"eu-north-1": {"nat|NatGateway-Hours": 0.046, "vpc|PublicIPv4:InUseAddress": 0.005, "ec2|m5.large": 0.102, "ec2|m6g.large": 0.0816,
 		"ebs|EBS:VolumeUsage.gp2": 0.105, "ebs|EBS:VolumeUsage.gp3": 0.084, "ebs|EBS:VolumeP-IOPS.gp3": 0.005, "ebs|EBS:VolumeP-Throughput.gp3": 0.042,
 		"rds|InstanceUsage:db.m5.large|14": 0.178, "rds|InstanceUsage:db.m6g.large|14": 0.16, "rds|RDS:GP3-Storage|14": 0.121,
+		"rds|RDS:GP2-Storage|14": 0.121, "rds|RDS:GP3-PIOPS|14": 0.024, "rds|RDS:GP3-Throughput|14": 0.096,
+		"rds|Multi-AZUsage:db.m6g.large|14": 0.32, "rds|RDS:Multi-AZ-GP2-Storage|14": 0.276, "rds|RDS:Multi-AZ-GP3-Storage|14": 0.262,
+		"rds|RDS:Multi-AZ-GP3-PIOPS|14": 0.048, "rds|RDS:Multi-AZ-GP3-Throughput|14": 0.192,
 		"elasticache|Redis|cache.t3.micro": 0.018, "elasticache|Redis|cache.t4g.micro": 0.017,
 		"fargate|Fargate-vCPU-Hours:perCPU": 0.04256, "fargate|Fargate-GB-Hours": 0.00467,
 		"fargate|Fargate-ARM-vCPU-Hours:perCPU": 0.03405, "fargate|Fargate-ARM-GB-Hours": 0.00374},
@@ -184,7 +187,7 @@ func TestHTML(t *testing.T) {
 
 // Capacity providers sized by the functions that use them across stacks, a
 // dashboard, and a type with no rule next to a free one.
-// Cheaper settings: gp3, Graviton (EC2, RDS, ElastiCache, Fargate) and one NAT
+// Cheaper settings: gp3 (EBS, and RDS where gp3 is priced lower), Graviton (EC2, RDS, ElastiCache, Fargate) and one NAT
 // Gateway per VPC, in text and Markdown; without --suggest, none.
 func TestSuggest(t *testing.T) {
 	stacks, err := LoadInputs([]string{"testdata/suggest.yaml"})

@@ -221,6 +221,7 @@ cost.
 | Suggestion | When |
 |---|---|
 | gp3 | EBS gp2 volumes (instances, launch templates, `AWS::EC2::Volume`), with the IOPS and throughput gp2 gives the size as its baseline |
+| gp3 for RDS | gp2 storage of RDS instances, priced the same way, only where gp3 costs less. RDS mostly prices gp3 per GB like gp2, so this shows in few regions (in the current snapshot, Multi-AZ in ap-northeast-2) |
 | Graviton | x86 types of EC2 instances and Auto Scaling groups, EKS node groups, RDS (Aurora too), ElastiCache and OpenSearch, when the Graviton type of the same size exists in the region and costs less. For EC2 the AMI and software have to run on arm64 |
 | ARM64 Fargate | x86 Linux tasks of ECS services, if the image is built for arm64 |
 | One NAT Gateway per VPC | the second and later public NAT Gateways of a VPC (and their Elastic IPs in the template). Egress of every AZ then goes through one, so it suits development stacks |

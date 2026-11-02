@@ -22,6 +22,9 @@ Resources:
   # gp3 has to buy the IOPS and throughput gp2 gives a 2000 GB volume.
   Big: { Type: AWS::EC2::Volume, Properties: { Size: 2000, VolumeType: gp2 } }
   Db: { Type: AWS::RDS::DBInstance, Properties: { DBInstanceClass: db.m5.large, Engine: postgres, AllocatedStorage: 20 } }
+  # RDS gp2: gp3 only where it is priced lower (here Multi-AZ), not at the same price.
+  DbMultiAZ: { Type: AWS::RDS::DBInstance, Properties: { DBInstanceClass: db.m6g.large, Engine: postgres, MultiAZ: true, AllocatedStorage: 100, StorageType: gp2 } }
+  DbSamePrice: { Type: AWS::RDS::DBInstance, Properties: { DBInstanceClass: db.m6g.large, Engine: postgres, AllocatedStorage: 100, StorageType: gp2 } }
   Cache: { Type: AWS::ElastiCache::CacheCluster, Properties: { Engine: redis, CacheNodeType: cache.t3.micro, NumCacheNodes: 2 } }
   Task:
     Type: AWS::ECS::TaskDefinition

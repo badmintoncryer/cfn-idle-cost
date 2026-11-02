@@ -1,16 +1,20 @@
-### Idle cost ≈ $705/mo
+### Idle cost ≈ $1095/mo
 
 | Region | Stacks | Idle cost |
 |---|---:|---:|
-| eu-north-1 | 1 | $705/mo |
+| eu-north-1 | 1 | $1095/mo |
 
 <details><summary>Breakdown by resource</summary>
 
 | Stack | Resource | Quantity | $/mo | |
 |---|---|---:|---:|---|
+| suggest | `DbMultiAZ` | ×1 | $234 | db.m6g.large postgres Multi-AZ |
+| suggest | `DbMultiAZ` | ×100 GB gp2 | $28 | storage |
 | suggest | `Big` | ×2000 GB gp2 | $210 | EBS gp2 storage |
 | suggest | `Db` | ×1 | $130 | db.m5.large postgres Single-AZ |
 | suggest | `Db` | ×20 GB gp3 | $2.42 | storage |
+| suggest | `DbSamePrice` | ×1 | $117 | db.m6g.large postgres Single-AZ |
+| suggest | `DbSamePrice` | ×100 GB gp2 | $12 | storage |
 | suggest | `Server` | ×1 | $74 | m5.large on-demand (Linux) |
 | suggest | `Server` | ×100 GB gp2 | $10 | EBS gp2 storage |
 | suggest | `Service` | ×2 vCPU | $62 | Fargate vCPU (2 tasks) |
@@ -26,8 +30,9 @@
 
 </details>
 
-**Suggestions (7, -$106/mo)**
+**Suggestions (8, -$107/mo)**
 
+- suggest `DbMultiAZ`: -$1.40/mo, gp3 (now storage)
 - suggest `Big`: -$22/mo, gp3 with 6000 IOPS and 250 MiB/s, gp2's baseline (now EBS gp2 storage)
 - suggest `Db`: -$13/mo, db.m6g.large (Graviton) (now db.m5.large postgres Single-AZ)
 - suggest `Server`: -$15/mo, m6g.large (Graviton), if the AMI and software run on arm64 (now m5.large on-demand (Linux))
