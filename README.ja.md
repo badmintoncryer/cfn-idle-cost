@@ -184,6 +184,7 @@ jobs:
 | 提案 | 対象 |
 |---|---|
 | gp3 | EBSのgp2ボリューム（インスタンス、起動テンプレート、`AWS::EC2::Volume`）。gp2がそのサイズで出すIOPSとスループットをgp3で買う前提で計算します |
+| RDSのgp3 | RDSインスタンスのgp2ストレージ。同じ前提で計算し、gp3の方が安いときだけ出します。RDSはgp3とgp2のGB単価がほぼ同じなので、出るのは一部のリージョンだけです（今のスナップショットではap-northeast-2のMulti-AZ） |
 | Graviton | EC2インスタンス、Auto Scalingグループ、EKSノードグループ、RDS（Auroraも）、ElastiCache、OpenSearchのx86のタイプ。同じサイズのGravitonのタイプがそのリージョンにあり、安いときだけです。EC2ではAMIとソフトウェアがarm64で動く必要があります |
 | ARM64のFargate | ECSサービスのx86 Linuxのタスク。イメージがarm64向けにビルドされている必要があります |
 | VPCにNAT Gatewayを1つ | VPCの2つ目以降のパブリックNAT Gateway（とテンプレート内のElastic IP）。全AZの外向き通信が1つを通るので、開発用のスタック向けです |

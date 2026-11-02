@@ -102,6 +102,30 @@ func (e *est) suggestGP3(size, n float64) {
 	e.suggest(n*(size*gp2-cost), text)
 }
 
+// suggestRDSGP3 offers gp3 for RDS gp2 storage of size GB, buying above gp3's
+// baseline (bi IOPS, bt MiB/s) what gp2 gives the size. RDS mostly prices gp3
+// per GB like gp2, so it shows only where gp3 is priced lower.
+func (e *est) suggestRDSGP3(size, bi, bt float64, key func(s string) string) {
+	gp2, ok1 := e.tryPrice(key("GP2-Storage"))
+	gp3, ok2 := e.tryPrice(key("GP3-Storage"))
+	pIOPS, ok3 := e.tryPrice(key("GP3-PIOPS"))
+	pTput, ok4 := e.tryPrice(key("GP3-Throughput"))
+	if !ok1 || !ok2 || !ok3 || !ok4 {
+		return
+	}
+	iops := math.Min(math.Max(3*size, 100), 16000)
+	tput := 125.0
+	if size >= 334 {
+		tput = 250
+	}
+	xi, xt := math.Max(0, iops-bi), math.Max(0, tput-bt)
+	text := "gp3"
+	if xi > 0 || xt > 0 {
+		text = fmt.Sprintf("gp3 with %.0f IOPS and %.0f MiB/s, gp2's baseline", iops, tput)
+	}
+	e.suggest(size*gp2-(size*gp3+xi*pIOPS+xt*pTput), text)
+}
+
 // suggestOneNAT offers to drop the NAT Gateways of a VPC after its first one:
 // the others' hours, and their Elastic IPs when they are in the template.
 func (e *est) suggestOneNAT(p map[string]any) {

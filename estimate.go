@@ -874,20 +874,11 @@ func rdsInstance(e *est, p map[string]any) {
 	switch t {
 	case "gp2":
 		e.monthly(size, "GB gp2", k("GP2-Storage"), "storage")
+		bi, bt := rdsGP3Baseline(engine, size)
+		e.suggestRDSGP3(size, bi, bt, k)
 	case "gp3":
 		e.monthly(size, "GB gp3", k("GP3-Storage"), "storage")
-		// Striped volumes from 400 GiB (200 GiB on Oracle) get a higher baseline;
-		// SQL Server is never striped.
-		bi, bt, stripe := 3000.0, 125.0, 400.0
-		switch le := strings.ToLower(engine); {
-		case strings.HasPrefix(le, "oracle"):
-			stripe = 200
-		case strings.HasPrefix(le, "sqlserver"):
-			stripe = math.Inf(1)
-		}
-		if size >= stripe {
-			bi, bt = 12000, 500
-		}
+		bi, bt := rdsGP3Baseline(engine, size)
 		e.monthly(math.Max(0, iops-bi), "IOPS", k("GP3-PIOPS"), fmt.Sprintf("gp3 IOPS above %.0f", bi))
 		e.monthly(math.Max(0, tput-bt), "MiB/s", k("GP3-Throughput"), fmt.Sprintf("gp3 throughput above %.0f MiB/s", bt))
 	case "io1":
@@ -901,6 +892,23 @@ func rdsInstance(e *est, p map[string]any) {
 	default:
 		panic(unresolved("StorageType " + t + " is not supported"))
 	}
+}
+
+// rdsGP3Baseline is the IOPS and throughput RDS gp3 storage includes: striped
+// volumes from 400 GiB (200 GiB on Oracle) get a higher baseline; SQL Server is
+// never striped.
+func rdsGP3Baseline(engine string, size float64) (iops, tput float64) {
+	stripe := 400.0
+	switch le := strings.ToLower(engine); {
+	case strings.HasPrefix(le, "oracle"):
+		stripe = 200
+	case strings.HasPrefix(le, "sqlserver"):
+		stripe = math.Inf(1)
+	}
+	if size >= stripe {
+		return 12000, 500
+	}
+	return 3000, 125
 }
 
 // licensedEngineCode returns the Price List engineCode of Oracle and SQL
