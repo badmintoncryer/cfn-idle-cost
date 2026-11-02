@@ -116,6 +116,9 @@ func estimateResource(all []*Stack, st *Stack, prices *Prices, id string) (items
 		b := base
 		b.Quantity, b.Monthly, b.Reason = it.Quantity, it.Monthly, it.Reason
 		b.Suggestion, b.Saving = it.Suggestion, it.Saving
+		if d := discountFor(e.r.Type); d > 0 {
+			b.Monthly, b.Saving = b.Monthly*(1-d), b.Saving*(1-d)
+		}
 		if len(e.notes) > 0 {
 			b.Reason += " (default of " + strings.Join(e.notes, ", ") + ")"
 		}
@@ -424,10 +427,11 @@ var reservedPricing bool
 
 // priceBasis says in the footer which rates the estimate uses.
 func priceBasis() string {
+	basis := "on-demand list prices"
 	if reservedPricing {
-		return "1-yr no-upfront Reserved Instance rates where marked 1-yr RI, on-demand list prices for the rest"
+		basis = "1-yr no-upfront Reserved Instance rates where marked 1-yr RI, on-demand list prices for the rest"
 	}
-	return "on-demand list prices"
+	return basis + discountBasis()
 }
 
 func (e *est) monthly(qty float64, unit, key, reason string) {
@@ -469,6 +473,7 @@ func init() {
 					panic(unresolved("SubnetIds is not set"))
 				}
 				e.hourly(float64(n), "AZ", "vpc|VpcEndpoint-Hours", "interface endpoint")
+				e.suggestOneAZEndpoint(n)
 			case "GatewayLoadBalancer":
 				e.hourly(1, "", "vpc|VpcEndpoint-GWLBE-Hours", "Gateway Load Balancer endpoint")
 			case "Resource":
@@ -891,6 +896,9 @@ func rdsInstance(e *est, p map[string]any) {
 		e.monthly(size, "GB magnetic", k("StorageUsage"), "storage")
 	default:
 		panic(unresolved("StorageType " + t + " is not supported"))
+	}
+	if multi {
+		e.suggestSingleAZ(rdsInstance, p)
 	}
 }
 

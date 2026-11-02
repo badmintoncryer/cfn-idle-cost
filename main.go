@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -45,11 +46,16 @@ Flags:
                        n hours a month instead of 730, e.g. 220 for weekdays 8:00-18:00;
                        monthly fees and storage stay whole
   --suggest            show cheaper settings the template could use, with what each saves
-                       (gp3, Graviton, one NAT Gateway per VPC); without --base
+                       (gp3, Graviton, one NAT Gateway per VPC, Single-AZ databases, one-AZ
+                       interface endpoints); without --base
   --live               fetch current prices from the AWS Price List Query API
                        (needs credentials with pricing:GetProducts) instead of the bundled snapshot
   --pricing p          on-demand (default) or reserved-1y: price EC2, RDS, ElastiCache, OpenSearch,
                        Redshift and MemoryDB instances at 1-year no-upfront Reserved Instance rates
+  --discount pct       take pct percent off every price, e.g. 10 for an EDP or private pricing
+  --discount Service=pct
+                       take pct percent off one service's resources instead (the CloudFormation
+                       service name, e.g. RDS=20 or EC2=30; repeatable, overrides the overall one)
   --version            print the version
 
 Exit codes: 0 ok, 1 error, 2 usage error, 3 over --max or --max-increase.
@@ -99,6 +105,9 @@ func run(args []string, stdout io.Writer) error {
 	pricing := fs.String("pricing", "on-demand", "")
 	hours := fs.Float64("hours", 730, "")
 	suggest := fs.Bool("suggest", false, "")
+	clear(discounts)
+	clear(discountNames)
+	fs.Var(discountFlag{}, "discount", "")
 	var params paramFlag
 	fs.Var(&params, "parameter", "")
 	showVersion := fs.Bool("version", false, "")
@@ -407,4 +416,63 @@ func runPrices(args []string) error {
 		return err
 	}
 	return WritePrices(*out, p)
+}
+
+// discounts is --discount: the fraction taken off every price ("") or off the
+// resource types of one CloudFormation service ("RDS"), e.g. an EDP or private pricing.
+var discounts = map[string]float64{}
+
+// discountFor returns the discount of a resource type: its service's, else the overall one.
+func discountFor(typ string) float64 {
+	parts := strings.Split(typ, "::")
+	if len(parts) == 3 {
+		if d, ok := discounts[strings.ToLower(parts[1])]; ok {
+			return d
+		}
+	}
+	return discounts[""]
+}
+
+// discountBasis says in the footer which discounts were taken off.
+func discountBasis() string {
+	if len(discounts) == 0 {
+		return ""
+	}
+	var parts []string
+	if d, ok := discounts[""]; ok {
+		parts = append(parts, strconv.FormatFloat(d*100, 'f', -1, 64)+"% off")
+	}
+	var svcs []string
+	for s := range discounts {
+		if s != "" {
+			svcs = append(svcs, s)
+		}
+	}
+	sort.Strings(svcs)
+	for _, s := range svcs {
+		parts = append(parts, strconv.FormatFloat(discounts[s]*100, 'f', -1, 64)+"% off "+discountNames[s])
+	}
+	return ", " + strings.Join(parts, ", ")
+}
+
+// discountNames keeps the service names as given, for the footer.
+var discountNames = map[string]string{}
+
+// discountFlag collects --discount pct and --discount Service=pct.
+type discountFlag struct{}
+
+func (discountFlag) String() string { return "" }
+
+func (discountFlag) Set(s string) error {
+	svc, v, scoped := strings.Cut(s, "=")
+	if !scoped {
+		svc, v = "", s
+	}
+	pct, err := strconv.ParseFloat(strings.TrimSuffix(v, "%"), 64)
+	if err != nil || pct < 0 || pct >= 100 || scoped && (svc == "" || strings.Contains(svc, ":")) {
+		return fmt.Errorf("--discount %q: want pct or Service=pct, e.g. 10 or RDS=20 (0 <= pct < 100)", s)
+	}
+	discounts[strings.ToLower(svc)] = pct / 100
+	discountNames[strings.ToLower(svc)] = svc
+	return nil
 }
