@@ -413,6 +413,22 @@ jobs:
 - Auto Scalingグループは、`DesiredCapacity`があればその値を、なければ`MinSize`を使います。DynamoDBは、Auto Scalingの最小値ではなく、テーブルに設定したプロビジョニング容量を使います。ただしグローバルテーブルは、書き込み容量をAuto Scalingの範囲でしか指定できないため、その最小値を使います。
 - 素のテンプレートにはコンストラクトのパスがないため、行には論理IDを表示します。
 
+## AIエージェントから使う
+
+`cfn-idle-cost mcp`は、標準入出力で[Model Context Protocol](https://modelcontextprotocol.io)のサーバーとして動き、`idle_cost`というツールを1つ提供します。CLIと同じ入力（`inputs`、`base`、`region`、`suggest`、`hours`、`parameters`、`discount`）を受け取り、`--format json`のレポートを返します。CDKを書くエージェントが、`cdk synth`のたびに変更の待機コストを確かめられます。Claude Codeなら次のとおりです。
+
+```sh
+claude mcp add idle-cost -- npx -y cfn-idle-cost mcp
+```
+
+ほかのクライアントでは、MCPの設定に次を書きます。
+
+```json
+{ "mcpServers": { "idle-cost": { "command": "npx", "args": ["-y", "cfn-idle-cost", "mcp"] } } }
+```
+
+サーバーはクライアントの作業ディレクトリで動くので、`inputs`の既定はそこの`./cdk.out`です。AWSの認証情報は要りません。
+
 ## インストール
 
 ```sh

@@ -21,6 +21,7 @@ const usage = `cfn-idle-cost — monthly idle cost of a CDK app or CloudFormatio
 Usage:
   cfn-idle-cost [flags] [cdk.out | template ...]
   cfn-idle-cost --base <cdk.out | template> [flags] [cdk.out | template ...]
+  cfn-idle-cost mcp    run as an MCP server (stdio) with an idle_cost tool, for AI agents
 
 Inputs default to ./cdk.out (run ` + "`cdk synth`" + ` first). Templates may be JSON or YAML.
 With --base, prints how the idle cost changes from the base to the inputs.
@@ -90,6 +91,9 @@ func main() {
 func run(args []string, stdout io.Writer) error {
 	if len(args) > 0 && args[0] == "prices" { // maintainer: regenerate prices.json
 		return runPrices(args[1:])
+	}
+	if len(args) > 0 && args[0] == "mcp" { // an MCP server for AI agents, on stdin/stdout
+		return runMCP(os.Stdin, stdout, mcpExec)
 	}
 	fs := flag.NewFlagSet("cfn-idle-cost", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)

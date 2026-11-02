@@ -526,6 +526,27 @@ and Timestream scheduled queries that run on a schedule) are listed under
   built in and also used with `--live`.
 - Plain templates have no construct paths, so lines show the logical ID.
 
+## For AI agents
+
+`cfn-idle-cost mcp` runs a [Model Context Protocol](https://modelcontextprotocol.io) server on
+stdin/stdout with one tool, `idle_cost`, which takes the same inputs as the CLI
+(`inputs`, `base`, `region`, `suggest`, `hours`, `parameters`, `discount`) and returns the
+`--format json` report. An agent that writes CDK can then check what a change costs
+idle after each `cdk synth`. For Claude Code:
+
+```sh
+claude mcp add idle-cost -- npx -y cfn-idle-cost mcp
+```
+
+or in any client's MCP configuration:
+
+```json
+{ "mcpServers": { "idle-cost": { "command": "npx", "args": ["-y", "cfn-idle-cost", "mcp"] } } }
+```
+
+The server runs in the client's working directory, so `inputs` defaults to its `./cdk.out`.
+It needs no AWS credentials.
+
 ## Install
 
 ```sh
