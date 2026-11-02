@@ -32,6 +32,10 @@ authentication and disallow tokens", so trusted publishing is the only way in.
 git tag v0.1.0 && git push origin v0.1.0
 ```
 
+Without pushing a tag yourself, run the `tag-release` workflow (Actions tab, or
+`gh workflow run tag-release.yml -f tag=v0.1.0`). It tags the head of main (or
+the `sha` input) and starts `release.yml` for the tag.
+
 A new platform (a new `cfn-idle-cost-<os>-<cpu>` package) needs the same
 first-publish + `npm trust` step before its first release.
 
