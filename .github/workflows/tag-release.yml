@@ -1,0 +1,29 @@
+# Cut a release from the Actions tab (or the API) without pushing a tag yourself:
+# tags a commit of main and starts release.yml for it, the way refresh-prices does.
+name: tag-release
+on:
+  workflow_dispatch:
+    inputs:
+      tag: { description: "new tag, e.g. v1.7.4", type: string, required: true }
+      sha: { description: "commit to tag (default: the head of main)", type: string, required: false }
+permissions:
+  contents: write
+  actions: write
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with: { fetch-depth: 0, ref: main }
+      - run: |
+          [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "tag must look like v1.2.3: $TAG"; exit 1; }
+          git rev-parse -q --verify "refs/tags/$TAG" >/dev/null && { echo "$TAG already exists"; exit 1; }
+          sha=$(git rev-parse --verify "${SHA:-HEAD}^{commit}")
+          git merge-base --is-ancestor "$sha" origin/main || { echo "$sha is not on main"; exit 1; }
+          git tag "$TAG" "$sha" && git push origin "$TAG"
+          # A tag pushed with GITHUB_TOKEN starts no workflow; a dispatch does.
+          gh workflow run release.yml -f tag="$TAG"
+        env:
+          TAG: ${{ inputs.tag }} # via env, not pasted into the script
+          SHA: ${{ inputs.sha }}
+          GH_TOKEN: ${{ github.token }}
