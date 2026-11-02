@@ -77,6 +77,8 @@ nested stacks) or CloudFormation templates (JSON or YAML).
 | `--suggest` | Show cheaper settings the template could use and what each saves. See [Cheaper settings](#cheaper-settings). Not with `--base`. |
 | `--live` | Fetch current prices from the [Price List Query API](https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/using-price-list-query-api.html) instead of the bundled snapshot. Needs AWS credentials with `pricing:GetProducts`. |
 | `--pricing reserved-1y` | Price EC2, RDS, ElastiCache, OpenSearch Service, Redshift and MemoryDB instances at the 1-year, no-upfront, standard Reserved Instance rate, to see the idle cost you would commit to. Those lines say `1-yr RI`; everything else stays on-demand. Uses the bundled snapshot only (not with `--live`). Default `on-demand`. |
+| `--discount <pct>` | Take `pct` percent off every price, for an Enterprise Discount Program or other private pricing, e.g. `--discount 10`. The footer says which discounts were taken. |
+| `--discount <Service>=<pct>` | Take `pct` percent off the resources of one CloudFormation service instead (`RDS` for `AWS::RDS::*`), e.g. `--discount EC2=30`. Repeatable, and overrides the overall one for that service. Suggested savings are discounted the same way. |
 | `--version` | Print the version. |
 
 Exit codes: `0` success (even when some resources could not be estimated), `1`
@@ -225,6 +227,8 @@ cost.
 | Graviton | x86 types of EC2 instances and Auto Scaling groups, EKS node groups, RDS (Aurora too), ElastiCache and OpenSearch, when the Graviton type of the same size exists in the region and costs less. For EC2 the AMI and software have to run on arm64 |
 | ARM64 Fargate | x86 Linux tasks of ECS services, if the image is built for arm64 |
 | One NAT Gateway per VPC | the second and later public NAT Gateways of a VPC (and their Elastic IPs in the template). Egress of every AZ then goes through one, so it suits development stacks |
+| Single-AZ database | Multi-AZ RDS instances (not Aurora, not Multi-AZ DB clusters): the instance and its storage priced as Single-AZ. No standby, so it suits development stacks |
+| One-AZ interface endpoint | interface VPC endpoints in two or more subnets. Clients in the other AZs then cross AZs to reach it, so it suits development stacks |
 
 In `--format md` they are listed under the breakdown, in `json` each item has
 `suggestion` and `saving`, and in `html` they are under their lines.
@@ -478,8 +482,8 @@ and Timestream scheduled queries that run on a schedule) are listed under
 ## Assumptions
 
 - On-demand list prices in USD, 730 hours a month (or `--hours`). Savings Plans
-  and the free tier are ignored, and Reserved Instances are used only with
-  `--pricing reserved-1y`.
+  and the free tier are ignored, Reserved Instances are used only with
+  `--pricing reserved-1y`, and discounts only with `--discount`.
 - EC2 instances are priced as Linux with shared tenancy (the AMI is not read).
   A root volume that comes from the AMI (no `VolumeSize` in
   `BlockDeviceMappings`) is not counted.

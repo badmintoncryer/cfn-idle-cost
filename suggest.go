@@ -187,3 +187,66 @@ func (e *est) suggestFargateARM(vcpu, gb float64) {
 	}
 	e.suggest((cur-arm)*hoursPerMonth, "ARM64 vCPU and memory (Graviton, RuntimePlatform CpuArchitecture), if the image is built for arm64")
 }
+
+// suggestFirstFree attaches a suggestion to the resource's first line that has
+// none yet, for a setting that changes the whole resource rather than one line.
+func (e *est) suggestFirstFree(saving float64, text string) {
+	if saving < 0.005 {
+		return
+	}
+	for i := range e.items {
+		if e.items[i].Suggestion == "" {
+			e.items[i].Suggestion, e.items[i].Saving = text, saving
+			return
+		}
+	}
+}
+
+// whatIf prices the resource with other properties, without adding its lines.
+func (e *est) whatIf(rule func(e *est, p map[string]any), p map[string]any) (total float64, ok bool) {
+	s := &est{st: e.st, all: e.all, prices: e.prices, r: e.r, id: e.id}
+	defer func() {
+		if v := recover(); v != nil {
+			if _, isUnresolved := v.(unresolved); !isUnresolved {
+				panic(v)
+			}
+			total, ok = 0, false
+		}
+	}()
+	rule(s, p)
+	for _, it := range s.items {
+		total += it.Monthly
+	}
+	return total, true
+}
+
+// suggestSingleAZ offers Single-AZ for a Multi-AZ database: the instance and
+// its storage, priced by the same rule with MultiAZ false.
+func (e *est) suggestSingleAZ(rule func(e *est, p map[string]any), p map[string]any) {
+	var cur float64
+	for _, it := range e.items {
+		cur += it.Monthly
+	}
+	q := map[string]any{}
+	for k, v := range p {
+		q[k] = v
+	}
+	q["MultiAZ"] = false
+	single, ok := e.whatIf(rule, q)
+	if !ok {
+		return
+	}
+	e.suggestFirstFree(cur-single, "Single-AZ instance and storage, for development stacks: no standby, so an AZ failure or maintenance takes the database down")
+}
+
+// suggestOneAZEndpoint offers one subnet for an interface endpoint in n.
+func (e *est) suggestOneAZEndpoint(n int) {
+	if n < 2 {
+		return
+	}
+	h, ok := e.tryPrice("vpc|VpcEndpoint-Hours")
+	if !ok {
+		return
+	}
+	e.suggest(float64(n-1)*h*hoursPerMonth, fmt.Sprintf("one subnet instead of %d, for development stacks: clients in the other AZs then cross AZs and lose the endpoint if its AZ fails", n))
+}
