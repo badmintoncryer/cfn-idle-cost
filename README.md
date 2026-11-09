@@ -89,6 +89,66 @@ fail on them, but `--max-increase` does when the pull request adds a resource
 that can't be estimated or makes one unresolvable, since its increase can't be
 checked. Resources under `? no rule` are in the warning but never fail a budget.
 
+## With a CloudFormation template
+
+No CDK app is needed: pass the template files instead of `cdk.out`. A plain
+template names no region, so give one with `--region`:
+
+```sh
+npx cfn-idle-cost --region ap-northeast-1 template.yaml
+```
+
+```
+ap-northeast-1 · 1 stack · idle ≈ $87/mo
+
+template                  $87/mo
+  Nat       ×1            $45  NAT Gateway
+  Database  ×1            $36  db.t4g.micro postgres Multi-AZ (default of InstanceClass)
+  Database  ×20 GB gp3  $5.52  storage (default of InstanceClass)
+```
+
+- Each template is one stack, named after its file without the extension
+  (`template` above). Lines show the logical ID.
+- Parameters use their `Default`. Give other values with `--parameter`, for
+  every template that has the parameter or for one of them:
+  `--parameter InstanceClass=db.t4g.small` or
+  `--parameter template:InstanceClass=db.t4g.small`. A parameter with no
+  `Default` and no `--parameter` leaves what depends on it unestimated.
+- Pass several templates to price them together:
+  `npx cfn-idle-cost --region ap-northeast-1 network.yaml app.yaml`.
+- `--suggest`, `--format`, `--max` and the other flags work as with `cdk.out`.
+
+To compare two versions of a template, keep the same file name on both sides,
+since resources are matched by stack name (the file name) and logical ID:
+
+```sh
+mkdir -p base && git show main:template.yaml > base/template.yaml
+npx cfn-idle-cost --region ap-northeast-1 --base base/template.yaml template.yaml
+```
+
+```
+ap-northeast-1 · idle ≈ $87 → $66/mo (-$21)
+
+  ~ template  Database  $42 → $21  -$21  db.t4g.micro postgres Multi-AZ (default of InstanceClass) + 1 more → db.t4g.micro postgres Single-AZ (default of InstanceClass) + 1 more
+```
+
+The [GitHub Action](#in-pull-requests) takes templates the same way, with no
+Node.js or synth step (`base` is one template):
+
+```yaml
+    steps:
+      - uses: actions/checkout@v7
+        with: { path: head }
+      - uses: actions/checkout@v7
+        with: { path: base, ref: "${{ github.base_ref }}" }
+      - uses: badmintoncryer/cfn-idle-cost@v1
+        with:
+          base: base/template.yaml
+          path: head/template.yaml
+          max-increase: 50
+          args: --region ap-northeast-1
+```
+
 ## At `cdk synth`
 
 The npm package also has a CDK

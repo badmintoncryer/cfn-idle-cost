@@ -76,6 +76,57 @@ npx cfn-idle-cost [flags] [cdk.out | template ...]
 
 終了コードは、成功が`0`、エラーが`1`、使い方の誤り（リージョンのないスタックを含みます）が`2`、`--max`か`--max-increase`の超過が`3`です。見積もれなかったリソースがあっても、成功なら`0`を返します。予算のフラグを付けたときに見積もれなかったリソースがあると、実際のアイドルコストはもっと高いかもしれないという警告を出します。`--max`はこの場合も失敗にしません。一方、`--max-increase`は、見積もれないリソースが追加されたときや、見積もれていたリソースが見積もれなくなったときに失敗します。増加額を確かめられないためです。`? no rule`のリソースは警告の件数に含めますが、予算のチェックを失敗させることはありません。
 
+## CloudFormationテンプレートで使う
+
+CDKアプリがなくても使えます。`cdk.out`の代わりにテンプレートのファイルを渡します。素のテンプレートにはリージョンがないので、`--region`で指定します。
+
+```sh
+npx cfn-idle-cost --region ap-northeast-1 template.yaml
+```
+
+```
+ap-northeast-1 · 1 stack · idle ≈ $87/mo
+
+template                  $87/mo
+  Nat       ×1            $45  NAT Gateway
+  Database  ×1            $36  db.t4g.micro postgres Multi-AZ (default of InstanceClass)
+  Database  ×20 GB gp3  $5.52  storage (default of InstanceClass)
+```
+
+- テンプレート1つが1スタックで、スタック名はファイル名から拡張子を除いたものです（上の例では`template`）。各行には論理IDが出ます。
+- パラメータには`Default`を使います。ほかの値は`--parameter`で指定します。そのパラメータを持つすべてのテンプレートに効かせるなら`--parameter InstanceClass=db.t4g.small`、1つだけなら`--parameter template:InstanceClass=db.t4g.small`です。`Default`がなく`--parameter`も指定しなかったパラメータに依存する部分は見積もりません。
+- 複数のテンプレートを渡すと、まとめて見積もります（例: `npx cfn-idle-cost --region ap-northeast-1 network.yaml app.yaml`）。
+- `--suggest`、`--format`、`--max`などのフラグは`cdk.out`のときと同じように使えます。
+
+テンプレートの2つの版を比べるときは、両方のファイル名をそろえてください。リソースはスタック名（ファイル名）と論理IDで対応づけるためです。
+
+```sh
+mkdir -p base && git show main:template.yaml > base/template.yaml
+npx cfn-idle-cost --region ap-northeast-1 --base base/template.yaml template.yaml
+```
+
+```
+ap-northeast-1 · idle ≈ $87 → $66/mo (-$21)
+
+  ~ template  Database  $42 → $21  -$21  db.t4g.micro postgres Multi-AZ (default of InstanceClass) + 1 more → db.t4g.micro postgres Single-AZ (default of InstanceClass) + 1 more
+```
+
+[GitHub Action](#プルリクエストで使う)も同じようにテンプレートを受け取ります。Node.jsのセットアップやsynthの手順は要りません（`base`に渡せるテンプレートは1つです）。
+
+```yaml
+    steps:
+      - uses: actions/checkout@v7
+        with: { path: head }
+      - uses: actions/checkout@v7
+        with: { path: base, ref: "${{ github.base_ref }}" }
+      - uses: badmintoncryer/cfn-idle-cost@v1
+        with:
+          base: base/template.yaml
+          path: head/template.yaml
+          max-increase: 50
+          args: --region ap-northeast-1
+```
+
 ## `cdk synth`で使う
 
 npmのパッケージには、CDKの[検証プラグイン](https://docs.aws.amazon.com/cdk/v2/guide/policy-validation-synthesis.html)も入っています。CIを用意しなくても、`cdk synth`のたびにアイドルコストを表示します。
