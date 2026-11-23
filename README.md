@@ -614,7 +614,8 @@ npm install -D cfn-idle-cost   # or: npx cfn-idle-cost
 go install github.com/badmintoncryer/cfn-idle-cost@latest
 ```
 
-`cdk-idle-cost` is the same tool under another name. The npm packages cover
+`cdk-idle-cost` is the same tool under another name, for both the command and
+the library (`import { IdleCost } from 'cdk-idle-cost'`). The npm packages cover
 Linux and macOS (x64 and arm64); on Windows, use `go install` or the binary from
 the GitHub Release.
 
