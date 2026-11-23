@@ -40,13 +40,14 @@ deps="{${OPT%,}}"
 cat >"$OUT/cfn-idle-cost/package.json" <<JSON
 {"name":"cfn-idle-cost","version":"$VERSION","description":"Monthly idle cost (what you pay with zero traffic) of an AWS CDK app or CloudFormation template",
  "license":"Apache-2.0","repository":{"type":"git","url":"git+https://github.com/badmintoncryer/cfn-idle-cost.git"},"keywords":["aws","aws-cdk","cdk","cloudformation","cost","pricing","finops"],
- "main":"index.js","bin":{"cfn-idle-cost":"bin/cfn-idle-cost.js"},"optionalDependencies":$deps,
+ "main":"index.js","types":"index.d.ts","bin":{"cfn-idle-cost":"bin/cfn-idle-cost.js"},"optionalDependencies":$deps,
  "peerDependencies":{"aws-cdk-lib":"^2.0.0"},"peerDependenciesMeta":{"aws-cdk-lib":{"optional":true}}}
 JSON
 publish "$OUT/cfn-idle-cost" "$@"
 cat >"$OUT/cdk-idle-cost/package.json" <<JSON
 {"name":"cdk-idle-cost","version":"$VERSION","description":"Alias of cfn-idle-cost: monthly idle cost of an AWS CDK app",
  "license":"Apache-2.0","repository":{"type":"git","url":"git+https://github.com/badmintoncryer/cfn-idle-cost.git"},"keywords":["aws","aws-cdk","cdk","cloudformation","cost","pricing","finops"],
- "bin":{"cdk-idle-cost":"bin/cdk-idle-cost.js"},"dependencies":{"cfn-idle-cost":"$VERSION"}}
+ "main":"index.js","types":"index.d.ts","bin":{"cdk-idle-cost":"bin/cdk-idle-cost.js"},"dependencies":{"cfn-idle-cost":"$VERSION"},
+ "peerDependencies":{"aws-cdk-lib":"^2.0.0"},"peerDependenciesMeta":{"aws-cdk-lib":{"optional":true}}}
 JSON
 publish "$OUT/cdk-idle-cost" "$@"

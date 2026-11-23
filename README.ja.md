@@ -487,7 +487,7 @@ npm install -D cfn-idle-cost   # または npx cfn-idle-cost
 go install github.com/badmintoncryer/cfn-idle-cost@latest
 ```
 
-`cdk-idle-cost`は、同じツールの別名です。npmのパッケージはLinuxとmacOS（x64とarm64）に対応しています。Windowsでは、`go install`か、GitHub Releaseのバイナリを使ってください。
+`cdk-idle-cost`は、同じツールの別名です。コマンドもライブラリ（`import { IdleCost } from 'cdk-idle-cost'`）も同じように使えます。npmのパッケージはLinuxとmacOS（x64とarm64）に対応しています。Windowsでは、`go install`か、GitHub Releaseのバイナリを使ってください。
 
 ## ライセンス
 
