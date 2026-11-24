@@ -66,6 +66,9 @@ type est struct {
 	notes  []string // parameters whose defaults were used
 	// assuming marks the lines added while it is set (see Assumption).
 	assuming *Assumption
+	// engineVersion replaces the EngineVersion a DB instance is billed for (a
+	// Blue/Green deployment's TargetEngineVersion).
+	engineVersion string
 }
 
 // Estimate returns the billed items of every stack, plus the resources it could
@@ -650,6 +653,10 @@ func init() {
 				min = v
 			}
 			e.hourly(min, "GB", "elasticache|CachedData:"+engine, "Serverless minimum data storage")
+			// A minimum ECPU rate is billed whether or not requests use it.
+			if ecpu := e.num(asMap(asMap(p["CacheUsageLimits"])["ECPUPerSecond"]), "Minimum", 0); ecpu > 0 {
+				e.add(ecpu, "ECPU/s", ecpu*3600*hoursPerMonth*e.price("elasticache|ElastiCacheProcessingUnits:"+engine), "Serverless minimum ECPUs per second")
+			}
 		},
 		"AWS::DynamoDB::Table": func(e *est, p map[string]any) {
 			if e.str(p, "BillingMode", "PROVISIONED") != "PROVISIONED" {
@@ -853,10 +860,19 @@ func rdsInstance(e *est, p map[string]any) {
 			engine = e.mustStr(cluster, "Engine")
 		}
 	}
+	versioned := p // where EngineVersion and EngineLifecycleSupport are set
+	var replicaOf map[string]any
+	if cluster != nil {
+		versioned = cluster
+	}
 	if engine == "" {
 		if _, ok := p["SourceDBInstanceIdentifier"]; ok {
 			_, src := e.ref(p, "SourceDBInstanceIdentifier")
 			engine = e.mustStr(src.Properties, "Engine")
+			if p["EngineVersion"] == nil { // a read replica runs its source's version
+				versioned = src.Properties
+			}
+			replicaOf = src.Properties
 		} else {
 			panic(unresolved("Engine is not set"))
 		}
@@ -886,6 +902,8 @@ func rdsInstance(e *est, p map[string]any) {
 				return
 			}
 			e.hourly(min, "ACU", key, "Serverless v2 minimum capacity"+suffix)
+			e.rdsExtendedSupport(engine, versioned, class, 1, min)
+			e.databaseInsights(cluster, class, min)
 			return
 		}
 		usage := "InstanceUsage"
@@ -894,6 +912,8 @@ func rdsInstance(e *est, p map[string]any) {
 		}
 		e.hourly(1, "", "rds|"+usage+":"+class+"|"+code, class+" "+engine+suffix)
 		e.suggestGraviton(class, 1, func(c string) string { return "rds|" + usage + ":" + c + "|" + code }, "")
+		e.rdsExtendedSupport(engine, versioned, class, 1, 0)
+		e.databaseInsights(cluster, class, 0)
 		return
 	}
 	multi := e.flag(p, "MultiAZ")
@@ -906,6 +926,38 @@ func rdsInstance(e *est, p map[string]any) {
 	}
 	e.hourly(1, "", "rds|"+usage+":"+class+"|"+code, class+" "+engine+" "+az)
 	e.suggestGraviton(class, 1, func(c string) string { return "rds|" + usage + ":" + c + "|" + code }, "")
+	k := func(s string) string { return "rds|RDS:" + maz + s + "|" + code }
+	storage := p
+	if p["AllocatedStorage"] == nil && replicaOf != nil { // a read replica gets its source's storage
+		storage = map[string]any{}
+		for _, key := range []string{"AllocatedStorage", "StorageType", "Iops", "StorageThroughput"} {
+			if v, ok := p[key]; ok {
+				storage[key] = v
+			} else if v, ok := replicaOf[key]; ok {
+				storage[key] = v
+			}
+		}
+	}
+	e.rdsStorage(engine, storage, "", k, true)
+	vols, _ := p["AdditionalStorageVolumes"].([]any)
+	for _, v := range vols {
+		v := asMap(v)
+		e.rdsStorage(engine, v, "additional volume "+e.str(v, "VolumeName", ""), k, false)
+	}
+	copies := 1.0
+	if multi {
+		copies = 2 // the standby pays Extended Support too
+	}
+	e.rdsExtendedSupport(engine, versioned, class, copies, 0)
+	e.databaseInsights(p, class, 0)
+	if multi {
+		e.suggestSingleAZ(rdsInstance, p)
+	}
+}
+
+// rdsStorage bills an RDS storage volume: the instance's own (what == "") or
+// one of its AdditionalStorageVolumes. k makes the price key of a usage.
+func (e *est) rdsStorage(engine string, p map[string]any, what string, k func(string) string, suggest bool) {
 	size := e.mustNum(p, "AllocatedStorage")
 	iops, tput := e.num(p, "Iops", 0), e.num(p, "StorageThroughput", 0)
 	def := "gp3" // CloudFormation's default
@@ -913,31 +965,139 @@ func rdsInstance(e *est, p map[string]any) {
 		def = "io1"
 	}
 	t := e.str(p, "StorageType", def)
-	k := func(s string) string { return "rds|RDS:" + maz + s + "|" + code }
+	label := func(s string) string {
+		if what == "" {
+			return s
+		}
+		return s + ", " + strings.TrimSpace(what)
+	}
 	switch t {
 	case "gp2":
-		e.monthly(size, "GB gp2", k("GP2-Storage"), "storage")
-		bi, bt := rdsGP3Baseline(engine, size)
-		e.suggestRDSGP3(size, bi, bt, k)
+		e.monthly(size, "GB gp2", k("GP2-Storage"), label("storage"))
+		if suggest {
+			bi, bt := rdsGP3Baseline(engine, size)
+			e.suggestRDSGP3(size, bi, bt, k)
+		}
 	case "gp3":
-		e.monthly(size, "GB gp3", k("GP3-Storage"), "storage")
+		e.monthly(size, "GB gp3", k("GP3-Storage"), label("storage"))
 		bi, bt := rdsGP3Baseline(engine, size)
-		e.monthly(math.Max(0, iops-bi), "IOPS", k("GP3-PIOPS"), fmt.Sprintf("gp3 IOPS above %.0f", bi))
-		e.monthly(math.Max(0, tput-bt), "MiB/s", k("GP3-Throughput"), fmt.Sprintf("gp3 throughput above %.0f MiB/s", bt))
+		e.monthly(math.Max(0, iops-bi), "IOPS", k("GP3-PIOPS"), label(fmt.Sprintf("gp3 IOPS above %.0f", bi)))
+		e.monthly(math.Max(0, tput-bt), "MiB/s", k("GP3-Throughput"), label(fmt.Sprintf("gp3 throughput above %.0f MiB/s", bt)))
 	case "io1":
-		e.monthly(size, "GB io1", k("PIOPS-Storage"), "storage")
-		e.monthly(iops, "IOPS", k("PIOPS"), "provisioned IOPS")
+		e.monthly(size, "GB io1", k("PIOPS-Storage"), label("storage"))
+		e.monthly(iops, "IOPS", k("PIOPS"), label("provisioned IOPS"))
 	case "io2":
-		e.monthly(size, "GB io2", k("PIOPS-Storage-IO2"), "storage")
-		e.monthly(iops, "IOPS", k("IO2-PIOPS"), "provisioned IOPS")
+		e.monthly(size, "GB io2", k("PIOPS-Storage-IO2"), label("storage"))
+		e.monthly(iops, "IOPS", k("IO2-PIOPS"), label("provisioned IOPS"))
 	case "standard":
-		e.monthly(size, "GB magnetic", k("StorageUsage"), "storage")
+		e.monthly(size, "GB magnetic", k("StorageUsage"), label("storage"))
 	default:
 		panic(unresolved("StorageType " + t + " is not supported"))
 	}
-	if multi {
-		e.suggestSingleAZ(rdsInstance, p)
+}
+
+// rdsExtendedSupportDates holds, for each major version RDS Extended Support
+// covers, the first day of the year 1 rate, of the year 3 rate ("" when it has
+// none) and the last day of Extended Support, from the RDS and Aurora release
+// calendars. Keys are the Price List's names of the versions.
+// ponytail: a table to update when RDS releases a major version; versions not
+// in it are taken to be in standard support.
+var rdsExtendedSupportDates = map[string][3]string{
+	"MySQL5.7": {"2024-03-01", "2026-03-01", "2029-06-30"}, "MySQL8.0": {"2026-08-01", "2028-08-01", "2029-07-31"},
+	"MySQL8.4": {"2029-08-01", "2031-08-01", "2032-07-31"}, "MySQL9.7": {"2031-08-01", "2033-08-01", "2034-07-31"},
+	"PostgreSQL11": {"2024-04-01", "2026-04-01", "2027-03-31"}, "PostgreSQL12": {"2025-03-01", "2027-03-01", "2028-02-29"},
+	"PostgreSQL13": {"2026-03-01", "2028-03-01", "2029-02-28"}, "PostgreSQL14": {"2027-03-01", "2029-03-01", "2030-02-28"},
+	"PostgreSQL15": {"2028-03-01", "2030-03-01", "2031-02-28"}, "PostgreSQL16": {"2029-03-01", "2031-03-01", "2032-02-29"},
+	"PostgreSQL17": {"2030-03-01", "2032-03-01", "2033-02-28"}, "PostgreSQL18": {"2031-03-01", "2033-03-01", "2034-02-28"},
+	"AuroraMySQL2": {"2024-12-01", "2026-12-01", "2029-06-30"}, "AuroraMySQL3": {"2028-05-01", "", "2029-07-31"},
+	"AuroraPostgreSQL11": {"2024-04-01", "2026-04-01", "2027-03-31"}, "AuroraPostgreSQL12": {"2025-03-01", "2027-03-01", "2028-02-29"},
+	"AuroraPostgreSQL13": {"2026-03-01", "2028-03-01", "2029-02-28"}, "AuroraPostgreSQL14": {"2027-03-01", "2029-03-01", "2030-02-28"},
+	"AuroraPostgreSQL15": {"2028-03-01", "2030-03-01", "2031-02-28"}, "AuroraPostgreSQL16": {"2029-03-01", "2031-03-01", "2032-02-28"},
+	"AuroraPostgreSQL17": {"2030-03-01", "2032-03-01", "2033-02-28"}, "AuroraPostgreSQL18": {"2031-03-01", "2033-03-01", "2034-02-28"},
+}
+
+// rdsMajorVersion names the major version of an EngineVersion the way the
+// Price List and rdsExtendedSupportDates do (MySQL8.0, AuroraPostgreSQL13), or
+// "" for engines RDS Extended Support doesn't cover.
+func rdsMajorVersion(engine, version string) string {
+	parts := strings.SplitN(version, ".", 3)
+	switch strings.ToLower(engine) {
+	case "mysql":
+		if len(parts) >= 2 {
+			return "MySQL" + parts[0] + "." + parts[1]
+		}
+	case "postgres":
+		return "PostgreSQL" + parts[0]
+	case "aurora-mysql": // 5.7.mysql_aurora.2.11.2, 8.0.mysql_aurora.3.05.2
+		switch {
+		case strings.HasPrefix(version, "5.7"):
+			return "AuroraMySQL2"
+		case strings.HasPrefix(version, "8.0"):
+			return "AuroraMySQL3"
+		}
+	case "aurora-postgresql":
+		return "AuroraPostgreSQL" + parts[0]
 	}
+	return ""
+}
+
+// priceDay is the date the prices are for: the snapshot's, or today with
+// --live, so a template always gives the same total with the same prices.
+func (e *est) priceDay() string {
+	if e.prices.AsOf != "" {
+		return e.prices.AsOf
+	}
+	return time.Now().UTC().Format("2006-01-02")
+}
+
+// rdsExtendedSupport bills RDS Extended Support when the engine version in
+// versioned is past the end of standard support on the price day: per vCPU of
+// each of the copies instances of the class (a Multi-AZ standby pays too), or
+// per ACU of a Serverless v2 minimum capacity acu.
+func (e *est) rdsExtendedSupport(engine string, versioned map[string]any, class string, copies, acu float64) {
+	v := e.engineVersion
+	if v == "" {
+		v = e.str(versioned, "EngineVersion", "")
+	}
+	major := rdsMajorVersion(engine, v)
+	s, ok := rdsExtendedSupportDates[major]
+	day := e.priceDay()
+	if v == "" || !ok || day < s[0] {
+		return // the default (latest) version, or one in standard support
+	}
+	if day > s[2] {
+		panic(unresolved(fmt.Sprintf("%s %s reached the end of RDS Extended Support on %s", engine, v, s[2])))
+	}
+	if e.str(versioned, "EngineLifecycleSupport", "") == "open-source-rds-extended-support-disabled" {
+		panic(unresolved(fmt.Sprintf("%s %s is past the end of standard support and EngineLifecycleSupport disables RDS Extended Support", engine, v)))
+	}
+	yr, rate, since := "Yr1-Yr2", "year 1-2", s[0]
+	if s[1] != "" && day >= s[1] {
+		yr, rate, since = "Yr3", "year 3", s[1]
+	}
+	why := fmt.Sprintf("RDS Extended Support for %s %s (%s rate since %s)", engine, v, rate, since)
+	if acu > 0 {
+		e.hourly(acu, "ACU", "rdses|ExtendedSupport:"+yr+":ASv2:"+major, why+", per ACU of the minimum capacity")
+		return
+	}
+	if copies > 1 {
+		why += fmt.Sprintf(", %g instances", copies)
+	}
+	e.hourly(copies*dbVCPU(class), "vCPU", "rdses|ExtendedSupport:"+yr+":"+major, why)
+}
+
+// databaseInsights bills CloudWatch Database Insights in Advanced mode, set on
+// an RDS instance or an Aurora cluster: per vCPU of the instance class, or per
+// ACU of a Serverless v2 minimum capacity acu.
+func (e *est) databaseInsights(p map[string]any, class string, acu float64) {
+	if !strings.EqualFold(e.str(p, "DatabaseInsightsMode", "standard"), "advanced") {
+		return
+	}
+	if acu > 0 {
+		e.hourly(acu, "ACU", "cw|CW:DatabaseInsights-ACU-Hours", "Database Insights Advanced mode, per ACU of the minimum capacity")
+		return
+	}
+	e.hourly(dbVCPU(class), "vCPU", "cw|CW:DatabaseInsights-vCPU-Hours", "Database Insights Advanced mode")
 }
 
 // rdsGP3Baseline is the IOPS and throughput RDS gp3 storage includes: striped
@@ -998,6 +1158,7 @@ func rdsCluster(e *est, p map[string]any) {
 	}
 	class := e.mustStr(p, "DBClusterInstanceClass")
 	e.hourly(1, "", "rds|Multi-AZClusterUsage:"+class+"|"+code, class+" "+engine+" Multi-AZ DB cluster (3 instances)")
+	e.rdsExtendedSupport(engine, p, class, 3, 0)
 	size := e.mustNum(p, "AllocatedStorage")
 	k := func(s string) string { return "rds|RDS:Multi-AZCluster-" + s + "|" + code }
 	switch t := e.mustStr(p, "StorageType"); t {
@@ -1031,6 +1192,14 @@ func (e *est) searchDomain(cc map[string]any, ccName string, p map[string]any) {
 	if e.flag(cc, "DedicatedMasterEnabled") {
 		m := norm(e.mustStr(cc, "DedicatedMasterType"))
 		e.hourly(e.mustNum(cc, "DedicatedMasterCount"), "", "es|"+m, m+" dedicated master nodes")
+	}
+	nodeOptions, _ := cc["NodeOptions"].([]any)
+	for _, o := range nodeOptions {
+		o := asMap(o)
+		if c := asMap(o["NodeConfig"]); e.flag(c, "Enabled") {
+			t := norm(e.mustStr(c, "Type"))
+			e.hourly(e.mustNum(c, "Count"), "", "es|"+t, t+" "+e.str(o, "NodeType", "")+" nodes")
+		}
 	}
 	if e.flag(cc, "WarmEnabled") {
 		w := norm(e.mustStr(cc, "WarmType"))
@@ -1085,8 +1254,12 @@ func (e *est) cacheNodes(engine, nodeType string, n float64) {
 
 func fsx(e *est, p map[string]any) {
 	t := e.mustStr(p, "FileSystemType")
-	size := e.mustNum(p, "StorageCapacity")
 	storageType := e.str(p, "StorageType", "SSD")
+	if t == "LUSTRE" && storageType == "INTELLIGENT_TIERING" {
+		lustreTiering(e, asMap(p["LustreConfiguration"]))
+		return
+	}
+	size := e.mustNum(p, "StorageCapacity")
 	switch t {
 	case "WINDOWS":
 		c := asMap(p["WindowsConfiguration"])
@@ -1140,6 +1313,20 @@ func fsx(e *est, p map[string]any) {
 		e.userIOPS(asMap(c["DiskIopsConfiguration"]), size, "fsx|ONTAP|ProvisionedSSDIOPS."+sfx)
 	default:
 		panic(unresolved("FSx for " + t + " is not supported yet"))
+	}
+}
+
+// lustreTiering bills an Intelligent-Tiering Lustre file system: its throughput
+// capacity and its provisioned SSD read cache. Its storage is pay per use.
+func lustreTiering(e *est, c map[string]any) {
+	e.monthly(e.mustNum(c, "ThroughputCapacity"), "MB/s", "fsx|Lustre|ThroughputCapacity.P2", "Intelligent-Tiering throughput capacity (storage and metadata IOPS not counted)")
+	rc := asMap(c["DataReadCacheConfiguration"])
+	switch m := e.str(rc, "SizingMode", "NO_CACHE"); m {
+	case "NO_CACHE":
+	case "USER_PROVISIONED":
+		e.monthly(e.mustNum(rc, "SizeGiB"), "GB", "fsx|Lustre|Storage.P2:INT_SSDCache", "SSD read cache")
+	default:
+		panic(unresolved("DataReadCacheConfiguration SizingMode " + m + ": the cache size FSx picks is not in the template"))
 	}
 }
 
@@ -1478,7 +1665,11 @@ func init() {
 				e.hourly(1, "", "vpc|VPN-concentrator-site-Usage-Hours:ipsec.1", "VPN concentrator site connection")
 				return
 			}
-			e.hourly(1, "", "vpc|VPN-Usage-Hours:ipsec.1", "Site-to-Site VPN connection")
+			if e.str(p, "TunnelBandwidth", "standard") == "large" {
+				e.hourly(1, "", "vpc|VPN-large-Usage-Hours:ipsec.1", "Site-to-Site VPN connection with large (5 Gbps) tunnels")
+			} else {
+				e.hourly(1, "", "vpc|VPN-Usage-Hours:ipsec.1", "Site-to-Site VPN connection")
+			}
 			if _, ok := p["TransitGatewayId"]; ok {
 				e.hourly(1, "", "tgw|TransitGatewayVPN", "Transit Gateway VPN attachment")
 			}
@@ -2057,10 +2248,7 @@ func eksCluster(e *est, p map[string]any) {
 	if v == "" {
 		return // the latest version, in standard support
 	}
-	day := e.prices.AsOf
-	if day == "" {
-		day = time.Now().UTC().Format("2006-01-02")
-	}
+	day := e.priceDay()
 	s, ok := eksSupport[v]
 	if !ok {
 		minor, err := strconv.Atoi(strings.TrimPrefix(v, "1."))

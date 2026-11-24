@@ -310,31 +310,31 @@ and provisioned storage billed whether you use it or not.
 | `AWS::EC2::Instance` | instance hourly (Linux, or Windows with the license included; see [Assumptions](#assumptions) for how the OS is read), EBS volumes in `BlockDeviceMappings`, the public IPv4 it gets at launch |
 | `AWS::AutoScaling::AutoScalingGroup` | instance hourly × `DesiredCapacity` (or `MinSize`), EBS volumes and public IPv4 at launch, from its launch template or launch configuration. With a `MixedInstancesPolicy`: only the On-Demand part (`OnDemandBaseCapacity`, then `OnDemandPercentageAboveBaseCapacity` of the rest, rounded up) at the first override's type, and the Spot part at that type's Spot saving (see [Assumptions](#assumptions)); EBS and IPv4 are for all instances |
 | `AWS::EC2::Volume` | size, gp3 IOPS / throughput above 3000 / 125 MiB/s, io1 / io2 IOPS |
-| `AWS::RDS::DBInstance` | instance hourly (Single-AZ / Multi-AZ; MySQL, PostgreSQL, MariaDB, Oracle and SQL Server by license model), allocated storage, provisioned IOPS and throughput above the gp3 baseline. Aurora: provisioned instances, or Serverless v2 minimum ACU (I/O-Optimized aware) |
-| `AWS::RDS::DBCluster` (Multi-AZ DB cluster) | cluster hourly (writer and two readable standbys), allocated storage and provisioned IOPS (gp3 IOPS and throughput not supported yet) |
-| `AWS::OpenSearchService::Domain`, `AWS::Elasticsearch::Domain` | data, dedicated master and UltraWarm nodes, EBS storage / IOPS / throughput |
+| `AWS::RDS::DBInstance` | instance hourly (Single-AZ / Multi-AZ; MySQL, PostgreSQL, MariaDB, Oracle and SQL Server by license model), allocated storage (a read replica's from its source, plus `AdditionalStorageVolumes`), provisioned IOPS and throughput above the gp3 baseline. Aurora: provisioned instances, or Serverless v2 minimum ACU (I/O-Optimized aware). RDS Extended Support per vCPU (Multi-AZ standby included) or per minimum ACU when `EngineVersion` (the cluster's, for Aurora) is past the end of standard support on the date of the prices, at the year 1-2 or year 3 rate; Database Insights per vCPU or minimum ACU when `DatabaseInsightsMode` is `advanced` |
+| `AWS::RDS::DBCluster` (Multi-AZ DB cluster) | cluster hourly (writer and two readable standbys), allocated storage and provisioned IOPS (gp3 IOPS and throughput not supported yet), RDS Extended Support for the three instances like a DB instance |
+| `AWS::OpenSearchService::Domain`, `AWS::Elasticsearch::Domain` | data, dedicated master, UltraWarm and coordinator (`NodeOptions`) nodes, EBS storage / IOPS / throughput |
 | `AWS::ElastiCache::CacheCluster`, `ReplicationGroup` | node hourly × nodes |
-| `AWS::ElastiCache::ServerlessCache` | minimum data storage (1 GB, 100 MB for Valkey, or your `CacheUsageLimits` minimum) |
+| `AWS::ElastiCache::ServerlessCache` | minimum data storage (1 GB, 100 MB for Valkey, or your `CacheUsageLimits` minimum), and the `ECPUPerSecond` minimum when set |
 | `AWS::DynamoDB::Table` | provisioned RCU / WCU, including GSIs (Standard and Standard-IA) |
 | `AWS::DynamoDB::GlobalTable` | provisioned RCU and the auto scaling minimum WCU of the replica in the stack's region, including GSIs (replicated WCU with two or more replicas). Replicas in other regions are counted in the line, not priced |
 | `AWS::Kinesis::Stream` | provisioned shard hours (and extended retention over 24 hours), or the on-demand stream hour |
 | `AWS::ECS::Service` (Fargate) | vCPU, memory, ephemeral storage above 20 GB and public IPv4 (`AssignPublicIp: ENABLED`) × `DesiredCount` (x86 and ARM Linux, and Windows with its OS license per vCPU). With a capacity provider strategy, only the FARGATE share is priced: `Base` first, then the rest by `Weight`, rounded up since ECS doesn't document how it rounds. Fargate Spot tasks are not counted, and tasks on other providers are counted through their Auto Scaling groups |
 | `AWS::EFS::FileSystem` | provisioned throughput |
-| `AWS::FSx::FileSystem` | storage and throughput capacity for Windows, Lustre, OpenZFS and ONTAP, SSD IOPS above the included 3 per GB (the ONTAP capacity pool is pay-per-use) |
+| `AWS::FSx::FileSystem` | storage and throughput capacity for Windows, Lustre, OpenZFS and ONTAP, SSD IOPS above the included 3 per GB (the ONTAP capacity pool is pay-per-use). Intelligent-Tiering Lustre: throughput capacity and a provisioned SSD read cache (its storage is pay-per-use) |
 | `AWS::KMS::Key`, `AWS::KMS::ReplicaKey` | $1 per key |
 | `AWS::SecretsManager::Secret` | per secret and per replica |
 | `AWS::Route53::HostedZone` | per hosted zone |
 | `AWS::EKS::Cluster` | cluster hourly, plus the extended support fee when `Version` is past the end of standard support on the date of the prices (the snapshot date, or today with `--live`) |
 | `AWS::EKS::Nodegroup` | instance hourly × `DesiredSize` (or `MinSize`), on-demand, one instance type. Windows AMI types are priced at Windows license-included rates. Node volumes: `DiskSize` (20 GB, 50 GB for Windows) as gp3, marked `≈` since EKS doesn't document their type; with a launch template, its `BlockDeviceMappings` and the AMI's root volume (20 GB, `≈`) |
 | `AWS::NetworkFirewall::Firewall` | endpoint hourly × subnets, plus Advanced Inspection hourly × subnets when its firewall policy (in the same template) has a TLS inspection configuration |
-| `AWS::WAFv2::WebACL` | web ACL, its rules, and the rules of the rule groups in the same template it references (managed rule group fees not counted) |
+| `AWS::WAFv2::WebACL` | web ACL, its rules, the rules of the rule groups in the same template it references, and the monthly fee of the Bot Control, Account Takeover Prevention and Anti-DDoS AWS managed rule groups (their request fees not counted) |
 | `AWS::CloudWatch::Alarm`, `CompositeAlarm` | per alarm metric (standard or high resolution; an anomaly detection band adds two), per composite alarm |
 | `AWS::Lambda::Alias`, `AWS::Lambda::Version` | provisioned concurrency × function memory (x86 and ARM). Versions: the SnapStart cache per GB of memory, for a non-Java function in the same template |
 | `AWS::Lambda::CapacityProvider` | Lambda Managed Instances: EC2 hourly (Linux) plus the management fee × the instances the functions that use it need at least. See [Assumptions](#assumptions). Needs `AllowedInstanceTypes` with one type |
 | `AWS::CloudWatch::Dashboard` | $3 per dashboard (the list price; dashboards are not in the Price List) |
 | `AWS::EC2::TransitGatewayAttachment`, `TransitGatewayVpcAttachment`, `TransitGatewayPeeringAttachment`, `TransitGatewayConnect` | attachment hourly |
 | `AWS::EC2::TransitGatewayNetworkFunctionAttachment` | Gateway Load Balancer network functions: the attachment hourly at the standard attachment rate, plus a Gateway Load Balancer endpoint hourly × `AvailabilityZones`. AWS Network Firewall attachments are billed to the firewall owner and are not estimated |
-| `AWS::EC2::VPNConnection` | connection hourly (the lower site rate on a VPN concentrator), plus the Transit Gateway VPN attachment |
+| `AWS::EC2::VPNConnection` | connection hourly (the higher rate with `TunnelBandwidth: large`, the lower site rate on a VPN concentrator), plus the Transit Gateway VPN attachment |
 | `AWS::EC2::ClientVpnTargetNetworkAssociation` | association hourly |
 | `AWS::Route53Resolver::ResolverEndpoint` | hourly × IP addresses |
 | `AWS::GlobalAccelerator::Accelerator` | fixed hourly fee |
@@ -409,7 +409,7 @@ and provisioned storage billed whether you use it or not.
 | `AWS::GameLift::GameServerGroup` | `MinSize` × (EC2 hourly + FleetIQ fee) of the first instance type, for `ON_DEMAND_ONLY` groups (Linux assumed) |
 | `AWS::ECS::ExpressGatewayService` | Fargate vCPU and memory (1 vCPU and 2 GB by default) and public IPv4 × `MinTaskCount`, plus the Application Load Balancer Express Mode services share, once per stack |
 | `AWS::EKS::Capability` | hourly fee per Argo CD, ACK or kro capability (managed resources not counted) |
-| `AWS::FSx::FileCache` | storage at $1.33/GB-month (the us-east-1 list price; File Cache is not in the Price List) |
+| `AWS::FSx::FileCache` | storage per GB-month |
 | `AWS::Transfer::WebApp` | hourly per web app unit (1 if not set) |
 | `AWS::AppConfig::ExperimentRun` | hourly while the experiment runs (creating it starts the run) |
 | `AWS::Budgets::BudgetsAction` | daily fee of an action-enabled budget, once per budget in the stack |
