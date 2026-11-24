@@ -542,8 +542,12 @@ func init() {
 			bdm := p["BlockDeviceMappings"]
 			nics := p["NetworkInterfaces"]
 			img := p["ImageId"]
+			spot := e.str(asMap(p["InstanceMarketOptions"]), "MarketType", "") == "spot"
 			if lt, ok := p["LaunchTemplate"]; ok {
 				data := e.launchTemplate(asMap(lt))
+				if p["InstanceMarketOptions"] == nil {
+					spot = e.str(asMap(data["InstanceMarketOptions"]), "MarketType", "") == "spot"
+				}
 				if t == "" {
 					t = e.str(data, "InstanceType", "")
 				}
@@ -564,7 +568,9 @@ func init() {
 				panic(unresolved("dedicated tenancy is not supported yet"))
 			}
 			e.notLocalZone(p)
-			if e.instances(1, t, img, "") {
+			if spot {
+				e.spotInstances(1, t, img, "")
+			} else if e.instances(1, t, img, "") {
 				e.suggestGraviton(t, 1, ec2Key, armCaveat)
 			}
 			e.blockDevices(bdm, 1)
@@ -586,11 +592,12 @@ func init() {
 			}
 			od, odWhy := n, why
 			if dist != nil { // the Spot instances' EBS volumes and IPv4 addresses are still billed
-				od, odWhy = e.onDemand(dist, n), fmt.Sprintf("On-Demand part of %s %g (Spot not counted)", why, n)
+				od, odWhy = e.onDemand(dist, n), fmt.Sprintf("On-Demand part of %s %g", why, n)
 			}
 			if e.instances(od, t, img, ", "+odWhy) {
 				e.suggestGraviton(t, od, ec2Key, armCaveat)
 			}
+			e.spotInstances(n-od, t, img, fmt.Sprintf(", Spot part of %s %g", why, n))
 			e.blockDevices(bdm, n)
 			e.rootVolume(bdm, img, n)
 			subnets, _ := p["VPCZoneIdentifier"].([]any)
@@ -1350,8 +1357,9 @@ func init() {
 	more := map[string]func(e *est, p map[string]any){
 		"AWS::EKS::Cluster": eksCluster,
 		"AWS::EKS::Nodegroup": func(e *est, p map[string]any) {
-			if e.str(p, "CapacityType", "ON_DEMAND") != "ON_DEMAND" {
-				panic(unresolved("Spot node groups are not supported"))
+			ct := e.str(p, "CapacityType", "ON_DEMAND")
+			if !in(ct, "ON_DEMAND", "SPOT") {
+				panic(unresolved("CapacityType " + ct + " is not supported"))
 			}
 			key, os := "ec2|", "Linux"
 			if strings.HasPrefix(e.str(p, "AmiType", ""), "WINDOWS_") {
@@ -1374,9 +1382,17 @@ func init() {
 			} else {
 				panic(unresolved("InstanceTypes must name exactly one type"))
 			}
-			e.hourly(n, "", key+t, fmt.Sprintf("%s on-demand (%s), %s", t, os, why))
-			if key == "ec2|" {
-				e.suggestGraviton(t, n, ec2Key, armCaveat)
+			if ct == "SPOT" {
+				nos := "linux"
+				if key == "ec2win|" {
+					nos = "windows"
+				}
+				e.spot(n, t, nos, ", "+why)
+			} else {
+				e.hourly(n, "", key+t, fmt.Sprintf("%s on-demand (%s), %s", t, os, why))
+				if key == "ec2|" {
+					e.suggestGraviton(t, n, ec2Key, armCaveat)
+				}
 			}
 			size := 20.0 // the EKS AMIs' root volume, and DiskSize's default
 			if key == "ec2win|" {
@@ -2203,13 +2219,11 @@ func (e *est) fleetLaunches(v any) []fleetLaunch {
 	return out
 }
 
-// fleet bills the on-demand instances of an EC2 Fleet or Spot Fleet, when they
-// can be of only one instance type. Spot capacity has no fixed price.
+// fleet bills the instances of an EC2 Fleet or Spot Fleet, when they can be
+// of only one instance type: on-demand at the list price, Spot at the Spot
+// Instance Advisor's average saving.
 func (e *est) fleet(od, spot float64, launches []fleetLaunch) {
-	if od <= 0 {
-		if spot > 0 {
-			panic(unresolved("Spot capacity is not supported"))
-		}
+	if od <= 0 && spot <= 0 {
 		return
 	}
 	if len(launches) == 0 {
@@ -2221,14 +2235,13 @@ func (e *est) fleet(od, spot float64, launches []fleetLaunch) {
 			panic(unresolved("the fleet can launch several instance types"))
 		}
 	}
-	n := math.Ceil(od / l.weight)
-	why := "on-demand capacity"
-	if spot > 0 {
-		why += fmt.Sprintf(" (%g Spot not counted)", spot)
+	nOD, nSpot := math.Ceil(od/l.weight), math.Ceil(spot/l.weight)
+	if nOD > 0 {
+		e.instances(nOD, l.typ, l.img, ", on-demand capacity")
 	}
-	e.instances(n, l.typ, l.img, ", "+why)
-	e.blockDevices(l.bdm, n)
-	e.rootVolume(l.bdm, l.img, n)
+	e.spotInstances(nSpot, l.typ, l.img, ", Spot capacity")
+	e.blockDevices(l.bdm, nOD+nSpot)
+	e.rootVolume(l.bdm, l.img, nOD+nSpot)
 }
 
 // healthCheck bills a Route 53 health check and its optional features. An

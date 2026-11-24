@@ -1,13 +1,17 @@
-eu-west-1 · 1 stack · idle ≈ $114/mo · $100 of it on assumptions
+eu-west-1 · 1 stack · idle ≈ $172/mo · $158 of it on assumptions
 
-mixed                    $114/mo
-  Mixed    ×3            $100  ≈ t3.medium on-demand (Linux assumed), On-Demand part of DesiredCapacity 6 (Spot not counted)
+mixed                    $172/mo
+  Mixed    ×3            $100  ≈ t3.medium on-demand (Linux assumed), On-Demand part of DesiredCapacity 6
+  Mixed    ×3             $35  ≈ t3.medium Spot (Linux assumed, 65% off on-demand), Spot part of DesiredCapacity 6
   Mixed    ×120 GB gp3    $11  EBS gp3 storage
+  AllSpot  ×2             $23  ≈ t3.medium Spot (Linux assumed, 65% off on-demand), Spot part of MinSize 2
   AllSpot  ×40 GB gp3   $3.52  EBS gp3 storage
   Anomaly  ×3 metrics   $0.30  alarm per metric
 
-≈ assumptions: 1 (in the total; set them to firm it up)
+≈ assumptions: 3 (in the total; set them to firm it up)
   mixed  Mixed  Linux assumed: ImageId doesn't say the OS. Set it: --os Mixed=windows (or Metadata cfn-idle-cost: {os: windows})
+  mixed  Mixed  Linux assumed: ImageId doesn't say the OS; Spot at 65% off on-demand, the Spot Instance Advisor's recent average for t3.medium; Spot prices move. +$65/mo if Spot rises to the on-demand price, the most it can cost. Set it: --os Mixed=windows (or Metadata cfn-idle-cost: {os: windows})
+  mixed  AllSpot  Linux assumed: ImageId doesn't say the OS; Spot at 65% off on-demand, the Spot Instance Advisor's recent average for t3.medium; Spot prices move. +$43/mo if Spot rises to the on-demand price, the most it can cost. Set it: --os AllSpot=windows (or Metadata cfn-idle-cost: {os: windows})
 
 ? could not estimate: 1
   mixed  Weighted  MixedInstancesPolicy with WeightedCapacity is not supported yet

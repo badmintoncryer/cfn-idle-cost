@@ -308,7 +308,7 @@ and provisioned storage billed whether you use it or not.
 | `AWS::ElasticLoadBalancingV2::LoadBalancer` | ALB / NLB / GWLB hourly, plus one public IPv4 per subnet when internet-facing (none for `dualstack-without-public-ipv4`) |
 | `AWS::ElasticLoadBalancing::LoadBalancer` | Classic Load Balancer hourly |
 | `AWS::EC2::Instance` | instance hourly (Linux, or Windows with the license included; see [Assumptions](#assumptions) for how the OS is read), EBS volumes in `BlockDeviceMappings`, the public IPv4 it gets at launch |
-| `AWS::AutoScaling::AutoScalingGroup` | instance hourly × `DesiredCapacity` (or `MinSize`), EBS volumes and public IPv4 at launch, from its launch template or launch configuration. With a `MixedInstancesPolicy`: only the On-Demand part (`OnDemandBaseCapacity`, then `OnDemandPercentageAboveBaseCapacity` of the rest, rounded up) at the first override's type; Spot is not counted, EBS and IPv4 are for all instances |
+| `AWS::AutoScaling::AutoScalingGroup` | instance hourly × `DesiredCapacity` (or `MinSize`), EBS volumes and public IPv4 at launch, from its launch template or launch configuration. With a `MixedInstancesPolicy`: only the On-Demand part (`OnDemandBaseCapacity`, then `OnDemandPercentageAboveBaseCapacity` of the rest, rounded up) at the first override's type, and the Spot part at that type's Spot saving (see [Assumptions](#assumptions)); EBS and IPv4 are for all instances |
 | `AWS::EC2::Volume` | size, gp3 IOPS / throughput above 3000 / 125 MiB/s, io1 / io2 IOPS |
 | `AWS::RDS::DBInstance` | instance hourly (Single-AZ / Multi-AZ; MySQL, PostgreSQL, MariaDB, Oracle and SQL Server by license model), allocated storage, provisioned IOPS and throughput above the gp3 baseline. Aurora: provisioned instances, or Serverless v2 minimum ACU (I/O-Optimized aware) |
 | `AWS::RDS::DBCluster` (Multi-AZ DB cluster) | cluster hourly (writer and two readable standbys), allocated storage and provisioned IOPS (gp3 IOPS and throughput not supported yet) |
@@ -377,7 +377,7 @@ and provisioned storage billed whether you use it or not.
 | `AWS::EMR::Cluster`, `AWS::EMR::InstanceGroupConfig`, `AWS::EMR::InstanceFleetConfig` | EC2 hourly (Linux), EMR fee and EBS volumes of on-demand instance groups, and of instance fleets of one instance type (`TargetOnDemandCapacity` / `WeightedCapacity` instances). Clusters that auto-terminate or end with their steps: $0 idle |
 | `AWS::KinesisAnalyticsV2::Application` | KPUs (parallelism / parallelism per KPU) plus one for orchestration, and 50 GB of running storage per KPU, as if it runs (CloudFormation creates it stopped). Studio notebooks: two extra KPUs and storage for one. SQL applications are not estimated |
 | `AWS::NetworkManager::CoreNetwork` | hourly per edge location in `PolicyDocument`, priced in the stack's region |
-| `AWS::EC2::EC2Fleet`, `AWS::EC2::SpotFleet` | instance hourly (Linux or Windows, as for instances) × on-demand target capacity, and the EBS volumes of its launch template, when the fleet launches one instance type. Spot capacity is not counted |
+| `AWS::EC2::EC2Fleet`, `AWS::EC2::SpotFleet` | instance hourly (Linux or Windows, as for instances) × on-demand target capacity, and the EBS volumes of its launch template, when the fleet launches one instance type. Spot capacity is priced at the type's Spot saving (see [Assumptions](#assumptions)) |
 | `AWS::Route53::HealthCheck` | monthly fee and optional features (HTTPS, string matching, fast interval, latency measurement). An endpoint that is a resource in the template is priced as an AWS endpoint, any other as non-AWS. Calculated and CloudWatch metric checks are priced as AWS endpoints. Private endpoint checks (`EndpointType: PRIVATE`) are priced at the private rates |
 | `AWS::Route53::HealthCheckSource` | private endpoint health check source hourly × Availability Zones in `SubnetConfigurationList` |
 | `AWS::Kendra::Index` | edition hourly (Developer, Enterprise, GenAI Enterprise) and additional query and storage capacity units |
@@ -546,9 +546,9 @@ free still gets a line.
 Every other type with no rule is listed under `? no rule` and assumed $0 idle,
 so a resource that may cost money never disappears without a line.
 Partly supported types (Spot
-node groups, EMR instance fleets with Spot capacity or several instance
+node groups of several instance types, EMR instance fleets with Spot capacity or several instance
 types, Aurora Serverless v1 (past end of support), instances in
-Local Zones, canaries on a cron schedule, Spot-only fleets and fleets of several
+Local Zones, canaries on a cron schedule, fleets of several
 instance types, Batch compute environments with `MinvCpus` above 0, and
 GameLift fleets on Spot or in remote locations, FleetIQ game server groups
 that use Spot, event source mappings with provisioned pollers, and Glue triggers
@@ -585,7 +585,16 @@ and Timestream scheduled queries that run on a schedule) are listed under
   Linux and marked `≈`. Set its OS with `--os ami-0abc12=windows`, or on the
   resource with Metadata, which in CDK is
   `(instance.node.defaultChild as cdk.CfnResource).addMetadata('cfn-idle-cost', { os: 'windows' })`.
-  Tenancy is shared.
+  Tenancy is shared. An instance whose `InstanceMarketOptions` (or launch
+  template's) says `spot` is priced as Spot.
+- Spot instances (Auto Scaling groups with a `MixedInstancesPolicy`, EC2
+  Fleets, Spot Fleets, EKS Spot node groups of one instance type, Spot
+  instances) are priced at the on-demand price minus the average saving the
+  [Spot Instance Advisor](https://aws.amazon.com/ec2/spot/instance-advisor/)
+  shows for the type, region and OS, kept in the snapshot (fetched with
+  `--live`). Spot prices move, so those lines are marked `≈`, and the
+  assumptions list says how much more they would cost at the on-demand price,
+  the most Spot can cost.
 - The root volume of an instance whose size comes from the AMI (no mapping
   with a `VolumeSize` for `/dev/xvda` or `/dev/sda1`) is counted at the
   usual AMI size, 8 GB, or 30 GB for Windows, as gp3 unless the mapping sets
