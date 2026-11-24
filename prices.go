@@ -190,6 +190,21 @@ var selectors = []selector{
 			}
 			return f
 		}},
+	// RDS Extended Support rows have no productFamily.
+	{name: "rdses", service: "AmazonRDS", families: []string{""},
+		key: func(a map[string]string, u string) string {
+			if strings.HasPrefix(u, "ExtendedSupport:") {
+				return u
+			}
+			return ""
+		},
+		liveFilter: func(d string) map[string]string {
+			year := "Year 1, Year 2"
+			if strings.Contains(d, ":Yr3:") {
+				year = "Year 3"
+			}
+			return map[string]string{"productFamily": "", "extendedSupportPricingYear": year}
+		}},
 	{name: "es", service: "AmazonES", families: []string{"Amazon OpenSearch Service Instance", "Amazon OpenSearch Service Volume"},
 		key: func(a map[string]string, u string) string {
 			switch {
@@ -291,9 +306,10 @@ var selectors = []selector{
 		}},
 	{name: "waf", service: "awswaf", families: []string{"Web Application Firewall"},
 		key: func(a map[string]string, u string) string { return keep(u, "WebACLV2", "RuleV2", "WebACL", "Rule") }},
-	{name: "cw", service: "AmazonCloudWatch", families: []string{"Alarm", "Canaries", "Contributor Insights", "Metric"},
+	{name: "cw", service: "AmazonCloudWatch", families: []string{"Alarm", "Canaries", "Contributor Insights", "Metric", "CloudWatch Database Insights"},
 		key: func(a map[string]string, u string) string {
-			return keep(u, "CW:AlarmMonitorUsage", "CW:HighResAlarmMonitorUsage", "CW:CompositeAlarmMonitorUsage", "CW:Canary-runs", "CW:ContributorInsightRules", "CW:MetricMonitorUsage")
+			return keep(u, "CW:AlarmMonitorUsage", "CW:HighResAlarmMonitorUsage", "CW:CompositeAlarmMonitorUsage", "CW:Canary-runs", "CW:ContributorInsightRules", "CW:MetricMonitorUsage",
+				"CW:DatabaseInsights-vCPU-Hours", "CW:DatabaseInsights-ACU-Hours")
 		}},
 	{name: "lambda", service: "AWSLambda", families: []string{"Serverless"},
 		key: func(a map[string]string, u string) string {
