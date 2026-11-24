@@ -127,8 +127,8 @@ func (e *est) instances(n float64, t string, img any, what string) (linux bool) 
 		label = note
 	}
 	if note != "" && n > 0 { // what it costs if the guess is wrong
-		lin, ok1 := e.prices.Get(e.st.Region, "ec2|"+t)
-		win, ok2 := e.prices.Get(e.st.Region, "ec2win|"+t)
+		lin, ok1 := e.prices.Get(e.reg(), "ec2|"+t)
+		win, ok2 := e.prices.Get(e.reg(), "ec2win|"+t)
 		if ok1 && ok2 && win > lin {
 			a.IfWrong = (win - lin) * n * hoursPerMonth * (1 - discountFor(e.r.Type))
 			a.IfWrongCase = "Windows"
@@ -206,9 +206,9 @@ func (e *est) spot(n float64, t, os, what string) {
 		key, label, adv = "ec2win|", "Windows", "Windows"
 	}
 	od := e.price(key + t)
-	s, ok := e.prices.Get(e.st.Region, "spot|"+adv+":"+t)
+	s, ok := e.prices.Get(e.reg(), "spot|"+adv+":"+t)
 	if !ok {
-		panic(unresolved(fmt.Sprintf("the Spot Instance Advisor has no saving for %s %s in %s", label, t, e.st.Region)))
+		panic(unresolved(fmt.Sprintf("the Spot Instance Advisor has no saving for %s %s in %s", label, t, e.reg())))
 	}
 	pct := math.Round(s * 100)
 	d := 1 - discountFor(e.r.Type)

@@ -20,11 +20,13 @@ type regionReport struct {
 	Stacks  int     `json:"stackCount"`
 	Monthly float64 `json:"monthly"`
 	// Assumed is the part of Monthly from lines that rest on an assumption.
-	Assumed float64       `json:"assumedMonthly"`
-	Billed  []stackReport `json:"stacks"`
-	Unknown []Item        `json:"couldNotEstimate"`
-	Skipped []Item        `json:"notCounted"`
-	NoRule  []Item        `json:"noRule"`
+	Assumed float64 `json:"assumedMonthly"`
+	// Elsewhere is the part of Monthly billed in other regions (replicas).
+	Elsewhere map[string]float64 `json:"billedInOtherRegions,omitempty"`
+	Billed    []stackReport      `json:"stacks"`
+	Unknown   []Item             `json:"couldNotEstimate"`
+	Skipped   []Item             `json:"notCounted"`
+	NoRule    []Item             `json:"noRule"`
 }
 
 // stageReport is the idle cost of one CDK Stage, over all its regions.
@@ -83,6 +85,12 @@ func NewReport(stacks []*Stack, items []Item, prices *Prices) Report {
 		r.Monthly += it.Monthly
 		if it.Assumption != nil {
 			r.Assumed += it.Monthly
+		}
+		if it.BilledIn != "" {
+			if r.Elsewhere == nil {
+				r.Elsewhere = map[string]float64{}
+			}
+			r.Elsewhere[it.BilledIn] += it.Monthly
 		}
 		i := 0
 		for i < len(r.Billed) && r.Billed[i].Name != it.Stack {
@@ -217,12 +225,17 @@ func approx(it Item) string {
 	return ""
 }
 
-// assumedNote is the header's "· $70 of it on assumptions".
+// assumedNote is the header's "· $70 of it on assumptions", and the parts
+// billed in other regions.
 func (r regionReport) assumedNote() string {
-	if r.Assumed < 0.005 {
-		return ""
+	n := ""
+	if r.Assumed >= 0.005 {
+		n = " · " + money(r.Assumed) + " of it on assumptions"
 	}
-	return " · " + money(r.Assumed) + " of it on assumptions"
+	for _, reg := range sortedIDs(r.Elsewhere) {
+		n += " · " + money(r.Elsewhere[reg]) + " billed in " + reg
+	}
+	return n
 }
 
 // assumptionGroup is one assumption and the resources of a stack that rest on it.
@@ -294,6 +307,10 @@ func (rep Report) WriteJSON(w io.Writer) error {
 		r := &rep.Regions[i]
 		cents(&r.Monthly)
 		cents(&r.Assumed)
+		for k, v := range r.Elsewhere {
+			cents(&v)
+			r.Elsewhere[k] = v
+		}
 		for j := range r.Billed {
 			s := &r.Billed[j]
 			cents(&s.Monthly)

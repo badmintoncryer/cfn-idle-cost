@@ -316,13 +316,13 @@ and provisioned storage billed whether you use it or not.
 | `AWS::ElastiCache::CacheCluster`, `ReplicationGroup` | node hourly × nodes |
 | `AWS::ElastiCache::ServerlessCache` | minimum data storage (1 GB, 100 MB for Valkey, or your `CacheUsageLimits` minimum), and the `ECPUPerSecond` minimum when set |
 | `AWS::DynamoDB::Table` | provisioned RCU / WCU, including GSIs (Standard and Standard-IA) |
-| `AWS::DynamoDB::GlobalTable` | provisioned RCU and the auto scaling minimum WCU of the replica in the stack's region, including GSIs (replicated WCU with two or more replicas). Replicas in other regions are counted in the line, not priced |
+| `AWS::DynamoDB::GlobalTable` | provisioned RCU and the auto scaling minimum WCU of every replica, including GSIs (replicated WCU with two or more replicas), each priced in its own region. See [Assumptions](#assumptions) |
 | `AWS::Kinesis::Stream` | provisioned shard hours (and extended retention over 24 hours), or the on-demand stream hour |
 | `AWS::ECS::Service` (Fargate) | vCPU, memory, ephemeral storage above 20 GB and public IPv4 (`AssignPublicIp: ENABLED`) × `DesiredCount` (x86 and ARM Linux, and Windows with its OS license per vCPU). With a capacity provider strategy, only the FARGATE share is priced: `Base` first, then the rest by `Weight`, rounded up since ECS doesn't document how it rounds. Fargate Spot tasks are not counted, and tasks on other providers are counted through their Auto Scaling groups |
 | `AWS::EFS::FileSystem` | provisioned throughput |
 | `AWS::FSx::FileSystem` | storage and throughput capacity for Windows, Lustre, OpenZFS and ONTAP, SSD IOPS above the included 3 per GB (the ONTAP capacity pool is pay-per-use). Intelligent-Tiering Lustre: throughput capacity and a provisioned SSD read cache (its storage is pay-per-use) |
 | `AWS::KMS::Key`, `AWS::KMS::ReplicaKey` | $1 per key |
-| `AWS::SecretsManager::Secret` | per secret and per replica |
+| `AWS::SecretsManager::Secret` | per secret, and per replica in its own region |
 | `AWS::Route53::HostedZone` | per hosted zone |
 | `AWS::EKS::Cluster` | cluster hourly, plus the extended support fee when `Version` is past the end of standard support on the date of the prices (the snapshot date, or today with `--live`) |
 | `AWS::EKS::Nodegroup` | instance hourly × `DesiredSize` (or `MinSize`), on-demand, one instance type. Windows AMI types are priced at Windows license-included rates. Node volumes: `DiskSize` (20 GB, 50 GB for Windows) as gp3, marked `≈` since EKS doesn't document their type; with a launch template, its `BlockDeviceMappings` and the AMI's root volume (20 GB, `≈`) |
@@ -587,6 +587,12 @@ and Timestream scheduled queries that run on a schedule) are listed under
   `(instance.node.defaultChild as cdk.CfnResource).addMetadata('cfn-idle-cost', { os: 'windows' })`.
   Tenancy is shared. An instance whose `InstanceMarketOptions` (or launch
   template's) says `spot` is priced as Spot.
+- A line billed in another region than its stack's, such as a global table's
+  replica, is priced in that region and says so (`replica in eu-west-1`). It
+  is in the stack's region total, and the header says how much of it is
+  billed elsewhere (`· $2.68 billed in eu-west-1`). In JSON the line has
+  `billedIn`. When that region has no price, only that line is listed under
+  `? could not estimate`.
 - Spot instances (Auto Scaling groups with a `MixedInstancesPolicy`, EC2
   Fleets, Spot Fleets, EKS Spot node groups of one instance type, Spot
   instances) are priced at the on-demand price minus the average saving the
