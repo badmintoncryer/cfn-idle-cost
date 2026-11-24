@@ -103,3 +103,23 @@ Resources:
   PyVersion: { Type: AWS::Lambda::Version, Properties: { FunctionName: !Ref Py } }
   JavaVersion: { Type: AWS::Lambda::Version, Properties: { FunctionName: !Ref Java } }
   OutsideVersion: { Type: AWS::Lambda::Version, Properties: { FunctionName: my-function } }
+  # Intelligent-Tiering Lustre: throughput capacity and a provisioned SSD read cache; storage is pay per use.
+  LustreTiering:
+    Type: AWS::FSx::FileSystem
+    Properties:
+      FileSystemType: LUSTRE
+      StorageType: INTELLIGENT_TIERING
+      SubnetIds: [subnet-11111111]
+      LustreConfiguration: { DeploymentType: PERSISTENT_2, ThroughputCapacity: 4000, DataReadCacheConfiguration: { SizingMode: USER_PROVISIONED, SizeGiB: 32 } }
+  # A minimum ECPU rate is billed like the minimum data storage: 1000 ECPU/s × 2,628,000 s.
+  ServerlessEcpu:
+    Type: AWS::ElastiCache::ServerlessCache
+    Properties: { Engine: valkey, ServerlessCacheName: s, CacheUsageLimits: { ECPUPerSecond: { Minimum: 1000 } } }
+  # Coordinator nodes are billed like data nodes.
+  Search:
+    Type: AWS::OpenSearchService::Domain
+    Properties:
+      ClusterConfig:
+        InstanceType: r7g.large.search
+        InstanceCount: 2
+        NodeOptions: [{ NodeType: coordinator, NodeConfig: { Enabled: true, Type: m7g.large.search, Count: 2 } }]

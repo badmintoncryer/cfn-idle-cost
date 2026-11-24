@@ -262,31 +262,31 @@ jobs:
 | `AWS::EC2::Instance` | インスタンスの時間料金（Linux、またはライセンス込みのWindows。OSの読み方は[前提](#前提)を参照）、`BlockDeviceMappings`のEBSボリューム、起動時に割り当てられるパブリックIPv4 |
 | `AWS::AutoScaling::AutoScalingGroup` | インスタンスの時間料金×`DesiredCapacity`（なければ`MinSize`）、EBSボリューム、起動時に割り当てられるパブリックIPv4。起動テンプレートか起動設定から読みます。`MixedInstancesPolicy`ではオンデマンドの分（`OnDemandBaseCapacity`と、残りの`OnDemandPercentageAboveBaseCapacity`、端数は切り上げ）だけを、最初のオーバーライドのタイプで数え、Spotの分はそのタイプのSpotの割引率で数えます（[前提](#前提)を参照）。EBSとIPv4は全台分です |
 | `AWS::EC2::Volume` | 容量、gp3の3000 IOPS・125 MiB/sを超える分、io1・io2のIOPS |
-| `AWS::RDS::DBInstance` | インスタンスの時間料金（シングルAZ・マルチAZ。MySQL、PostgreSQL、MariaDBと、ライセンスモデルごとのOracleとSQL Server）、割り当てたストレージ、プロビジョンドIOPS、gp3の基準値を超えるIOPSとスループット。Auroraは、プロビジョンドのインスタンスか、Serverless v2の最小ACU（I/O-Optimizedにも対応） |
-| `AWS::RDS::DBCluster`（マルチAZ DBクラスター） | クラスターの時間料金（ライター1台と読み取り可能なスタンバイ2台）、割り当てたストレージ、プロビジョンドIOPS（gp3のIOPSとスループットにはまだ対応していません） |
-| `AWS::OpenSearchService::Domain`、`AWS::Elasticsearch::Domain` | データノード、専用マスターノード、UltraWarmノード、EBSの容量・IOPS・スループット |
+| `AWS::RDS::DBInstance` | インスタンスの時間料金（シングルAZ・マルチAZ。MySQL、PostgreSQL、MariaDBと、ライセンスモデルごとのOracleとSQL Server）、割り当てたストレージ（リードレプリカはソースのもの、`AdditionalStorageVolumes`も含む）、プロビジョンドIOPS、gp3の基準値を超えるIOPSとスループット。Auroraは、プロビジョンドのインスタンスか、Serverless v2の最小ACU（I/O-Optimizedにも対応）。`EngineVersion`（Auroraはクラスターのもの）が価格の基準日に標準サポートを過ぎていれば、RDS延長サポートの料金をvCPUごと（マルチAZのスタンバイを含む）か最小ACUごとに、1〜2年目または3年目の単価で加えます。`DatabaseInsightsMode`が`advanced`なら、Database InsightsをvCPUごとか最小ACUごとに加えます |
+| `AWS::RDS::DBCluster`（マルチAZ DBクラスター） | クラスターの時間料金（ライター1台と読み取り可能なスタンバイ2台）、割り当てたストレージ、プロビジョンドIOPS（gp3のIOPSとスループットにはまだ対応していません）、3台分のRDS延長サポート（DBインスタンスと同じ条件） |
+| `AWS::OpenSearchService::Domain`、`AWS::Elasticsearch::Domain` | データノード、専用マスターノード、UltraWarmノード、コーディネーターノード（`NodeOptions`）、EBSの容量・IOPS・スループット |
 | `AWS::ElastiCache::CacheCluster`、`ReplicationGroup` | ノードの時間料金×ノード数 |
-| `AWS::ElastiCache::ServerlessCache` | データストレージの最小量（1 GB。Valkeyは100 MB。`CacheUsageLimits`で最小量を指定していればその値） |
+| `AWS::ElastiCache::ServerlessCache` | データストレージの最小量（1 GB。Valkeyは100 MB。`CacheUsageLimits`で最小量を指定していればその値）。`ECPUPerSecond`の最小値を指定していれば、そのECPUも加えます |
 | `AWS::DynamoDB::Table` | プロビジョニングしたRCU・WCU（GSIを含みます。StandardとStandard-IAに対応） |
 | `AWS::DynamoDB::GlobalTable` | すべてのレプリカの、プロビジョニングしたRCUとAuto Scalingの最小WCU（GSIを含みます。レプリカが2つ以上なら、書き込みにはレプリケートされたWCUの料金を使います）。各レプリカはそれぞれのリージョンの料金で見積もります。[前提](#前提)を参照してください |
 | `AWS::Kinesis::Stream` | プロビジョンドのシャード時間（24時間を超える延長保持を含む）、またはオンデマンドのストリーム時間 |
 | `AWS::ECS::Service`（Fargate） | vCPU、メモリ、20 GBを超えるエフェメラルストレージ、パブリックIPv4（`AssignPublicIp: ENABLED`のとき）×`DesiredCount`（x86とARMのLinux、Windows。WindowsはvCPUごとのOSライセンス料金も含みます）。キャパシティプロバイダ戦略を使うときは、FARGATEに割り当たるタスクだけを数えます。`Base`を先に割り当て、残りを`Weight`の比で分けます。ECSは端数の扱いを公開していないので、切り上げます。Fargate Spotのタスクは数えません。ほかのプロバイダのタスクは、そのAuto Scalingグループの側で数えます |
 | `AWS::EFS::FileSystem` | プロビジョンドスループット |
-| `AWS::FSx::FileSystem` | Windows、Lustre、OpenZFS、ONTAPのストレージ容量とスループット容量。容量1 GBあたり3 IOPSを超えるSSD IOPS（ONTAPの容量プールは使った分だけかかるので含みません） |
+| `AWS::FSx::FileSystem` | Windows、Lustre、OpenZFS、ONTAPのストレージ容量とスループット容量。容量1 GBあたり3 IOPSを超えるSSD IOPS（ONTAPの容量プールは使った分だけかかるので含みません）。Intelligent-TieringのLustreは、スループット容量とプロビジョンドのSSDリードキャッシュ（ストレージは使った分だけ） |
 | `AWS::KMS::Key`、`AWS::KMS::ReplicaKey` | キー1つにつき$1 |
 | `AWS::SecretsManager::Secret` | シークレットごとの料金と、レプリカごとにそのリージョンの料金 |
 | `AWS::Route53::HostedZone` | ホストゾーンごとの料金 |
 | `AWS::EKS::Cluster` | クラスターの時間料金。`Version`が価格の基準日（同梱のスナップショットの日付、`--live`なら当日）に標準サポートを過ぎていれば、延長サポートの料金も加えます |
 | `AWS::EKS::Nodegroup` | インスタンスの時間料金×`DesiredSize`（なければ`MinSize`）。オンデマンドで、インスタンスタイプが1つの場合。WindowsのAMIタイプは、ライセンス込みのWindowsの料金で見積もる。ノードのボリュームは`DiskSize`（既定20 GB、Windowsは50 GB）をgp3として数え、EKSがボリュームタイプを公開していないので`≈`を付ける。起動テンプレートを使うときは、その`BlockDeviceMappings`とAMIのルートボリューム（20 GB、`≈`）を数える |
 | `AWS::NetworkFirewall::Firewall` | エンドポイントの時間料金×サブネット数。同じテンプレートにあるファイアウォールポリシーがTLSインスペクションの設定を持つときは、Advanced Inspectionの時間料金×サブネット数も加える |
-| `AWS::WAFv2::WebACL` | Web ACLとルール。同じテンプレートのルールグループを参照していれば、そのグループのルールも数える（マネージドルールグループの追加料金は含みません） |
+| `AWS::WAFv2::WebACL` | Web ACLとルール。同じテンプレートのルールグループを参照していれば、そのグループのルールも数える。AWSマネージドルールグループのBot Control、Account Takeover Prevention、Anti-DDoSは月額料金を加えます（リクエストごとの料金は含みません） |
 | `AWS::CloudWatch::Alarm`、`CompositeAlarm` | アラームのメトリクスごとの料金（標準解像度・高解像度。異常検出のバンドは2つ分を加えます）、複合アラームごとの料金 |
 | `AWS::Lambda::Alias`、`AWS::Lambda::Version` | プロビジョニング済み同時実行数×関数のメモリ（x86とARM）。バージョンは、同じテンプレートにあるJava以外の関数のSnapStartキャッシュ（メモリ1GBあたり） |
 | `AWS::Lambda::CapacityProvider` | Lambda Managed Instances。EC2の時間料金（Linux）と管理料金×このプロバイダを使う関数に最低限必要なインスタンス数。[前提](#前提)を参照してください。`AllowedInstanceTypes`でタイプを1つに決めている必要があります |
 | `AWS::CloudWatch::Dashboard` | ダッシュボードごとに$3（公開価格。ダッシュボードはPrice Listにありません） |
 | `AWS::EC2::TransitGatewayAttachment`、`TransitGatewayVpcAttachment`、`TransitGatewayPeeringAttachment`、`TransitGatewayConnect` | アタッチメントの時間料金 |
 | `AWS::EC2::TransitGatewayNetworkFunctionAttachment` | Gateway Load Balancerのネットワーク機能は、標準のアタッチメント料金での時間料金と、Gateway Load Balancerエンドポイントの時間料金×`AvailabilityZones`の数。AWS Network Firewallのアタッチメントはファイアウォールの所有者に課金されるので、見積もらない |
-| `AWS::EC2::VPNConnection` | 接続の時間料金（VPNコンセントレーターにつなぐ場合は、安いサイト接続の料金）。Transit Gatewayにつなぐ場合は、VPNアタッチメントの時間料金も加えます |
+| `AWS::EC2::VPNConnection` | 接続の時間料金（`TunnelBandwidth: large`なら高い料金、VPNコンセントレーターにつなぐ場合は、安いサイト接続の料金）。Transit Gatewayにつなぐ場合は、VPNアタッチメントの時間料金も加えます |
 | `AWS::EC2::ClientVpnTargetNetworkAssociation` | 関連付けの時間料金 |
 | `AWS::Route53Resolver::ResolverEndpoint` | 時間料金×IPアドレス数 |
 | `AWS::GlobalAccelerator::Accelerator` | 固定の時間料金 |
@@ -361,7 +361,7 @@ jobs:
 | `AWS::GameLift::GameServerGroup` | `ON_DEMAND_ONLY`のグループで、最初のインスタンスタイプの（EC2の時間料金＋FleetIQの料金）×`MinSize`。OSはLinuxとみなす |
 | `AWS::ECS::ExpressGatewayService` | FargateのvCPUとメモリ（既定は1 vCPUと2 GB）とパブリックIPv4×`MinTaskCount`。Express Modeのサービスが共有するApplication Load Balancerは、スタックごとに1台数える |
 | `AWS::EKS::Capability` | Argo CD、ACK、kroのケイパビリティごとの時間料金。管理するリソースの料金は数えない |
-| `AWS::FSx::FileCache` | ストレージ1GBあたり月$1.33（us-east-1の公開価格。File CacheはPrice Listにありません） |
+| `AWS::FSx::FileCache` | ストレージ1GBあたりの月額料金 |
 | `AWS::Transfer::WebApp` | ウェブアプリユニットごとの時間料金（指定がなければ1ユニット） |
 | `AWS::AppConfig::ExperimentRun` | 実験の実行中の時間料金。リソースを作ると実行が始まる |
 | `AWS::Budgets::BudgetsAction` | アクションを有効にした予算の日額料金。スタック内の予算ごとに1回だけ数える |

@@ -9,6 +9,7 @@ import (
 // golden file doesn't move with the snapshot.
 var networkPrices = &Prices{Source: "test prices", AsOf: "2026-10-20", Regions: map[string]map[string]float64{
 	"us-east-1": {
+		"waf|AMR-BotControl": 10, "vpc|VPN-large-Usage-Hours:ipsec.1": 0.6,
 		"vpc|VPCEncryptionControls-hours": 0.15, "vpc|VpcEndpoint-Hours": 0.01, "nfw|Endpoint-Hour": 0.395,
 		"nfw|Secondary-Endpoint-Hour": 0.158, "nfw|Advanced-Inspection-Endpoint-Hour": 0.38,
 		"resolver|AdvancedDNS-ThreatProtectionsVPCAssociationHours": 0.16, "resolver|DNS-FirewallDomainName": 0.0005,

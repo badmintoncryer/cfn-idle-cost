@@ -112,7 +112,7 @@ Resources:
       Scope: REGIONAL
       VisibilityConfig: { SampledRequestsEnabled: false, CloudWatchMetricsEnabled: false, MetricName: g }
       Rules: [{ Name: a }, { Name: b }, { Name: c }]
-  # 2 rules of its own, plus the 3 rules of RuleGroup; the managed group adds none.
+  # 3 rules of its own, plus the 3 rules of RuleGroup; Common is free, Bot Control has a monthly fee.
   WebAcl:
     Type: AWS::WAFv2::WebACL
     Properties:
@@ -122,6 +122,7 @@ Resources:
       Rules:
         - { Name: own, Priority: 0, Statement: { RuleGroupReferenceStatement: { Arn: !GetAtt RuleGroup.Arn } } }
         - { Name: managed, Priority: 1, Statement: { ManagedRuleGroupStatement: { VendorName: AWS, Name: AWSManagedRulesCommonRuleSet } } }
+        - { Name: bots, Priority: 2, Statement: { ManagedRuleGroupStatement: { VendorName: AWS, Name: AWSManagedRulesBotControlRuleSet } } }
   App: { Type: AWS::Amplify::App, Properties: { Name: app } }
   AssocAmplify: { Type: AWS::WAFv2::WebACLAssociation, Properties: { ResourceArn: !GetAtt App.Arn, WebACLArn: !GetAtt WebAcl.Arn } }
   AssocAmplifyArn:
@@ -130,3 +131,5 @@ Resources:
   AssocAlb: { Type: AWS::WAFv2::WebACLAssociation, Properties: { ResourceArn: arn:aws:elasticloadbalancing:alb, WebACLArn: !GetAtt WebAcl.Arn } }
   CertExport: { Type: AWS::CertificateManager::Certificate, Properties: { DomainName: example.com, CertificateExport: ENABLED } }
   Cert: { Type: AWS::CertificateManager::Certificate, Properties: { DomainName: example.com } }
+  # Large (5 Gbps) tunnels cost more per connection hour.
+  VpnLarge: { Type: AWS::EC2::VPNConnection, Properties: { Type: ipsec.1, CustomerGatewayId: cgw-1, VpnGatewayId: vgw-1, TunnelBandwidth: large } }

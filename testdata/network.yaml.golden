@@ -1,9 +1,10 @@
-us-east-1 · 1 stack · idle ≈ $2903/mo
+us-east-1 · 1 stack · idle ≈ $3352/mo
 
-network                            $2903/mo
+network                            $3352/mo
   Firewall           ×2 endpoints   $577  firewall endpoint per AZ
   Firewall           ×2 endpoints   $555  Advanced Inspection (TLS inspection) per AZ
   DistVip            ×1             $600  dedicated IP custom SSL certificate
+  VpnLarge           ×1             $438  Site-to-Site VPN connection with large (5 Gbps) tunnels
   FirewallOutside    ×1 endpoints   $288  firewall endpoint per AZ
   Tgw                ×2 VPCs        $219  encryption support, per attached VPC in this template
   AssocAdvanced      ×1             $117  DNS Firewall Advanced rule group association
@@ -16,13 +17,14 @@ network                            $2903/mo
   AttachPlain2       ×1              $36  Transit Gateway VPC attachment
   AttachVpc          ×1              $36  Transit Gateway VPC attachment
   StreamVpc          ×3 AZ           $22  VPC delivery per AZ
+  WebAcl             ×1              $10  Bot Control managed rule group fee (requests not counted)
+  WebAcl             ×1            $5.00  web ACL
+  WebAcl             ×3 rules      $3.00  rules
+  WebAcl             ×3 rules      $3.00  rules in rule group RuleGroup
   AssocAmplify       ×1              $15  Amplify Hosting firewall
   AssocAmplifyArn    ×1              $15  Amplify Hosting firewall
   ProxyEndpoint      ×2 AZ           $15  proxy endpoint (interface endpoint per subnet)
   Anycast            ×3 IPv4         $11  Anycast static IPv4 (IPv6 is free)
-  WebAcl             ×1            $5.00  web ACL
-  WebAcl             ×3 rules      $3.00  rules in rule group RuleGroup
-  WebAcl             ×2 rules      $2.00  rules (managed rule group fees not counted)
   Metrics            ×8 metrics    $2.40  additional CloudFront metrics
   CloudMapInstance   ×1            $0.10  Cloud Map registered instance
   Domains            ×3 domains    $0.00  domains in a custom list
