@@ -97,3 +97,7 @@ Resources:
   # API Portal: a documentation portal waives the discovery minimum.
   ApiPortal: { Type: AWS::APIPortal::Portal, Properties: { PortalContent: { DisplayName: p } } }
   ApiDiscovery: { Type: AWS::APIPortal::DiscoveryEnablement, Properties: { Id: config-1 } }
+  # RCS agents bill a monthly maintenance fee once launched, outside CloudFormation.
+  RcsAgent: { Type: AWS::SMSVOICE::RcsAgent, Properties: {} }
+  # Sized by the data: listed as not counted.
+  DocDbSnapshot: { Type: AWS::DocDBElastic::ClusterSnapshot, Properties: { ClusterArn: arn, SnapshotName: s } }

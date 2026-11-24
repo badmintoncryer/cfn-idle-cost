@@ -476,7 +476,7 @@ and provisioned storage billed whether you use it or not.
 | `AWS::SageMaker::FeatureGroup` | in-memory online store minimum (5 GiB) hourly, and provisioned read and write capacity |
 | `AWS::SageMaker::InferenceExperiment` | shadow variant hosting hourly while the experiment runs (up to 30 days) |
 | `AWS::AppFlow::Flow`, `AWS::DataBrew::Schedule`, `AWS::DataSync::Task`, `AWS::ImageBuilder::ImagePipeline`, `AWS::Timestream::ScheduledQuery` | $0 idle unless they run on a schedule (see below) |
-| `AWS::Glue::Session`, `AWS::Personalize::Campaign` | not estimated. A session bills once until it times out; the rate of a campaign's minimum TPS depends on its recipe |
+| `AWS::Glue::Session`, `AWS::Personalize::Campaign`, `AWS::Personalize::Recommender` | not estimated. A session bills once until it times out; the rate of a campaign's minimum TPS depends on its recipe; a recommender bills every active hour at a tier set by the users in its dataset group |
 | `AWS::CodeBuild::Fleet` | reserved capacity × `BaseCapacity`, billed per minute whether builds run or not (`BUILD_GENERAL1_*` sizes; `ATTRIBUTE_BASED_COMPUTE` and `CUSTOM_INSTANCE_TYPE` are not estimated) |
 | `AWS::AppStream::ImageBuilder` | instance hourly, as a Windows image builder (it runs from creation). Linux images are not estimated |
 | `AWS::WorkspacesInstances::WorkspaceInstance` | WorkSpaces Core managed instance hourly at the Linux / BYOL rate, and the EBS volumes in `BlockDeviceMappings` |
@@ -496,6 +496,7 @@ and provisioned storage billed whether you use it or not.
 | `AWS::PricingPlanManager::Subscription` | $0 for the Free plan. Paid CloudFront flat-rate plans are not estimated: the fee starts once the subscription is approved, which CloudFormation leaves pending |
 | `AWS::SMSVOICE::PhoneNumber` | monthly lease (built-in list prices; not in the Price List): US 10DLC $1, US toll-free $2, simulator $1, long codes in the 15 countries on the pricing page |
 | `AWS::SMSVOICE::Registration` | $0 idle; 10DLC campaign registrations are not estimated (the monthly fee starts once the campaign is approved) |
+| `AWS::SMSVOICE::RcsAgent` | not estimated: the $200 monthly agent maintenance fee starts once the agent is launched, after carrier testing outside CloudFormation |
 | `AWS::Lightsail::LoadBalancer`, `Disk`, `Container`, `StaticIp` | load balancer hourly, disk GB-month, container service nodes hourly × `Scale` (billed while disabled too), static IP hourly while not attached |
 | `AWS::Lightsail::Bucket`, `Distribution` | monthly bundle by the size in `BundleId` (`small_*`, `medium_*`, `large_*`) |
 
@@ -518,7 +519,17 @@ scopes, Network Security Manager deployments, network performance metric
 subscriptions), Elastic Disaster Recovery plan executions, SageMaker Partner
 AI Apps, Oracle Database@AWS, WorkSpaces Pools, Launch Wizard deployments,
 Service Catalog provisioned products, Lambda MicroVM images and Lightsail
-snapshots. MediaConnect flows and router I/O and MediaTailor channels are
+snapshots. So are snapshots and backups sized by their data (EBS, DocumentDB
+elastic clusters, Redshift Serverless, Timestream for InfluxDB, Managed Service
+for Apache Flink), HealthOmics read sets and Storage Gateway gateways, Image
+Builder images (build time charged once at creation), app block builders
+(created stopped), Inspector multi-cloud connectors, Network Flow Monitor
+monitors, AppFabric ingestions, Fraud Detector detectors, HealthAgent
+subscriptions, IoT SiteWise Edge gateways and Spot Instance requests, and new
+types whose price isn't published yet (Transit Gateway 1:1 NAT, Global Resolver
+core network endpoints, OpenSearch Ingestion pipeline endpoints, Cloud WAN
+context stores, MediaConnect source and destination endpoints, Security Agent
+private connections). MediaConnect flows and router I/O and MediaTailor channels are
 listed there too: CloudFormation creates them stopped, and they are billed once
 started. So are jobs charged once at creation (Security Agent pentest jobs,
 DataSync task executions) and types priced outside the template or with no

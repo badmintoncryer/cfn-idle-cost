@@ -36,7 +36,7 @@ services                       $81378/mo
   Cloud9          ×10 GB gp3    $0.80  EBS gp3 storage
   ApiDiscovery    ×1            $0.00  discovery minimum waived: a documentation portal in this template covers 400 discovered APIs
 
-? could not estimate: 12
+? could not estimate: 13
   services  BillingGroupAuto  AutoAssociate adds accounts the template doesn't list
   services  Campaign  US_TEN_DLC_CAMPAIGN_REGISTRATION: $10/month per campaign ($2 low-volume) once it is approved
   services  Cloud9Default  AutomaticStopTimeMinutes is not set; whether the instance then stops when idle is not documented
@@ -49,8 +49,10 @@ services                       $81378/mo
   services  OtherInput  not known whether a SMPTE_2110_RECEIVER_GROUP input has an idle charge
   services  PcsSpot  PurchaseOption SPOT is not supported yet
   services  PlanPro  the PRO plan's monthly fee starts once the subscription is approved; CloudFormation leaves it pending
+  services  RcsAgent  $200/month agent maintenance fee (not in the Price List) once the agent is launched; CloudFormation creates it before carrier testing
 
-! not counted yet: 2 (these may cost money idle; cfn-idle-cost has no rule for them)
+! not counted yet: 3 (these may cost money idle; cfn-idle-cost has no rule for them)
+  services  DocDbSnapshot  AWS::DocDBElastic::ClusterSnapshot
   services  Flow  AWS::MediaConnect::Flow
   services  LsSnapshot  AWS::Lightsail::DiskSnapshot
 
