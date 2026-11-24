@@ -26,7 +26,7 @@ func TestCheckHandTables(t *testing.T) {
 	if got := handTablesPast(eksUntil()); len(got) != 0 {
 		t.Errorf("on its last day: %v", got)
 	}
-	if got := handTablesPast("9999-01-01"); len(got) != 1 || got[0].Name != handTables[0].Name {
+	if got := handTablesPast("9999-01-01"); len(got) != 2 || got[0].Name != handTables[0].Name || got[1].Name != handTables[1].Name {
 		t.Errorf("after it: %v", got)
 	}
 }

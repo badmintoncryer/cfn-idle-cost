@@ -23,8 +23,8 @@ type handTable struct {
 // ponytail: when you update one of these tables, set its Checked date.
 var handTables = []handTable{
 	{"EKS Kubernetes version support calendar", "https://docs.aws.amazon.com/eks/latest/userguide/kubernetes-versions.html", "2026-11-24", eksUntil},
+	{"RDS Extended Support calendar", "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/extended-support.html", "2026-11-24", rdsUntil},
 	{"CloudWatch dashboard list price ($3)", "https://aws.amazon.com/cloudwatch/pricing/", "2026-11-24", nil},
-	{"FSx File Cache list price ($1.33/GB-month, us-east-1)", "https://aws.amazon.com/fsx/file-cache/pricing/", "2026-11-24", nil},
 	{"End User Messaging number lease list prices", "https://aws.amazon.com/end-user-messaging/pricing/", "2026-11-24", nil},
 }
 
@@ -33,6 +33,15 @@ var handTables = []handTable{
 func eksUntil() string {
 	last := ""
 	for _, d := range eksSupport {
+		last = max(last, d[0])
+	}
+	return last
+}
+
+// rdsUntil is the newest end of standard support in rdsExtendedSupportDates.
+func rdsUntil() string {
+	last := ""
+	for _, d := range rdsExtendedSupportDates {
 		last = max(last, d[0])
 	}
 	return last
