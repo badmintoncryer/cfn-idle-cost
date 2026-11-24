@@ -1,0 +1,44 @@
+us-east-1 · 1 stack · idle ≈ $4654/mo
+
+rds                                $4654/mo
+  MultiAZCluster      ×6 vCPU       $438  RDS Extended Support for postgres 13.12 (year 1-2 rate since 2026-03-01), 3 instances
+  MultiAZCluster      ×1            $381  db.m6gd.large postgres Multi-AZ DB cluster (3 instances)
+  MultiAZCluster      ×1000 IOPS    $300  provisioned IOPS
+  MultiAZCluster      ×100 GB io1    $38  storage
+  Oracle              ×1            $320  db.m5.large oracle-se2 Single-AZ
+  Oracle              ×3000 IOPS    $300  provisioned IOPS, additional volume rdsdbdata2
+  Oracle              ×200 GB io2    $25  storage, additional volume rdsdbdata2
+  Oracle              ×100 GB gp3    $12  storage
+  Oracle              ×50 GB gp3   $5.75  storage, additional volume rdsdbdata3
+  MySQL80             ×1            $314  db.r6g.large mysql Multi-AZ
+                                        → -$314/mo: Single-AZ instance and storage, for development stacks: no standby, so an AZ failure or maintenance takes the database down
+  MySQL80             ×4 vCPU       $292  RDS Extended Support for mysql 8.0.40 (year 1-2 rate since 2026-08-01), 2 instances
+  MySQL80             ×100 GB gp3    $23  storage
+  AuroraMySQL2Writer  ×1            $212  db.r5.large aurora-mysql
+  AuroraMySQL2Writer  ×2 vCPU       $146  RDS Extended Support for aurora-mysql 5.7.mysql_aurora.2.11.2 (year 1-2 rate since 2024-12-01)
+  AuroraPg13Writer    ×1            $190  db.r6g.large aurora-postgresql
+  AuroraPg13Writer    ×2 vCPU       $146  RDS Extended Support for aurora-postgresql 13.15 (year 1-2 rate since 2026-03-01)
+  AuroraPg13Writer    ×2 vCPU        $18  Database Insights Advanced mode
+  MySQL57             ×2 vCPU       $292  RDS Extended Support for mysql 5.7.44 (year 3 rate since 2026-03-01)
+  MySQL57             ×1             $50  db.t3.medium mysql Single-AZ
+  MySQL57             ×20 GB gp3   $2.30  storage
+  MySQL57Replica      ×2 vCPU       $292  RDS Extended Support for mysql 5.7.44 (year 3 rate since 2026-03-01)
+  MySQL57Replica      ×1             $50  db.t3.medium mysql Single-AZ
+  MySQL57Replica      ×20 GB gp3   $2.30  storage
+  AuroraPg13Reader    ×2 ACU        $175  Serverless v2 minimum capacity
+  AuroraPg13Reader    ×2 ACU        $124  RDS Extended Support for aurora-postgresql 13.15 (year 1-2 rate since 2026-03-01), per ACU of the minimum capacity
+  AuroraPg13Reader    ×2 ACU       $4.56  Database Insights Advanced mode, per ACU of the minimum capacity
+  Pg16                ×1            $246  db.m7g.xlarge postgres Single-AZ
+  Pg16                ×4 vCPU        $36  Database Insights Advanced mode
+  Pg16                ×20 GB gp3   $2.30  storage
+  PgLatest            ×1            $164  db.r6g.large postgres Single-AZ
+  PgLatest            ×20 GB gp3   $2.30  storage
+  BlueGreen           ×1             $50  green copy: db.t3.medium mysql Single-AZ
+  BlueGreen           ×20 GB gp3   $2.30  green copy: storage
+
+→ 1 suggestion save $314/mo
+
+? could not estimate: 1
+  rds  Pg13Disabled  postgres 13.15 is past the end of standard support and EngineLifecycleSupport disables RDS Extended Support
+
+prices: test prices · on-demand list prices, 730 h/mo, USD, free tier ignored
