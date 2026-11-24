@@ -171,6 +171,9 @@ func (rep Report) WriteText(w io.Writer) {
 			fmt.Fprintf(w, "\n%s%s/mo\n", pad(s.Name+" ", 6+pw+qw+mw-len(tot)), tot)
 			for _, it := range s.Items {
 				fmt.Fprintf(w, "  %s  %s  %*s  %s\n", pad(it.Path, pw), pad(it.Quantity, qw), mw, money(it.Monthly), approx(it)+it.Reason)
+				if it.Later != nil {
+					fmt.Fprintf(w, "  %s  ↗ %s/mo after %s: %s\n", pad("", pw+qw+mw+2), money(it.Later.Monthly), it.Later.After, it.Later.Why)
+				}
 				if it.Suggestion != "" {
 					fmt.Fprintf(w, "  %s  → -%s/mo: %s\n", pad("", pw+qw+mw+2), money(it.Saving), it.Suggestion)
 				}
@@ -215,6 +218,14 @@ func (rep Report) WriteText(w io.Writer) {
 		}
 	}
 	fmt.Fprintf(w, "\nprices: %s · %s, %g h/mo, USD, free tier ignored\n", rep.Prices, priceBasis(), hoursPerMonth)
+}
+
+// laterNote: " (↗ $3.00/mo after 2 years, automatic key rotation)".
+func laterNote(it Item) string {
+	if it.Later == nil {
+		return ""
+	}
+	return fmt.Sprintf(" (↗ %s/mo after %s, %s)", money(it.Later.Monthly), it.Later.After, it.Later.Why)
 }
 
 // approx marks a line that rests on an assumption.
@@ -317,6 +328,9 @@ func (rep Report) WriteJSON(w io.Writer) error {
 			for k := range s.Items {
 				cents(&s.Items[k].Monthly)
 				cents(&s.Items[k].Saving)
+				if l := s.Items[k].Later; l != nil {
+					cents(&l.Monthly)
+				}
 			}
 		}
 	}
@@ -377,7 +391,7 @@ func (rep Report) WriteMarkdown(w io.Writer) {
 		fmt.Fprintln(w, "| Stack | Resource | Quantity | $/mo | |\n|---|---|---:|---:|---|")
 		for _, s := range r.Billed {
 			for _, it := range s.Items {
-				fmt.Fprintf(w, "| %s | `%s` | %s | %s | %s |\n", mdCell(s.Name), mdCell(it.Path), it.Quantity, money(it.Monthly), mdCell(approx(it)+it.Reason))
+				fmt.Fprintf(w, "| %s | `%s` | %s | %s | %s |\n", mdCell(s.Name), mdCell(it.Path), it.Quantity, money(it.Monthly), mdCell(approx(it)+it.Reason+laterNote(it)))
 			}
 		}
 		fmt.Fprintln(w)

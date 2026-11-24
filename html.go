@@ -351,7 +351,7 @@ renderBars(); renderHead(); renderRows();
 // htmlReason: the reason, and for an assumed line what was assumed and how to set it.
 func htmlReason(it Item) string {
 	if it.Assumption == nil {
-		return it.Reason
+		return it.Reason + laterNote(it)
 	}
-	return "≈ " + it.Reason + " · " + assumptionGroup{A: *it.Assumption}.text()
+	return "≈ " + it.Reason + laterNote(it) + " · " + assumptionGroup{A: *it.Assumption}.text()
 }

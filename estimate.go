@@ -35,12 +35,25 @@ type Item struct {
 	// Suggestion is a cheaper setting for this line, and Saving what it saves a month (--suggest).
 	Suggestion string  `json:"suggestion,omitempty"`
 	Saving     float64 `json:"saving,omitempty"`
+	// Later is what the line will cost once a charge that grows with time has
+	// grown, such as a KMS key's rotations; the total uses today's.
+	Later *Later `json:"later,omitempty"`
+	// PriceSource is "list-price" for a price read from a pricing page because
+	// it is not in the Price List.
+	PriceSource string `json:"priceSource,omitempty"`
 	// BilledIn is the region the line is billed in when it is not the stack's,
 	// such as a global table's replica in another region.
 	BilledIn string `json:"billedIn,omitempty"`
 	// Assumption is what the line takes for granted that the template doesn't say.
 	// The line is in the total, marked ≈, with how to set it right.
 	Assumption *Assumption `json:"assumption,omitempty"`
+}
+
+// Later is a line's monthly cost after some time.
+type Later struct {
+	Monthly float64 `json:"monthly"`
+	After   string  `json:"after"` // "2 years"
+	Why     string  `json:"why"`   // "automatic key rotation"
 }
 
 // Assumption is a guess an estimate line rests on.
@@ -176,8 +189,14 @@ func estimateResource(all []*Stack, st *Stack, prices *Prices, id string) (items
 		b := base
 		b.Quantity, b.Monthly, b.Reason, b.Unknown = it.Quantity, it.Monthly, it.Reason, it.Unknown
 		b.Suggestion, b.Saving, b.Assumption, b.BilledIn = it.Suggestion, it.Saving, it.Assumption, it.BilledIn
+		b.Later, b.PriceSource = it.Later, it.PriceSource
 		if d := discountFor(e.r.Type); d > 0 {
 			b.Monthly, b.Saving = b.Monthly*(1-d), b.Saving*(1-d)
+			if b.Later != nil {
+				l := *b.Later
+				l.Monthly *= 1 - d
+				b.Later = &l
+			}
 		}
 		if len(e.notes) > 0 {
 			b.Reason += " (default of " + strings.Join(e.notes, ", ") + ")"
@@ -504,6 +523,16 @@ func (e *est) monthly(qty float64, unit, key, reason string) {
 	}
 }
 
+// listPrice adds a line priced from a pricing page, for a charge that is not
+// in the Price List; the table of such prices is handTables.
+func (e *est) listPrice(qty float64, unit string, monthly float64, reason string) {
+	n := len(e.items)
+	e.add(qty, unit, monthly, reason)
+	for i := n; i < len(e.items); i++ {
+		e.items[i].PriceSource = "list-price"
+	}
+}
+
 func (e *est) add(qty float64, unit string, monthly float64, reason string) {
 	if qty <= 0 {
 		return
@@ -734,6 +763,14 @@ func init() {
 		},
 		"AWS::KMS::Key": func(e *est, p map[string]any) {
 			e.monthly(1, "", "kms|KMS-Keys", "customer managed key")
+			if e.flag(p, "EnableKeyRotation") { // the first two rotations each add a key's price
+				days := e.num(p, "RotationPeriodInDays", 365)
+				after := fmt.Sprintf("%g days", 2*days)
+				if int(days)%365 == 0 {
+					after = count(2*days/365, "year")
+				}
+				e.items[len(e.items)-1].Later = &Later{Monthly: 3 * e.price("kms|KMS-Keys"), After: after, Why: "automatic key rotation"}
+			}
 		},
 		"AWS::KMS::ReplicaKey": func(e *est, p map[string]any) {
 			e.monthly(1, "", "kms|KMS-Keys", "customer managed key (replica)")
@@ -2642,7 +2679,7 @@ func init() {
 	}
 	rules["AWS::CloudWatch::Dashboard"] = func(e *est, p map[string]any) {
 		// ponytail: dashboards are not in the Price List; update by hand if the $3 list price changes.
-		e.add(1, "", 3, "dashboard ($3 list price, not in the Price List)")
+		e.listPrice(1, "", 3, "dashboard ($3 list price, not in the Price List)")
 	}
 }
 

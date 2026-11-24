@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 )
 
 var version = "dev"
@@ -152,7 +153,11 @@ func run(args []string, stdout io.Writer) error {
 		return usageError{err.Error() + " (see --help)"}
 	}
 	if *showVersion {
-		fmt.Fprintln(stdout, version)
+		p, err := BundledPrices()
+		if err != nil {
+			return err
+		}
+		writeVersion(stdout, p)
 		return nil
 	}
 	if !in(*format, "text", "md", "json", "html", "sarif") {
@@ -240,6 +245,13 @@ func run(args []string, stdout io.Writer) error {
 	}
 	if err != nil {
 		return err
+	}
+	day := prices.AsOf
+	if day == "" {
+		day = time.Now().UTC().Format("2006-01-02")
+	}
+	for _, t := range handTablesPast(day) {
+		fmt.Fprintf(os.Stderr, "warning: the %s that cfn-idle-cost knows ends %s, before the prices' date %s; what was announced since is not counted\n", t.Name, t.Until(), day)
 	}
 	headItems := Estimate(head, prices)
 	if !*suggest {
@@ -417,8 +429,13 @@ func runPrices(args []string) error {
 	out := fs.String("o", "prices.json", "output file")
 	regions := fs.String("regions", "", "comma-separated regions (default: all commercial regions)")
 	services := fs.String("services", "", "comma-separated offer codes, e.g. AmazonKinesis (default: all), to fetch the keys a new selector adds")
+	check := fs.Bool("check", false, "list the hand-kept tables (calendars, list prices) that need a look, as a Markdown checklist, and fetch nothing")
 	if err := fs.Parse(args); err != nil {
 		return usageError{err.Error()}
+	}
+	if *check {
+		checkHandTables(os.Stdout, time.Now().UTC())
+		return nil
 	}
 	var rs, ss []string
 	if *regions != "" {
