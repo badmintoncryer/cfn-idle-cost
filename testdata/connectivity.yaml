@@ -70,3 +70,28 @@ Resources:
   RefactorApp: { Type: AWS::RefactorSpaces::Application, Properties: { EnvironmentIdentifier: !Ref RefactorEnv, Name: a, ProxyType: API_GATEWAY, VpcId: vpc-1 } }
   RefactorSvc: { Type: AWS::RefactorSpaces::Service, Properties: { EnvironmentIdentifier: !Ref RefactorEnv, ApplicationIdentifier: !Ref RefactorApp, EndpointType: URL, Name: s, VpcId: vpc-2 } }
   StatusCheck: { Type: AWS::EC2::ApplicationStatusCheck, Properties: { Protocol: http, Port: 80 } }
+  # Private endpoint health checks: the source bills per AZ, each check at the private rate.
+  CheckSource:
+    Type: AWS::Route53::HealthCheckSource
+    Properties:
+      HealthCheckSourceConfig:
+        VpcId: vpc-1
+        SubnetConfigurationList:
+          - { SubnetId: a, AvailabilityZoneId: use1-az1, SecurityGroupIdList: [sg] }
+          - { SubnetId: b, AvailabilityZoneId: use1-az2, SecurityGroupIdList: [sg] }
+          - { SubnetId: c, AvailabilityZoneId: use1-az4, SecurityGroupIdList: [sg] }
+  PrivateCheck:
+    Type: AWS::Route53::HealthCheck
+    Properties:
+      HealthCheckConfig: { Type: HTTPS, EndpointType: PRIVATE, HealthCheckSourceId: !Ref CheckSource, IPAddress: 10.0.0.10, Port: 443 }
+  # Network Synthetic Monitor: two probes from one subnet are billed once.
+  SyntheticMonitor: { Type: AWS::NetworkMonitor::Monitor, Properties: { MonitorName: m } }
+  ProbeA1: { Type: AWS::NetworkMonitor::Probe, Properties: { MonitorName: !Ref SyntheticMonitor, SourceArn: arn:aws:ec2:us-east-1:111111111111:subnet/subnet-a, Destination: 10.1.0.1, Protocol: ICMP } }
+  ProbeA2: { Type: AWS::NetworkMonitor::Probe, Properties: { MonitorName: !Ref SyntheticMonitor, SourceArn: arn:aws:ec2:us-east-1:111111111111:subnet/subnet-a, Destination: 10.1.0.2, Protocol: ICMP } }
+  ProbeB: { Type: AWS::NetworkMonitor::Probe, Properties: { MonitorName: !Ref SyntheticMonitor, SourceArn: arn:aws:ec2:us-east-1:111111111111:subnet/subnet-b, Destination: 10.1.0.1, Protocol: ICMP } }
+  # Gateway Load Balancer network function: the attachment and an endpoint per AZ.
+  NfaGwlb:
+    Type: AWS::EC2::TransitGatewayNetworkFunctionAttachment
+    Properties: { TransitGatewayId: tgw-1, ServiceName: com.amazonaws.vpce.us-east-1.vpce-svc-0123456789abcdef0, AvailabilityZones: [us-east-1a, us-east-1b] }
+  # API discovery with no documentation portal pays the monthly minimum.
+  ApiDiscovery: { Type: AWS::APIPortal::DiscoveryEnablement, Properties: { Id: config-1 } }

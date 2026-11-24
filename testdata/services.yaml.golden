@@ -1,6 +1,6 @@
-us-east-1 · 1 stack · idle ≈ $81253/mo
+us-east-1 · 1 stack · idle ≈ $81378/mo
 
-services                       $81253/mo
+services                       $81378/mo
   PcsGpu          ×1           $40179  p5.48xlarge static compute nodes (MinInstanceCount; root volumes not counted)
   PcsGpu          ×1             $467  PCS node management fee
   Evs             ×4 hosts     $32067  i4i.metal hosts
@@ -12,6 +12,7 @@ services                       $81253/mo
   Fleet           ×2             $263  BUILD_GENERAL1_SMALL LINUX_CONTAINER reserved capacity (billed per minute, used or not)
   PcsNodes        ×2             $124  c5.large static compute nodes (MinInstanceCount; root volumes not counted)
   PcsNodes        ×2             $117  PCS node management fee
+  ApiPortal       ×1             $125  documentation portal (includes 400 APIs)
   CoreInstance    ×1              $85  m5.large WorkSpaces Core managed instance (Linux or BYOL rate; license-included OSes cost more)
   CoreInstance    ×50 GB gp3    $4.00  EBS gp3 storage
   ImageBuilder    ×1              $73  stream.standard.medium image builder (runs from creation; Windows assumed)
@@ -33,6 +34,7 @@ services                       $81253/mo
   TollFree        ×1            $2.00  US TOLL_FREE number lease ($2 list price, not in the Price List)
   PaymentKey      ×1            $1.00  active key
   Cloud9          ×10 GB gp3    $0.80  EBS gp3 storage
+  ApiDiscovery    ×1            $0.00  discovery minimum waived: a documentation portal in this template covers 400 discovered APIs
 
 ? could not estimate: 12
   services  BillingGroupAuto  AutoAssociate adds accounts the template doesn't list

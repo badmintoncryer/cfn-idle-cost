@@ -94,3 +94,6 @@ Resources:
     Properties: { DistributionName: d, BundleId: small_1_0, DefaultCacheBehavior: { Behavior: cache }, Origin: { Name: lb, RegionName: us-east-1 } }
   LsSnapshot: { Type: AWS::Lightsail::DiskSnapshot, Properties: { DiskSnapshotName: s, DiskName: d } }
   Flow: { Type: AWS::MediaConnect::Flow, Properties: { Name: f, Source: { Name: s } } }
+  # API Portal: a documentation portal waives the discovery minimum.
+  ApiPortal: { Type: AWS::APIPortal::Portal, Properties: { PortalContent: { DisplayName: p } } }
+  ApiDiscovery: { Type: AWS::APIPortal::DiscoveryEnablement, Properties: { Id: config-1 } }

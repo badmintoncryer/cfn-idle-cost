@@ -283,6 +283,7 @@ jobs:
 | `AWS::Lambda::CapacityProvider` | Lambda Managed Instances。EC2の時間料金（Linux）と管理料金×このプロバイダを使う関数に最低限必要なインスタンス数。[前提](#前提)を参照してください。`AllowedInstanceTypes`でタイプを1つに決めている必要があります |
 | `AWS::CloudWatch::Dashboard` | ダッシュボードごとに$3（公開価格。ダッシュボードはPrice Listにありません） |
 | `AWS::EC2::TransitGatewayAttachment`、`TransitGatewayVpcAttachment`、`TransitGatewayPeeringAttachment`、`TransitGatewayConnect` | アタッチメントの時間料金 |
+| `AWS::EC2::TransitGatewayNetworkFunctionAttachment` | Gateway Load Balancerのネットワーク機能は、標準のアタッチメント料金での時間料金と、Gateway Load Balancerエンドポイントの時間料金×`AvailabilityZones`の数。AWS Network Firewallのアタッチメントはファイアウォールの所有者に課金されるので、見積もらない |
 | `AWS::EC2::VPNConnection` | 接続の時間料金（VPNコンセントレーターにつなぐ場合は、安いサイト接続の料金）。Transit Gatewayにつなぐ場合は、VPNアタッチメントの時間料金も加えます |
 | `AWS::EC2::ClientVpnTargetNetworkAssociation` | 関連付けの時間料金 |
 | `AWS::Route53Resolver::ResolverEndpoint` | 時間料金×IPアドレス数 |
@@ -301,6 +302,8 @@ jobs:
 | `AWS::SageMaker::Endpoint` | プロダクションバリアントごとに、インスタンスの時間単価 × `InitialInstanceCount`。`InitialInstanceCount`がなければ、`ManagedInstanceScaling.MinInstanceCount`を使う（推論コンポーネントをホストするエンドポイント）。サーバーレスのバリアントはアイドル時$0 |
 | `AWS::CodePipeline::Pipeline` | アクティブなV1パイプラインごとの料金（V2は実行時間の分だけかかるので、アイドル時は$0） |
 | `AWS::ApiGateway::Stage` | `CacheClusterEnabled`のとき、`CacheClusterSize`に応じたキャッシュクラスターの時間料金 |
+| `AWS::APIPortal::Portal` | ドキュメントポータルごとの月額料金（含まれる400件を超えるAPIは数えない） |
+| `AWS::APIPortal::DiscoveryEnablement` | APIディスカバリーの月額最低料金を、スタックごとに1回。同じテンプレートにドキュメントポータルがあれば、最低料金は免除されるので$0（400件を超えるディスカバリー済みのAPIは数えない） |
 | `AWS::DirectoryService::MicrosoftAD` | ドメインコントローラー2台の時間料金（StandardとEnterprise）。あとから追加したドメインコントローラーはテンプレートに現れないため含みません |
 | `AWS::DirectoryService::SimpleAD` | ディレクトリの時間料金（SmallとLarge） |
 | `AWS::ACMPCA::CertificateAuthority` | CAごとの月額料金（汎用モードと短期証明書モード） |
@@ -325,7 +328,8 @@ jobs:
 | `AWS::KinesisAnalyticsV2::Application` | KPU（並列度÷KPUあたりの並列度）とオーケストレーション用の1KPU、KPUごとに50GBの実行時ストレージ。CloudFormationは停止した状態で作成するが、起動している前提で数える。StudioノートブックはKPUが2つ、ストレージが1KPU分多い。SQLアプリケーションは見積もらない |
 | `AWS::NetworkManager::CoreNetwork` | `PolicyDocument`にあるエッジロケーションごとの時間料金。スタックのリージョンの価格で計算する |
 | `AWS::EC2::EC2Fleet`、`AWS::EC2::SpotFleet` | インスタンスタイプが1つのフリートの、インスタンスの時間料金（Linux）×オンデマンドの目標容量と、起動テンプレートのEBSボリューム。Spotの分は数えない |
-| `AWS::Route53::HealthCheck` | 月額料金とオプション機能（HTTPS、文字列照合、高速間隔、レイテンシー測定）。テンプレート内のリソースを監視するものはAWSエンドポイント、それ以外はAWS以外のエンドポイントの価格で計算する。`CALCULATED`と`CLOUDWATCH_METRIC`のヘルスチェックは、AWSエンドポイントの価格で計算する |
+| `AWS::Route53::HealthCheck` | 月額料金とオプション機能（HTTPS、文字列照合、高速間隔、レイテンシー測定）。テンプレート内のリソースを監視するものはAWSエンドポイント、それ以外はAWS以外のエンドポイントの価格で計算する。`CALCULATED`と`CLOUDWATCH_METRIC`のヘルスチェックは、AWSエンドポイントの価格で計算する。プライベートエンドポイントのヘルスチェック（`EndpointType: PRIVATE`）は、プライベート用の価格で計算する |
+| `AWS::Route53::HealthCheckSource` | プライベートエンドポイントのヘルスチェックソースの時間料金×`SubnetConfigurationList`のAZ数 |
 | `AWS::Kendra::Index` | エディション（Developer、Enterprise、GenAI Enterprise）の時間料金と、追加のクエリ・ストレージのキャパシティユニット |
 | `AWS::EC2::VerifiedAccessEndpoint` | エンドポイントごとの時間料金。HTTPのアプリケーションと、HTTP以外（TCP、RDS、CIDR）のアプリケーションで価格が違う |
 | `AWS::CloudWatch::InsightRule` | 有効なContributor Insightsルールごとの月額料金。一致したログイベントの料金は数えない |
@@ -387,6 +391,7 @@ jobs:
 | `AWS::SES::DedicatedIpPool` | `ScalingMode: MANAGED`のときの、専用IP（マネージド）の月額料金。アカウントごとの料金なので、スタックごとに1回だけ数える |
 | `AWS::SES::Tenant` | テナントごとの月額料金 |
 | `AWS::InternetMonitor::Monitor` | 時間料金×`Resources`のリソース数。無効にしたモニターは$0。都市ネットワークの料金は数えない |
+| `AWS::NetworkMonitor::Probe` | Network Synthetic Monitorの、監視するサブネットごとの時間料金。`SourceArn`とモニターが同じプローブは1回だけ数える。`AWS::NetworkMonitor::Monitor`は$0 |
 | `AWS::ApplicationInsights::Application` | アイドル時$0。`AutoConfigurationEnabled`やコンポーネントで監視を設定したときは、作られるアラームとメトリクスの料金を見積もらない |
 | `AWS::ARCRegionSwitch::Plan` | リージョン切り替えプランごとの月額料金 |
 | `AWS::RefactorSpaces::Environment` | 環境の時間料金。`NetworkFabricType: TRANSIT_GATEWAY`なら、同じテンプレートにあるアプリケーションとサービスのVPCごとに、Transit Gatewayアタッチメントの時間料金も数える |
@@ -450,7 +455,7 @@ jobs:
 
 ### まだ見積もらないもの
 
-アクセスがゼロでも費用がかかるのに、まだルールのないリソースタイプのうち、よく使われるもの（WorkSpaces、AppStream 2.0、Lightsail、Elastic Beanstalkなど）は、`! not counted yet`に載せます。テンプレートから費用を見積もれないタイプも、ここに載せます。該当するのはアカウント単位のサービス（GuardDuty、Security Hub、Configのレコーダー、CloudWatchのOTelエンリッチメント、CloudWatch Logsのインテグレーション、Macie、DevOps Guru、Audit Manager、InspectorのCISスキャンとコードリポジトリのスキャン、CodeGuru Reviewer、AppFabric、IoT TwinMakerのエンティティ）、Bedrockにインポートしたモデル、CloudFrontのディストリビューションテナント、OutpostsのRoute 53 Resolver、ECSのゲートウェイ（サービスをつなぐとECSがロードバランサーを追加します）と、テンプレートの外にあるリソースやプローブの数で決まる監視（EC2のアプリケーションステータスチェック、Network Synthetic Monitor、Network Flow Monitorのスコープ、Network Security Managerのデプロイ、ネットワークパフォーマンスのメトリクスのサブスクリプション）、Elastic Disaster Recoveryの復旧計画の実行、SageMakerのパートナーAIアプリ、Oracle Database@AWS、WorkSpaces Pools、Launch Wizardのデプロイ、Service Catalogでプロビジョニングした製品、LambdaのMicroVMイメージ、Lightsailのスナップショットです。MediaConnectのフローとルーターの入出力、MediaTailorのチャネルもここに載せます。CloudFormationはこれらを停止した状態で作り、開始すると課金が始まります。作るときに一度だけ課金されるジョブ（Security Agentのペネトレーションテスト、DataSyncのタスクの実行）と、費用がテンプレートの外で決まるか料金が公開されていないタイプ（DataZoneの環境とプロジェクト、SageMakerの推論コンポーネントとモニタリングのスケジュール、Timestreamのテーブル、QuickSightのトピック、Supply Chainなど）も、ここに載せます。アイドル時に費用がかからないとわかっているタイプ（IAM、S3、SQS、SNS、CloudWatch Logs、Lambda関数、サブネットやルートテーブル、設定だけのタイプ、デプロイ時に一度だけ課金されるジョブの大半、提供が終わったサービスなど）は載せません。費用がかからないタイプは、すべてのCloudFormationタイプを調べた結果をもとに約1,700件を1つずつ名前で挙げていて、プレフィックスで判定するのは`Custom::`のリソースだけです。そのため、ほかのタイプが無料のサービスに新しいタイプが加わっても、そのタイプは`? no rule`に載ります。それ以外のルールのないタイプは、アイドル時$0とみなして`? no rule`に載せます。費用がかかるかもしれないリソースが、行を出さずに消えることはありません。一部だけ対応しているリソース（Spotのノードグループ、Spotの容量を使うか複数のインスタンスタイプを使うEMRのインスタンスフリート、Aurora Serverless v1（サポート終了済み）、Local Zonesのインスタンス、cronのスケジュールで動くカナリア、Spotだけのフリート、複数のインスタンスタイプを使うフリート、`MinvCpus`が0より大きいBatchのコンピューティング環境、SpotやリモートロケーションのGameLiftフリート、Spotを使うFleetIQのゲームサーバーグループ、プロビジョニングしたイベントポーラーを使うイベントソースマッピング、スケジュールで動くかストリーミングジョブを開始するGlueのトリガーとクローラー、スケジュールで動くAppFlowのフロー、DataBrewのスケジュール、拡張モードのDataSyncタスク、Image Builderのパイプライン、Timestreamのスケジュールされたクエリ）は、`? could not estimate`に載ります。
+アクセスがゼロでも費用がかかるのに、まだルールのないリソースタイプのうち、よく使われるもの（WorkSpaces、AppStream 2.0、Lightsail、Elastic Beanstalkなど）は、`! not counted yet`に載せます。テンプレートから費用を見積もれないタイプも、ここに載せます。該当するのはアカウント単位のサービス（GuardDuty、Security Hub、Configのレコーダー、CloudWatchのOTelエンリッチメント、CloudWatch Logsのインテグレーション、Macie、DevOps Guru、Audit Manager、InspectorのCISスキャンとコードリポジトリのスキャン、CodeGuru Reviewer、AppFabric、IoT TwinMakerのエンティティ）、Bedrockにインポートしたモデル、CloudFrontのディストリビューションテナント、OutpostsのRoute 53 Resolver、ECSのゲートウェイ（サービスをつなぐとECSがロードバランサーを追加します）と、テンプレートの外にあるリソースやプローブの数で決まる監視（EC2のアプリケーションステータスチェック、Network Flow Monitorのスコープ、Network Security Managerのデプロイ、ネットワークパフォーマンスのメトリクスのサブスクリプション）、Elastic Disaster Recoveryの復旧計画の実行、SageMakerのパートナーAIアプリ、Oracle Database@AWS、WorkSpaces Pools、Launch Wizardのデプロイ、Service Catalogでプロビジョニングした製品、LambdaのMicroVMイメージ、Lightsailのスナップショットです。MediaConnectのフローとルーターの入出力、MediaTailorのチャネルもここに載せます。CloudFormationはこれらを停止した状態で作り、開始すると課金が始まります。作るときに一度だけ課金されるジョブ（Security Agentのペネトレーションテスト、DataSyncのタスクの実行）と、費用がテンプレートの外で決まるか料金が公開されていないタイプ（DataZoneの環境とプロジェクト、SageMakerの推論コンポーネントとモニタリングのスケジュール、Timestreamのテーブル、QuickSightのトピック、Supply Chainなど）も、ここに載せます。アイドル時に費用がかからないとわかっているタイプ（IAM、S3、SQS、SNS、CloudWatch Logs、Lambda関数、サブネットやルートテーブル、設定だけのタイプ、デプロイ時に一度だけ課金されるジョブの大半、提供が終わったサービスなど）は載せません。費用がかからないタイプは、すべてのCloudFormationタイプを調べた結果をもとに約1,700件を1つずつ名前で挙げていて、プレフィックスで判定するのは`Custom::`のリソースだけです。そのため、ほかのタイプが無料のサービスに新しいタイプが加わっても、そのタイプは`? no rule`に載ります。それ以外のルールのないタイプは、アイドル時$0とみなして`? no rule`に載せます。費用がかかるかもしれないリソースが、行を出さずに消えることはありません。一部だけ対応しているリソース（Spotのノードグループ、Spotの容量を使うか複数のインスタンスタイプを使うEMRのインスタンスフリート、Aurora Serverless v1（サポート終了済み）、Local Zonesのインスタンス、cronのスケジュールで動くカナリア、Spotだけのフリート、複数のインスタンスタイプを使うフリート、`MinvCpus`が0より大きいBatchのコンピューティング環境、SpotやリモートロケーションのGameLiftフリート、Spotを使うFleetIQのゲームサーバーグループ、プロビジョニングしたイベントポーラーを使うイベントソースマッピング、スケジュールで動くかストリーミングジョブを開始するGlueのトリガーとクローラー、スケジュールで動くAppFlowのフロー、DataBrewのスケジュール、拡張モードのDataSyncタスク、Image Builderのパイプライン、Timestreamのスケジュールされたクエリ）は、`? could not estimate`に載ります。
 
 ## 前提
 

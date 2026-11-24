@@ -1,6 +1,6 @@
-us-east-1 · 1 stack · idle ≈ $11801/mo
+us-east-1 · 1 stack · idle ≈ $12314/mo
 
-connectivity                        $11801/mo
+connectivity                        $12314/mo
   Resolver             ×2 Regions    $3650  first two Regions
   Resolver             ×1 Regions    $1095  additional Regions
   Dx                   ×1            $1642  10Gbps dedicated port (billed from activation or 90 days after the LOA)
@@ -11,6 +11,7 @@ connectivity                        $11801/mo
   RouteServerEndpoint  ×1             $548  route server endpoint
   SiteLinkVif          ×1             $365  SiteLink
   CrFleet              ×5             $350  m5.large reserved capacity (Linux)
+  CheckSource          ×3 AZs         $274  private endpoint health check source per Availability Zone
   NsmPolicy            ×1             $255  Network Security Manager fee, once per account and Region
   EncryptionControl    ×1             $110  VPC Encryption Controls
   FmsWaf               ×1             $100  Firewall Manager policy (resources it deploys are not counted)
@@ -19,11 +20,16 @@ connectivity                        $11801/mo
   WanPeering           ×1              $47  Cloud WAN peering
   WanPeering           ×1              $36  Transit Gateway peering attachment
   LatticeResource      ×1              $73  resource in a service network
+  ProbeA1              ×1 subnet       $73  monitored subnet (probes from the same subnet and monitor share it)
+  ProbeB               ×1 subnet       $73  monitored subnet (probes from the same subnet and monitor share it)
   SwitchPlan           ×1              $70  Region switch plan
+  NfaGwlb              ×1              $36  Transit Gateway attachment (standard attachment rate)
+  NfaGwlb              ×2 AZs          $15  Gateway Load Balancer endpoint per Availability Zone
   IngressOpen          ×1              $50  OPEN ingress endpoint (billed while closed too)
   WanDx                ×1              $47  Cloud WAN attachment
   WanVpc               ×1              $47  Cloud WAN attachment
   PublicBlock          ×8 IPv4         $47  Amazon-provided contiguous IPv4 block (/29)
+  ApiDiscovery         ×1              $40  API discovery minimum per Region (includes 400 APIs; waived with a documentation portal)
   DxTgw                ×1              $36  Transit Gateway Direct Connect attachment
   MskClient            ×3 AZ           $22  MSK-managed interface endpoint
   RefactorApp          ×1              $16  proxy Network Load Balancer
@@ -37,8 +43,12 @@ connectivity                        $11801/mo
   SiteVpn              ×1            $7.30  VPN concentrator site connection
   ClassicAcl           ×1            $5.00  web ACL (WAF Classic)
   ClassicAcl           ×1 rules      $1.00  rules (WAF Classic)
+  PrivateCheck         ×1 features   $1.00  optional features: HTTPS
+  PrivateCheck         ×1            $0.50  HTTPS health check, private endpoint (health check source counted on its own)
   Namespace            ×1            $0.50  hosted zone of the namespace
   Tenant               ×1            $0.01  tenant
+  ProbeA2              ×1            $0.00  same subnet and monitor as another probe; billed once
+  SyntheticMonitor     ×1            $0.00  monitor fee $0; its probes' subnets are counted on each Probe
 
 ? could not estimate: 2
   connectivity  AppInsights  the alarms and metrics it creates depend on the resources it finds

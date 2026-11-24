@@ -110,6 +110,20 @@ func init() {
 			panic(unresolved("the " + t + " plan's monthly fee starts once the subscription is approved; CloudFormation leaves it pending"))
 		}
 	}
+	rules["AWS::APIPortal::Portal"] = func(e *est, p map[string]any) {
+		e.monthly(1, "", "apiportal|APIGateway-APIPortal-DocumentationPortal-Months", "documentation portal (includes 400 APIs)")
+	}
+	rules["AWS::APIPortal::DiscoveryEnablement"] = func(e *est, p map[string]any) {
+		for _, r := range e.st.Resources {
+			if r.Type == "AWS::APIPortal::Portal" {
+				e.add(1, "", 0, "discovery minimum waived: a documentation portal in this template covers 400 discovered APIs")
+				return
+			}
+		}
+		if e.first(nil) {
+			e.monthly(1, "", "apiportal|APIGateway-APIPortal-DiscoveryMinimum-Months", "API discovery minimum per Region (includes 400 APIs; waived with a documentation portal)")
+		}
+	}
 	rules["AWS::SMSVOICE::PhoneNumber"] = smsPhoneNumber
 	rules["AWS::SMSVOICE::Registration"] = func(e *est, p map[string]any) {
 		if t := e.mustStr(p, "RegistrationType"); strings.Contains(t, "CAMPAIGN") {
