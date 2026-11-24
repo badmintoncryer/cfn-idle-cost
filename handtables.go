@@ -38,7 +38,8 @@ func eksUntil() string {
 	return last
 }
 
-// rdsUntil is the newest end of standard support in rdsExtendedSupportDates.
+// rdsUntil is the newest start of Extended Support in rdsExtendedSupportDates:
+// by then RDS has surely released major versions the table does not have.
 func rdsUntil() string {
 	last := ""
 	for _, d := range rdsExtendedSupportDates {
