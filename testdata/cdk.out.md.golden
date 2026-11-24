@@ -1,15 +1,15 @@
-### Idle cost ≈ $151/mo
+### Idle cost ≈ $152/mo
 
-$20 of it rests on assumptions (marked ≈, listed below).
+$21 of it rests on assumptions (marked ≈, listed below).
 
 | Region | Stacks | Idle cost |
 |---|---:|---:|
-| ap-northeast-1 | 2 | $150/mo |
+| ap-northeast-1 | 2 | $151/mo |
 | us-east-1 | 1 | $1.00/mo |
 
 | Stage | Idle cost |
 |---|---:|
-| (app) | $97/mo |
+| (app) | $98/mo |
 | Prod | $54/mo |
 
 <details><summary>Breakdown by resource</summary>
@@ -23,6 +23,7 @@ $20 of it rests on assumptions (marked ≈, listed below).
 | App | `Server` | ×1 | $9.93 | ≈ t3.micro on-demand (Linux assumed) (default of ServerType) |
 | App | `Server` | ×30 GB gp3 | $2.88 | EBS gp3 storage (default of ServerType) |
 | App | `Spare` | ×1 | $9.93 | ≈ t3.micro on-demand (Linux assumed) (default of Env) |
+| App | `Spare` | ×8 GB gp3 | $0.77 | ≈ root volume from the AMI (default of Env) |
 | App | `Table` | ×5 WCU | $2.71 | provisioned write capacity |
 | App | `Table` | ×10 RCU | $1.08 | provisioned read capacity |
 | App | `Vpc/EIP` | ×1 | $3.65 | public IPv4 address |
@@ -43,10 +44,11 @@ $20 of it rests on assumptions (marked ≈, listed below).
 
 - App `Vpc/SsmEndpoint`: -$10/mo, one subnet instead of 2, for development stacks: clients in the other AZs then cross AZs and lose the endpoint if its AZ fails (now interface endpoint)
 
-<details><summary>≈ Assumptions (2, in the total)</summary>
+<details><summary>≈ Assumptions (3, in the total)</summary>
 
 - App `Server`: Linux assumed: ImageId doesn't say the OS. Set it: --os Server=windows (or Metadata cfn-idle-cost: {os: windows})
 - App `Spare`: Linux assumed: ImageId doesn't say the OS. Set it: --os Spare=windows (or Metadata cfn-idle-cost: {os: windows})
+- App `Spare`: 8 GB gp3 root volume per instance, the Amazon Linux default (the AMI's size is not in the template). Set it: VolumeSize and VolumeType of the root device (/dev/xvda or /dev/sda1) in BlockDeviceMappings
 
 </details>
 

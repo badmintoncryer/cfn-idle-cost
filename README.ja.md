@@ -277,7 +277,7 @@ jobs:
 | `AWS::SecretsManager::Secret` | シークレットとレプリカごとの料金 |
 | `AWS::Route53::HostedZone` | ホストゾーンごとの料金 |
 | `AWS::EKS::Cluster` | クラスターの時間料金。`Version`が価格の基準日（同梱のスナップショットの日付、`--live`なら当日）に標準サポートを過ぎていれば、延長サポートの料金も加えます |
-| `AWS::EKS::Nodegroup` | インスタンスの時間料金×`DesiredSize`（なければ`MinSize`）。オンデマンドで、インスタンスタイプが1つの場合。WindowsのAMIタイプは、ライセンス込みのWindowsの料金で見積もる |
+| `AWS::EKS::Nodegroup` | インスタンスの時間料金×`DesiredSize`（なければ`MinSize`）。オンデマンドで、インスタンスタイプが1つの場合。WindowsのAMIタイプは、ライセンス込みのWindowsの料金で見積もる。ノードのボリュームは`DiskSize`（既定20 GB、Windowsは50 GB）をgp3として数え、EKSがボリュームタイプを公開していないので`≈`を付ける。起動テンプレートを使うときは、その`BlockDeviceMappings`とAMIのルートボリューム（20 GB、`≈`）を数える |
 | `AWS::NetworkFirewall::Firewall` | エンドポイントの時間料金×サブネット数。同じテンプレートにあるファイアウォールポリシーがTLSインスペクションの設定を持つときは、Advanced Inspectionの時間料金×サブネット数も加える |
 | `AWS::WAFv2::WebACL` | Web ACLとルール。同じテンプレートのルールグループを参照していれば、そのグループのルールも数える（マネージドルールグループの追加料金は含みません） |
 | `AWS::CloudWatch::Alarm`、`CompositeAlarm` | アラームのメトリクスごとの料金（標準解像度・高解像度。異常検出のバンドは2つ分を加えます）、複合アラームごとの料金 |
@@ -469,7 +469,8 @@ jobs:
   ≈ assumptions: 1 (in the total; set them to firm it up)
     app  Batch, Worker  Linux assumed: ImageId ami-0abc12 doesn't say the OS. +$134/mo if Windows. Set it: --os ami-0abc12=windows (or Metadata cfn-idle-cost: {os: windows})
   ```
-- EC2インスタンス、Auto Scalingグループ、ウォームプール、フリートのOSは、`ImageId`の公開SSMパラメータのパスから読みます。CDKの`MachineImage.latestWindows()`や`latestAmazonLinux2023()`などはこのパスを書き出します。`/aws/service/ami-windows-latest/...`はライセンス込みのWindows、Amazon Linux、Ubuntu、Debian、Bottlerocket、ECS・EKS最適化AMIはLinuxです。SQL ServerのAMIはWindows、SUSEのAMIはLinuxの料金で見積もり、SQL ServerのライセンスとSUSEのサブスクリプションは数えないので`≈`を付けます。リテラルのAMI IDなどほかのイメージはLinuxとみなして`≈`を付けます。OSは`--os ami-0abc12=windows`か、リソースのMetadataで指定できます。CDKでは`(instance.node.defaultChild as cdk.CfnResource).addMetadata('cfn-idle-cost', { os: 'windows' })`です。テナンシーは共有です。AMIから決まるルートボリューム（`BlockDeviceMappings`に`VolumeSize`がないもの）は数えません。
+- EC2インスタンス、Auto Scalingグループ、ウォームプール、フリートのOSは、`ImageId`の公開SSMパラメータのパスから読みます。CDKの`MachineImage.latestWindows()`や`latestAmazonLinux2023()`などはこのパスを書き出します。`/aws/service/ami-windows-latest/...`はライセンス込みのWindows、Amazon Linux、Ubuntu、Debian、Bottlerocket、ECS・EKS最適化AMIはLinuxです。SQL ServerのAMIはWindows、SUSEのAMIはLinuxの料金で見積もり、SQL ServerのライセンスとSUSEのサブスクリプションは数えないので`≈`を付けます。リテラルのAMI IDなどほかのイメージはLinuxとみなして`≈`を付けます。OSは`--os ami-0abc12=windows`か、リソースのMetadataで指定できます。CDKでは`(instance.node.defaultChild as cdk.CfnResource).addMetadata('cfn-idle-cost', { os: 'windows' })`です。テナンシーは共有です。
+- サイズがAMIから決まるルートボリューム（`/dev/xvda`か`/dev/sda1`のマッピングに`VolumeSize`がないもの）は、一般的なAMIのサイズ（8 GB、Windowsは30 GB）で数えます。マッピングに`VolumeType`がなければgp3とし、`≈`を付けます。ルートデバイスの`VolumeSize`を書けば確定します。
 - インスタンス、Auto Scalingグループ、Fargateのタスクに起動時に割り当てられるパブリックIPv4は、`AssociatePublicIpAddress`（Fargateは`AssignPublicIp`）で割り当てると指定しているときに数えます。指定がなければ、すべてのサブネットが同じテンプレートにあり、`MapPublicIpOnLaunch`がtrueのときに数えます。サブネットが別のスタックなどにあって決まらないときは、IPの行を出さず、リソースのほかの費用だけを見積もります。同じテンプレートでElastic IPを関連付けたインスタンスは、IPを二重に数えません。
 - Lambda Managed Instancesのキャパシティプロバイダは、関数が最低限必要とするインスタンス数で見積もります。関数ごとの実行環境は`MinExecutionEnvironments`（既定は3）個で、1つあたりのメモリは`MemorySize`、vCPUは`MemorySize`÷`ExecutionEnvironmentMemoryGiBPerVCpu`（既定はvCPUあたり2GiB）です。この実行環境をインスタンスタイプに詰め込んだ台数と、実行環境の数（上限3、AZごとに1台）の大きいほうを使います。トラフィックが倍になっても耐えられるようにLambdaが確保する余裕は数えないので、実際の費用はもっと高くなることがあります。どの関数も使っていないプロバイダは3台で見積もります。関数は同じリージョンのすべての入力スタックから探します。プロバイダを指す方法は`Ref`か`Fn::GetAtt`、エクスポートを読む`Fn::ImportValue`（CDKのstrong参照）、`Fn::GetStackOutput`（CDKのweak参照）、ARNのどれでもかまいません。`AWS::Lambda::Version`の`FunctionScalingConfig`は読みません。関数のインスタンスはキャパシティプロバイダの側で課金されるため、プロバイダがどの入力にもない関数（別のアプリのARNを指すものなど）は`? could not estimate`に載ります。
 - CloudWatchダッシュボードはPrice Listにないので、公開価格の$3を組み込んでいます。`--live`でもこの値を使います。

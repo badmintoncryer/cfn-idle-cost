@@ -52,10 +52,7 @@ func (e *est) imageOS(img any) (os string, note string, a *Assumption) {
 		switch {
 		case strings.Contains(l, "windows"):
 			if strings.Contains(l, "sql_") {
-				return "windows", "", &Assumption{
-					What:     "SQL Server license not counted: the Windows price of " + path,
-					Override: "none yet; add the SQL Server license-included rate by hand",
-				}
+				return "windows", "", &Assumption{What: "SQL Server license not counted: the Windows price of " + path}
 			}
 			return "windows", "", nil
 		case strings.HasPrefix(l, "/aws/service/suse/"):
@@ -140,4 +137,58 @@ func (e *est) instances(n float64, t string, img any, what string) (linux bool) 
 	defer func() { e.assuming = nil }()
 	e.hourly(n, "", key+t, fmt.Sprintf("%s on-demand (%s)%s", t, label, what))
 	return os == "linux"
+}
+
+// rootDevices are the root device names of Linux and Windows AMIs.
+var rootDevices = []string{"/dev/xvda", "/dev/sda1"}
+
+// rootVolume bills the root volumes of n instances when their size comes from
+// the AMI: no mapping for the root device with a VolumeSize. The AMI's size is
+// not in the template, so the line is marked as an assumption: 8 GB (the
+// Amazon Linux default) or 30 GB for Windows, gp3 unless the mapping says.
+func (e *est) rootVolume(bdm any, img any, n float64) {
+	size, why := 8.0, "the Amazon Linux default"
+	if os, _, _ := e.imageOS(img); os == "windows" {
+		size, why = 30, "the Windows Server default"
+	}
+	e.rootVolumeOf(bdm, n, size, why)
+}
+
+// rootVolumeOf is rootVolume with the AMI's root volume size given.
+func (e *est) rootVolumeOf(bdm any, n, size float64, why string) {
+	if n <= 0 {
+		return
+	}
+	t := ""
+	if l, ok := bdm.([]any); ok {
+		for _, d := range l {
+			d := asMap(d)
+			if !in(e.str(d, "DeviceName", ""), rootDevices...) {
+				continue
+			}
+			ebs := asMap(d["Ebs"])
+			if ebs == nil || ebs["VolumeSize"] != nil {
+				return // counted with the other volumes, or instance store
+			}
+			t = e.str(ebs, "VolumeType", "")
+		}
+	}
+	what := fmt.Sprintf("%g GB root volume per instance, %s", size, why)
+	if t == "" {
+		t = "gp3"
+		what = fmt.Sprintf("%g GB gp3 root volume per instance, %s", size, why)
+	}
+	usage := map[string]string{"gp2": "gp2", "gp3": "gp3", "io1": "piops", "io2": "io2", "st1": "st1", "sc1": "sc1", "standard": ""}
+	u, ok := usage[t]
+	if !ok {
+		panic(unresolved("EBS volume type " + t + " is not supported"))
+	}
+	key := "ebs|EBS:VolumeUsage"
+	if u != "" {
+		key += "." + u
+	}
+	e.assuming = &Assumption{What: what + " (the AMI's size is not in the template)",
+		Override: "VolumeSize and VolumeType of the root device (" + rootDevices[0] + " or " + rootDevices[1] + ") in BlockDeviceMappings"}
+	defer func() { e.assuming = nil }()
+	e.monthly(size*n, "GB "+t, key, "root volume from the AMI")
 }

@@ -109,6 +109,38 @@
             {
               "logicalLocations": [
                 {
+                  "fullyQualifiedName": "App/Spare",
+                  "kind": "resource",
+                  "name": "Spare"
+                }
+              ],
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "testdata/cdk.out/App.template.json"
+                },
+                "region": {
+                  "startLine": 23
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Spare (AWS::EC2::Instance) idles at ≈ $11/mo in ap-northeast-1: $9.93 t3.micro on-demand (Linux assumed) (default of Env) (×1); $0.77 root volume from the AMI (default of Env) (×8 GB gp3)"
+          },
+          "partialFingerprints": {
+            "resource/v1": "ap-northeast-1/App/Spare"
+          },
+          "properties": {
+            "monthlyUSD": 10.7
+          },
+          "ruleId": "idle-cost"
+        },
+        {
+          "level": "warning",
+          "locations": [
+            {
+              "logicalLocations": [
+                {
                   "fullyQualifiedName": "Prod-Edge/Stream",
                   "kind": "resource",
                   "name": "Stream"
@@ -219,6 +251,35 @@
           ],
           "message": {
             "text": "Spare (AWS::EC2::Instance): Linux assumed: ImageId doesn't say the OS. Set it: --os Spare=windows (or Metadata cfn-idle-cost: {os: windows})"
+          },
+          "partialFingerprints": {
+            "resource/v1": "ap-northeast-1/App/Spare"
+          },
+          "ruleId": "assumption"
+        },
+        {
+          "level": "note",
+          "locations": [
+            {
+              "logicalLocations": [
+                {
+                  "fullyQualifiedName": "App/Spare",
+                  "kind": "resource",
+                  "name": "Spare"
+                }
+              ],
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "testdata/cdk.out/App.template.json"
+                },
+                "region": {
+                  "startLine": 23
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Spare (AWS::EC2::Instance): 8 GB gp3 root volume per instance, the Amazon Linux default (the AMI's size is not in the template). Set it: VolumeSize and VolumeType of the root device (/dev/xvda or /dev/sda1) in BlockDeviceMappings"
           },
           "partialFingerprints": {
             "resource/v1": "ap-northeast-1/App/Spare"

@@ -1,6 +1,6 @@
-eu-west-1 · 1 stack · idle ≈ $4591/mo · $33 of it on assumptions
+eu-west-1 · 1 stack · idle ≈ $4595/mo · $38 of it on assumptions
 
-more                             $4591/mo
+more                             $4595/mo
   Broker         ×1               $661  mq.m5.large RabbitMQ Multi-AZ
   Firewall       ×2 endpoints     $577  firewall endpoint per AZ
   Kafka          ×3 brokers       $495  kafka.m5.large brokers
@@ -24,10 +24,12 @@ more                             $4591/mo
   Vpn            ×1                $36  Transit Gateway VPN attachment
   DocsInstance   ×1                $71  db.t4g.medium instance, I/O-Optimized
   Nodes          ×2                $67  t3.medium on-demand (Linux), DesiredSize
+  Nodes          ×40 GB gp3      $3.52  ≈ node volume (DiskSize 20 GB)
   Proxy          ×2 vCPU           $22  per vCPU of the target instances
   Proxy          ×2 ACU            $22  per ACU of the Serverless v2 targets (minimum)
   Attach         ×1                $36  Transit Gateway VPC attachment
   RegionBox      ×1                $33  ≈ t3.medium on-demand (Linux assumed)
+  RegionBox      ×8 GB gp3       $0.70  ≈ root volume from the AMI
   SmallDb        ×1                $26  db.t2.small mysql Single-AZ
   SmallDb        ×20 GB gp3      $2.54  storage
   SmallProxy     ×2 vCPU           $22  per vCPU of the target instances
@@ -41,8 +43,10 @@ more                             $4591/mo
   Logs2          ×1              $0.00  shares the OCUs of Logs
   Series         ×1              $0.00  shares the OCUs of Logs
 
-≈ assumptions: 1 (in the total; set them to firm it up)
+≈ assumptions: 3 (in the total; set them to firm it up)
+  more  Nodes  gp3 node volumes (EKS doesn't document the type of DiskSize volumes). Set it: use a launch template whose BlockDeviceMappings set VolumeType
   more  RegionBox  Linux assumed: ImageId doesn't say the OS. Set it: --os RegionBox=windows (or Metadata cfn-idle-cost: {os: windows})
+  more  RegionBox  8 GB gp3 root volume per instance, the Amazon Linux default (the AMI's size is not in the template). Set it: VolumeSize and VolumeType of the root device (/dev/xvda or /dev/sda1) in BlockDeviceMappings
 
 ? could not estimate: 1
   more  EdgeBox  Local Zone eu-west-1-lhr-1a prices are not supported yet

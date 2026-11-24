@@ -1,6 +1,6 @@
 idle cost of the same stacks in each region
 
-  ap-northeast-1  $151/mo  (1 could not estimate)
+  ap-northeast-1  $152/mo  (1 could not estimate)
   us-east-1        $83/mo  -$68 (-45%)  (3 could not estimate)
 
 largest differences ($/mo; ? = could not estimate there)
@@ -10,7 +10,7 @@ largest differences ($/mo; ? = could not estimate there)
   Prod-Edge  Stream                      $28        $22
   App        Vpc/SsmEndpoint             $20        $15
   App        Server                      $13      $9.99
-  App        Spare                     $9.93      $7.59
+  App        Spare                       $11      $8.23
   Prod-Edge  LoadBalancer                $25        $24
 
 prices: test prices · on-demand list prices, 730 h/mo, USD, free tier ignored
@@ -19,7 +19,7 @@ prices: test prices · on-demand list prices, 730 h/mo, USD, free tier ignored
 
 | Region | Idle cost | vs ap-northeast-1 | Could not estimate |
 |---|---:|---:|---:|
-| ap-northeast-1 | $151/mo |  | 1 |
+| ap-northeast-1 | $152/mo |  | 1 |
 | us-east-1 | $83/mo | -$68 (-45%) | 3 |
 
 <details><summary>Largest differences</summary>
@@ -31,7 +31,7 @@ prices: test prices · on-demand list prices, 730 h/mo, USD, free tier ignored
 | Prod-Edge | `Stream` | $28 | $22 |
 | App | `Vpc/SsmEndpoint` | $20 | $15 |
 | App | `Server` | $13 | $9.99 |
-| App | `Spare` | $9.93 | $7.59 |
+| App | `Spare` | $11 | $8.23 |
 | Prod-Edge | `LoadBalancer` | $25 | $24 |
 
 </details>

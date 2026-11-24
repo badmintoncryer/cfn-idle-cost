@@ -10,7 +10,7 @@ import (
 )
 
 var osPrices = &Prices{Source: "test prices", AsOf: "2026-11-24", Regions: map[string]map[string]float64{
-	"us-east-1": {"ec2|m5.large": 0.096, "ec2win|m5.large": 0.188},
+	"us-east-1": {"ec2|m5.large": 0.096, "ec2win|m5.large": 0.188, "ebs|EBS:VolumeUsage.gp3": 0.08},
 }}
 
 const osTemplate = `Parameters:
@@ -55,7 +55,9 @@ func osStacks(t *testing.T) []*Stack {
 func TestImageOS(t *testing.T) {
 	got := map[string]Item{}
 	for _, it := range Estimate(osStacks(t), osPrices) {
-		got[it.LogicalID] = it
+		if strings.HasPrefix(it.Reason, "m5.large") {
+			got[it.LogicalID] = it
+		}
 	}
 	win, lin := 0.188*730, 0.096*730
 	for id, want := range map[string]struct {
@@ -84,9 +86,10 @@ func TestImageOS(t *testing.T) {
 	rep := NewReport(osStacks(t), Estimate(osStacks(t), osPrices), osPrices)
 	rep.WriteText(&b)
 	for _, want := range []string{
-		"· $277 of it on assumptions\n", // Sql $137 + Literal $70 + Literal2 $70
+		"· $289 of it on assumptions\n", // Sql $137 + Literal $70 + Literal2 $70 + root volumes $12
 		"≈ m5.large on-demand (Linux assumed)",
-		"≈ assumptions: 2 ",
+		"≈ assumptions: 4 ",
+		"os  Resolved, Sql, Tagged, Win  30 GB gp3 root volume per instance, the Windows Server default",
 		"os  Literal, Literal2  Linux assumed: ImageId ami-0abc doesn't say the OS. +$134/mo if Windows. Set it: --os ami-0abc=windows",
 		"os  Sql  SQL Server license not counted",
 	} {
