@@ -589,6 +589,9 @@ var selectors = []selector{
 			}
 			return ""
 		}},
+	// Network Synthetic Monitor, per monitored subnet-hour.
+	{name: "cwnm", service: "AmazonCloudWatch", families: []string{"CloudWatch Network Monitor"},
+		key: func(a map[string]string, u string) string { return keep(u, "CWNMHybrid-Paid") }},
 	// Internet Monitor has no productFamily.
 	// Network Synthetic Monitor, per monitored subnet-hour.
 	{name: "cwnm", service: "AmazonCloudWatch", families: []string{"CloudWatch Network Monitor"},
