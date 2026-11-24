@@ -7,6 +7,9 @@ import (
 
 var computePrices = &Prices{Source: "test prices", AsOf: "2026-10-20", Regions: map[string]map[string]float64{
 	"us-east-1": {
+		"fsx|FileCache|Storage.1000": 1.33, "fsx|Lustre|ThroughputCapacity.P2": 0.52, "fsx|Lustre|Storage.P2:INT_SSDCache": 0.09,
+		"elasticache|CachedData:Valkey": 0.084, "elasticache|ElastiCacheProcessingUnits:Valkey": 0.0000000023,
+		"es|r7g.large.search": 0.167, "es|m7g.large.search": 0.136,
 		"rds|Aurora:IO-OptimizedLimitlessACUUsage-Limitless|21": 0.16, "rds|InstanceUsage:db.r6g.large|21": 0.26,
 		"rds|InstanceUsage:db.t4g.micro|14": 0.016, "rds|InstanceUsage:db.t4g.small|14": 0.032, "rds|RDS:GP3-Storage|14": 0.115,
 		"ec2|t3.micro": 0.0104, "ebs|EBS:VolumeUsage.gp3": 0.08, "ec2|c5.large": 0.085,

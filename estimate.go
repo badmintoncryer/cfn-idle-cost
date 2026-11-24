@@ -612,6 +612,10 @@ func init() {
 				min = v
 			}
 			e.hourly(min, "GB", "elasticache|CachedData:"+engine, "Serverless minimum data storage")
+			// A minimum ECPU rate is billed whether or not requests use it.
+			if ecpu := e.num(asMap(asMap(p["CacheUsageLimits"])["ECPUPerSecond"]), "Minimum", 0); ecpu > 0 {
+				e.add(ecpu, "ECPU/s", ecpu*3600*hoursPerMonth*e.price("elasticache|ElastiCacheProcessingUnits:"+engine), "Serverless minimum ECPUs per second")
+			}
 		},
 		"AWS::DynamoDB::Table": func(e *est, p map[string]any) {
 			if e.str(p, "BillingMode", "PROVISIONED") != "PROVISIONED" {
@@ -994,6 +998,14 @@ func (e *est) searchDomain(cc map[string]any, ccName string, p map[string]any) {
 		m := norm(e.mustStr(cc, "DedicatedMasterType"))
 		e.hourly(e.mustNum(cc, "DedicatedMasterCount"), "", "es|"+m, m+" dedicated master nodes")
 	}
+	nodeOptions, _ := cc["NodeOptions"].([]any)
+	for _, o := range nodeOptions {
+		o := asMap(o)
+		if c := asMap(o["NodeConfig"]); e.flag(c, "Enabled") {
+			t := norm(e.mustStr(c, "Type"))
+			e.hourly(e.mustNum(c, "Count"), "", "es|"+t, t+" "+e.str(o, "NodeType", "")+" nodes")
+		}
+	}
 	if e.flag(cc, "WarmEnabled") {
 		w := norm(e.mustStr(cc, "WarmType"))
 		e.hourly(e.mustNum(cc, "WarmCount"), "", "es|"+w, w+" UltraWarm nodes")
@@ -1047,8 +1059,12 @@ func (e *est) cacheNodes(engine, nodeType string, n float64) {
 
 func fsx(e *est, p map[string]any) {
 	t := e.mustStr(p, "FileSystemType")
-	size := e.mustNum(p, "StorageCapacity")
 	storageType := e.str(p, "StorageType", "SSD")
+	if t == "LUSTRE" && storageType == "INTELLIGENT_TIERING" {
+		lustreTiering(e, asMap(p["LustreConfiguration"]))
+		return
+	}
+	size := e.mustNum(p, "StorageCapacity")
 	switch t {
 	case "WINDOWS":
 		c := asMap(p["WindowsConfiguration"])
@@ -1102,6 +1118,20 @@ func fsx(e *est, p map[string]any) {
 		e.userIOPS(asMap(c["DiskIopsConfiguration"]), size, "fsx|ONTAP|ProvisionedSSDIOPS."+sfx)
 	default:
 		panic(unresolved("FSx for " + t + " is not supported yet"))
+	}
+}
+
+// lustreTiering bills an Intelligent-Tiering Lustre file system: its throughput
+// capacity and its provisioned SSD read cache. Its storage is pay per use.
+func lustreTiering(e *est, c map[string]any) {
+	e.monthly(e.mustNum(c, "ThroughputCapacity"), "MB/s", "fsx|Lustre|ThroughputCapacity.P2", "Intelligent-Tiering throughput capacity (storage and metadata IOPS not counted)")
+	rc := asMap(c["DataReadCacheConfiguration"])
+	switch m := e.str(rc, "SizingMode", "NO_CACHE"); m {
+	case "NO_CACHE":
+	case "USER_PROVISIONED":
+		e.monthly(e.mustNum(rc, "SizeGiB"), "GB", "fsx|Lustre|Storage.P2:INT_SSDCache", "SSD read cache")
+	default:
+		panic(unresolved("DataReadCacheConfiguration SizingMode " + m + ": the cache size FSx picks is not in the template"))
 	}
 }
 
@@ -1411,7 +1441,11 @@ func init() {
 				e.hourly(1, "", "vpc|VPN-concentrator-site-Usage-Hours:ipsec.1", "VPN concentrator site connection")
 				return
 			}
-			e.hourly(1, "", "vpc|VPN-Usage-Hours:ipsec.1", "Site-to-Site VPN connection")
+			if e.str(p, "TunnelBandwidth", "standard") == "large" {
+				e.hourly(1, "", "vpc|VPN-large-Usage-Hours:ipsec.1", "Site-to-Site VPN connection with large (5 Gbps) tunnels")
+			} else {
+				e.hourly(1, "", "vpc|VPN-Usage-Hours:ipsec.1", "Site-to-Site VPN connection")
+			}
 			if _, ok := p["TransitGatewayId"]; ok {
 				e.hourly(1, "", "tgw|TransitGatewayVPN", "Transit Gateway VPN attachment")
 			}

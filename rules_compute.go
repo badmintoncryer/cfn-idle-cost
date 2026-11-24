@@ -22,12 +22,7 @@ func init() {
 		e.hourly(1, "", "eks|AmazonEKSCapabilities-"+x+"-Hours:perCapability", x+" capability (managed resources not counted)")
 	}
 	rules["AWS::FSx::FileCache"] = func(e *est, p map[string]any) {
-		// ponytail: File Cache is not in the Price List; update by hand if the $1.33/GB-month us-east-1 list price changes.
-		if e.st.Region != "us-east-1" {
-			panic(unresolved("File Cache prices are not in the Price List; only us-east-1's is known"))
-		}
-		size := e.mustNum(p, "StorageCapacity")
-		e.add(size, "GB", size*1.33, "cache storage ($1.33/GB-month list price, not in the Price List)")
+		e.monthly(e.mustNum(p, "StorageCapacity"), "GB", "fsx|FileCache|Storage.1000", "cache storage (1000 MB/s per TiB)")
 	}
 	rules["AWS::Transfer::WebApp"] = func(e *est, p map[string]any) {
 		e.hourly(e.num(asMap(p["WebAppUnits"]), "Provisioned", 1), "units", "transfer|WebAppHours", "web app units")

@@ -137,7 +137,7 @@ var selectors = []selector{
 		}},
 	{name: "vpc", service: "AmazonVPC",
 		key: func(a map[string]string, u string) string {
-			return keep(u, "PublicIPv4:InUseAddress", "VpcEndpoint-Hours", "VpcEndpoint-GWLBE-Hours", "VPN-Usage-Hours:ipsec.1", "ClientVPN-EndpointHours", "VPCLattice-Service-Hourly",
+			return keep(u, "PublicIPv4:InUseAddress", "VpcEndpoint-Hours", "VpcEndpoint-GWLBE-Hours", "VPN-Usage-Hours:ipsec.1", "VPN-large-Usage-Hours:ipsec.1", "ClientVPN-EndpointHours", "VPCLattice-Service-Hourly",
 				"VerifiedAccess-App-Hours", "VerifiedAccess-non-HTTP-App-Hours", "VPCEncryptionControls-hours",
 				"ENI-Mirror", "RouteServer-EndpointHours", "VPN-concentrator-Usage-Hours:ipsec.1", "VPN-concentrator-site-Usage-Hours:ipsec.1",
 				"PublicIPv4:ContiguousBlock", "VpcEndpoint-Resource-Hours", "VpcLattice-Service-Network-Resource-Hours")
@@ -211,13 +211,13 @@ var selectors = []selector{
 			switch {
 			case strings.HasPrefix(u, "NodeUsage:"):
 				return a["cacheEngine"] + "|" + a["instanceType"]
-			case strings.HasPrefix(u, "CachedData:"):
+			case strings.HasPrefix(u, "CachedData:"), strings.HasPrefix(u, "ElastiCacheProcessingUnits:"):
 				return u
 			}
 			return ""
 		},
 		liveFilter: func(d string) map[string]string {
-			if strings.HasPrefix(d, "CachedData:") {
+			if strings.HasPrefix(d, "CachedData:") || strings.HasPrefix(d, "ElastiCacheProcessingUnits:") {
 				return map[string]string{"productFamily": "ElastiCache Serverless"}
 			}
 			_, t, _ := strings.Cut(d, "|")
@@ -238,6 +238,9 @@ var selectors = []selector{
 		key: func(a map[string]string, u string) string { return keep(u, "AWSSecretsManager-Secrets") }},
 	{name: "fsx", service: "AmazonFSx", families: []string{"Storage", "Provisioned Throughput", "Provisioned IOPS"},
 		key: func(a map[string]string, u string) string {
+			if a["fileCacheType"] != "" && strings.HasPrefix(u, "Storage") {
+				return "FileCache|" + u
+			}
 			if strings.HasPrefix(u, "Storage") || strings.HasPrefix(u, "ThroughputCapacity") || strings.HasPrefix(u, "ProvisionedSSDIOPS") {
 				return a["fileSystemType"] + "|" + u // the same usagetype appears under several file system types
 			}
@@ -290,7 +293,9 @@ var selectors = []selector{
 			return keep(u, "Endpoint-Hour", "Secondary-Endpoint-Hour", "Advanced-Inspection-Endpoint-Hour")
 		}},
 	{name: "waf", service: "awswaf", families: []string{"Web Application Firewall"},
-		key: func(a map[string]string, u string) string { return keep(u, "WebACLV2", "RuleV2", "WebACL", "Rule") }},
+		key: func(a map[string]string, u string) string {
+			return keep(u, "WebACLV2", "RuleV2", "WebACL", "Rule", "AMR-BotControl", "AMR-ATP", "AMR-AntiDDoS")
+		}},
 	{name: "cw", service: "AmazonCloudWatch", families: []string{"Alarm", "Canaries", "Contributor Insights", "Metric"},
 		key: func(a map[string]string, u string) string {
 			return keep(u, "CW:AlarmMonitorUsage", "CW:HighResAlarmMonitorUsage", "CW:CompositeAlarmMonitorUsage", "CW:Canary-runs", "CW:ContributorInsightRules", "CW:MetricMonitorUsage")

@@ -156,12 +156,31 @@ func networkFirewall(e *est, p map[string]any) {
 	}
 }
 
-// webACL bills the web ACL, its rules, and the rules of the rule groups (in
-// this template) it references.
+// wafPaidRuleGroups maps the AWS managed rule groups with a monthly fee per web
+// ACL to the name of that fee in the Price List.
+// ponytail: Account Creation Fraud Prevention (AWSManagedRulesACFPRuleSet) has
+// a $10 monthly fee too, but no monthly row in the Price List.
+var wafPaidRuleGroups = map[string][2]string{
+	"AWSManagedRulesBotControlRuleSet": {"BotControl", "Bot Control"}, "AWSManagedRulesATPRuleSet": {"ATP", "Account Takeover Prevention"},
+	"AWSManagedRulesAntiDDoSRuleSet": {"AntiDDoS", "Anti-DDoS"},
+}
+
+// webACL bills the web ACL, its rules, the monthly fee of the paid AWS
+// managed rule groups it uses, and the rules of the rule groups (in this
+// template) it references.
 func webACL(e *est, p map[string]any) {
 	e.monthly(1, "", "waf|WebACLV2", "web ACL")
-	e.monthly(float64(max(0, e.length(p, "Rules"))), "rules", "waf|RuleV2", "rules (managed rule group fees not counted)")
+	e.monthly(float64(max(0, e.length(p, "Rules"))), "rules", "waf|RuleV2", "rules")
 	l, _ := p["Rules"].([]any)
+	for _, r := range l {
+		mg := asMap(asMap(asMap(r)["Statement"])["ManagedRuleGroupStatement"])
+		if e.str(mg, "VendorName", "") != "AWS" {
+			continue
+		}
+		if fee, ok := wafPaidRuleGroups[e.str(mg, "Name", "")]; ok {
+			e.monthly(1, "", "waf|AMR-"+fee[0], fee[1]+" managed rule group fee (requests not counted)")
+		}
+	}
 	for _, r := range l {
 		arn := asMap(asMap(asMap(r)["Statement"])["RuleGroupReferenceStatement"])["Arn"]
 		g, ok := e.st.Resources[refID(arn)]
