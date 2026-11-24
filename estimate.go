@@ -571,6 +571,7 @@ func init() {
 				e.suggestGraviton(t, 1, ec2Key, armCaveat)
 			}
 			e.blockDevices(bdm, 1)
+			e.rootVolume(bdm, img, 1)
 			nic := firstMap(nics)
 			subnet := p["SubnetId"]
 			if subnet == nil {
@@ -594,6 +595,7 @@ func init() {
 				e.suggestGraviton(t, od, ec2Key, armCaveat)
 			}
 			e.blockDevices(bdm, n)
+			e.rootVolume(bdm, img, n)
 			subnets, _ := p["VPCZoneIdentifier"].([]any)
 			if e.autoPublicIP(assoc, subnets) {
 				e.hourly(n, "IPv4", "vpc|PublicIPv4:InUseAddress", "public IPv4 assigned at launch, "+why)
@@ -1548,10 +1550,14 @@ func init() {
 				n, why = e.mustNum(sc, "MinSize"), "MinSize"
 			}
 			var t string
+			var data map[string]any // the launch template's
+			if lt, ok := p["LaunchTemplate"]; ok {
+				data = e.launchTemplate(asMap(lt))
+			}
 			if l, ok := p["InstanceTypes"].([]any); ok && len(l) == 1 {
 				t = e.str(map[string]any{"InstanceTypes": l[0]}, "InstanceTypes", "")
-			} else if lt, ok := p["LaunchTemplate"]; ok && p["InstanceTypes"] == nil {
-				t = e.mustStr(e.launchTemplate(asMap(lt)), "InstanceType")
+			} else if data != nil && p["InstanceTypes"] == nil {
+				t = e.mustStr(data, "InstanceType")
 			} else {
 				panic(unresolved("InstanceTypes must name exactly one type"))
 			}
@@ -1559,6 +1565,22 @@ func init() {
 			if key == "ec2|" {
 				e.suggestGraviton(t, n, ec2Key, armCaveat)
 			}
+			size := 20.0 // the EKS AMIs' root volume, and DiskSize's default
+			if key == "ec2win|" {
+				size = 50
+			}
+			if data != nil {
+				e.blockDevices(data["BlockDeviceMappings"], n)
+				e.rootVolumeOf(data["BlockDeviceMappings"], n, size, "the EKS AMI default")
+				return
+			}
+			if p["DiskSize"] != nil {
+				size = e.num(p, "DiskSize", size)
+			}
+			e.assuming = &Assumption{What: "gp3 node volumes (EKS doesn't document the type of DiskSize volumes)",
+				Override: "use a launch template whose BlockDeviceMappings set VolumeType"}
+			e.monthly(size*n, "GB gp3", "ebs|EBS:VolumeUsage.gp3", fmt.Sprintf("node volume (DiskSize %g GB)", size))
+			e.assuming = nil
 		},
 		"AWS::NetworkFirewall::Firewall": networkFirewall,
 		"AWS::WAFv2::WebACL":             webACL,
@@ -2394,6 +2416,7 @@ func (e *est) fleet(od, spot float64, launches []fleetLaunch) {
 	}
 	e.instances(n, l.typ, l.img, ", "+why)
 	e.blockDevices(l.bdm, n)
+	e.rootVolume(l.bdm, l.img, n)
 }
 
 // healthCheck bills a Route 53 health check and its optional features. An

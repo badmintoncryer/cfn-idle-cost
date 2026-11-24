@@ -1,6 +1,6 @@
-us-east-1 · 1 stack · idle ≈ $2081/mo · $46 of it on assumptions
+us-east-1 · 1 stack · idle ≈ $2082/mo · $46 of it on assumptions
 
-rules4                        $2081/mo
+rules4                        $2082/mo
   Wan            ×3 edges     $1095  core network edge per location
   Studio         ×6 KPU        $482  Studio notebook: 4 KPU + 2 for orchestration and the notebook, while running
   Studio         ×250 GB        $25  running application storage, 50 GB per KPU
@@ -13,16 +13,18 @@ rules4                        $2081/mo
   Fleet          ×2             $15  ≈ t3.micro on-demand (Linux assumed), on-demand capacity (2 Spot not counted)
   Fleet          ×40 GB gp3   $3.20  EBS gp3 storage
   SpotMixed      ×1           $7.59  ≈ t3.micro on-demand (Linux assumed), on-demand capacity (4 Spot not counted)
+  SpotMixed      ×8 GB gp3    $0.64  ≈ root volume from the AMI
   CheckIp        ×4 features  $4.00  optional features: HTTPS, string matching, fast interval, latency measurement
   CheckIp        ×1           $0.50  HTTPS_STR_MATCH health check, AWS endpoint (first 50 are free)
   Ip             ×1           $3.65  public IPv4 address
   CheckOutside   ×1           $0.75  HTTP health check, non-AWS endpoint (not in this template)
   CheckCalc      ×1           $0.50  CALCULATED health check (first 50 AWS-endpoint checks are free)
 
-≈ assumptions: 3 (in the total; set them to firm it up)
+≈ assumptions: 4 (in the total; set them to firm it up)
   rules4  FleetOnDemand  Linux assumed: ImageId doesn't say the OS. Set it: --os FleetOnDemand=windows (or Metadata cfn-idle-cost: {os: windows})
   rules4  Fleet  Linux assumed: ImageId doesn't say the OS. Set it: --os Fleet=windows (or Metadata cfn-idle-cost: {os: windows})
   rules4  SpotMixed  Linux assumed: ImageId ami doesn't say the OS. Set it: --os ami=windows (or Metadata cfn-idle-cost: {os: windows})
+  rules4  SpotMixed  8 GB gp3 root volume per instance, the Amazon Linux default (the AMI's size is not in the template). Set it: VolumeSize and VolumeType of the root device (/dev/xvda or /dev/sda1) in BlockDeviceMappings
 
 ? could not estimate: 5
   rules4  FleetTypes  the fleet can launch several instance types

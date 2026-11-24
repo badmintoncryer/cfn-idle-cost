@@ -1,7 +1,8 @@
-us-east-1 · 1 stack · idle ≈ $773/mo
+us-east-1 · 1 stack · idle ≈ $781/mo · $8.00 of it on assumptions
 
-review                       $773/mo
+review                       $781/mo
   WinNodes     ×2            $274  m5.large on-demand (Windows, license included), DesiredSize
+  WinNodes     ×100 GB gp3  $8.00  ≈ node volume (DiskSize 50 GB)
   Search       ×1            $122  r6g.large.search data nodes
   Search       ×500 GB gp3    $61  EBS storage
   Search       ×50 MiB/s    $3.20  gp3 throughput above 250 MiB/s
@@ -20,6 +21,9 @@ review                       $773/mo
   Db           ×20 GB gp3   $2.30  storage
   Secret       ×3           $1.20  secret and its replicas
   AllSpot      ×1           $0.00  no tasks on FARGATE (2 tasks; FARGATE_SPOT not counted here)
+
+≈ assumptions: 1 (in the total; set them to firm it up)
+  review  WinNodes  gp3 node volumes (EKS doesn't document the type of DiskSize volumes). Set it: use a launch template whose BlockDeviceMappings set VolumeType
 
 ? could not estimate: 2
   review  Endpoint  SubnetIds has an item that uses Fn::If

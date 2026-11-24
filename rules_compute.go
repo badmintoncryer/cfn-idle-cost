@@ -196,8 +196,9 @@ func warmPool(e *est, p map[string]any) {
 	}
 	k := len(e.items)
 	e.blockDevices(bdm, n)
+	e.rootVolume(bdm, img, n)
 	if state != "Running" && len(e.items) == k { // shown at $0 so it reads as checked, not missed
-		e.items = append(e.items, Item{Quantity: fmt.Sprintf("×%g", n), Reason: "warm pool " + state + " (EBS volumes from the AMI not counted)"})
+		e.items = append(e.items, Item{Quantity: fmt.Sprintf("×%g", n), Reason: "warm pool " + state + " (no EBS volumes)"})
 	}
 }
 

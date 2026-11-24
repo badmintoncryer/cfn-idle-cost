@@ -325,7 +325,7 @@ and provisioned storage billed whether you use it or not.
 | `AWS::SecretsManager::Secret` | per secret and per replica |
 | `AWS::Route53::HostedZone` | per hosted zone |
 | `AWS::EKS::Cluster` | cluster hourly, plus the extended support fee when `Version` is past the end of standard support on the date of the prices (the snapshot date, or today with `--live`) |
-| `AWS::EKS::Nodegroup` | instance hourly × `DesiredSize` (or `MinSize`), on-demand, one instance type. Windows AMI types are priced at Windows license-included rates |
+| `AWS::EKS::Nodegroup` | instance hourly × `DesiredSize` (or `MinSize`), on-demand, one instance type. Windows AMI types are priced at Windows license-included rates. Node volumes: `DiskSize` (20 GB, 50 GB for Windows) as gp3, marked `≈` since EKS doesn't document their type; with a launch template, its `BlockDeviceMappings` and the AMI's root volume (20 GB, `≈`) |
 | `AWS::NetworkFirewall::Firewall` | endpoint hourly × subnets, plus Advanced Inspection hourly × subnets when its firewall policy (in the same template) has a TLS inspection configuration |
 | `AWS::WAFv2::WebACL` | web ACL, its rules, the rules of the rule groups in the same template it references, and the monthly fee of the Bot Control, Account Takeover Prevention and Anti-DDoS AWS managed rule groups (their request fees not counted) |
 | `AWS::CloudWatch::Alarm`, `CompositeAlarm` | per alarm metric (standard or high resolution; an anomaly detection band adds two), per composite alarm |
@@ -585,8 +585,12 @@ and Timestream scheduled queries that run on a schedule) are listed under
   Linux and marked `≈`. Set its OS with `--os ami-0abc12=windows`, or on the
   resource with Metadata, which in CDK is
   `(instance.node.defaultChild as cdk.CfnResource).addMetadata('cfn-idle-cost', { os: 'windows' })`.
-  Tenancy is shared. A root volume that comes from the AMI (no `VolumeSize`
-  in `BlockDeviceMappings`) is not counted.
+  Tenancy is shared.
+- The root volume of an instance whose size comes from the AMI (no mapping
+  with a `VolumeSize` for `/dev/xvda` or `/dev/sda1`) is counted at the
+  usual AMI size, 8 GB, or 30 GB for Windows, as gp3 unless the mapping sets
+  `VolumeType`, and marked `≈`. Set `VolumeSize` of the root device to firm
+  it up.
 - A public IPv4 that an instance, Auto Scaling group or Fargate task gets at
   launch is counted when `AssociatePublicIpAddress` (or `AssignPublicIp`) says
   so, or else when every subnet is in the template with `MapPublicIpOnLaunch:
