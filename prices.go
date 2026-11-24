@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
 
 // OfferBase serves the public, unauthenticated AWS Bulk Price List files.
@@ -190,6 +191,21 @@ var selectors = []selector{
 			}
 			return f
 		}},
+	// RDS Extended Support rows have no productFamily.
+	{name: "rdses", service: "AmazonRDS", families: []string{""},
+		key: func(a map[string]string, u string) string {
+			if strings.HasPrefix(u, "ExtendedSupport:") {
+				return u
+			}
+			return ""
+		},
+		liveFilter: func(d string) map[string]string {
+			year := "Year 1, Year 2"
+			if strings.Contains(d, ":Yr3:") {
+				year = "Year 3"
+			}
+			return map[string]string{"productFamily": "", "extendedSupportPricingYear": year}
+		}},
 	{name: "es", service: "AmazonES", families: []string{"Amazon OpenSearch Service Instance", "Amazon OpenSearch Service Volume"},
 		key: func(a map[string]string, u string) string {
 			switch {
@@ -296,9 +312,10 @@ var selectors = []selector{
 		key: func(a map[string]string, u string) string {
 			return keep(u, "WebACLV2", "RuleV2", "WebACL", "Rule", "AMR-BotControl", "AMR-ATP", "AMR-AntiDDoS")
 		}},
-	{name: "cw", service: "AmazonCloudWatch", families: []string{"Alarm", "Canaries", "Contributor Insights", "Metric"},
+	{name: "cw", service: "AmazonCloudWatch", families: []string{"Alarm", "Canaries", "Contributor Insights", "Metric", "CloudWatch Database Insights"},
 		key: func(a map[string]string, u string) string {
-			return keep(u, "CW:AlarmMonitorUsage", "CW:HighResAlarmMonitorUsage", "CW:CompositeAlarmMonitorUsage", "CW:Canary-runs", "CW:ContributorInsightRules", "CW:MetricMonitorUsage")
+			return keep(u, "CW:AlarmMonitorUsage", "CW:HighResAlarmMonitorUsage", "CW:CompositeAlarmMonitorUsage", "CW:Canary-runs", "CW:ContributorInsightRules", "CW:MetricMonitorUsage",
+				"CW:DatabaseInsights-vCPU-Hours", "CW:DatabaseInsights-ACU-Hours")
 		}},
 	{name: "lambda", service: "AWSLambda", families: []string{"Serverless"},
 		key: func(a map[string]string, u string) string {
@@ -972,8 +989,7 @@ func BuildPrices(regions, only []string, logf func(string, ...any)) (*Prices, er
 			defer wg.Done()
 			sem <- struct{}{}
 			defer func() { <-sem }()
-			out := map[string]map[string]float64{}
-			pub, err := fetchOffer(j.url, byService[j.service], j.region, out)
+			out, pub, err := fetchOfferRetry(j.url, byService[j.service], j.region)
 			mu.Lock()
 			defer mu.Unlock()
 			if err != nil {
@@ -1005,6 +1021,26 @@ func BuildPrices(regions, only []string, logf func(string, ...any)) (*Prices, er
 	}
 	wg.Wait()
 	return p, firstErr
+}
+
+// offerTries is how many times BuildPrices downloads an offer before it gives
+// up, waiting retryDelay × try² before each retry.
+var offerTries, retryDelay = 4, 5 * time.Second
+
+// fetchOfferRetry is fetchOffer, tried again when a download fails: the EC2
+// offers are about 450 MB per region, and one cut off used to fail the weekly
+// refresh.
+func fetchOfferRetry(url string, sels []selector, offerRegion string) (out map[string]map[string]float64, pub string, err error) {
+	for try := 1; try <= offerTries; try++ {
+		if try > 1 {
+			time.Sleep(time.Duration(try*try) * retryDelay)
+		}
+		out = map[string]map[string]float64{}
+		if pub, err = fetchOffer(url, sels, offerRegion, out); err == nil {
+			return out, pub, nil
+		}
+	}
+	return nil, "", fmt.Errorf("after %d tries: %w", offerTries, err)
 }
 
 func fetchOffer(url string, sels []selector, offerRegion string, out map[string]map[string]float64) (string, error) {

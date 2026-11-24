@@ -94,6 +94,7 @@ func blueGreen(e *est, p map[string]any) {
 		return c
 	}
 	n := len(e.items)
+	e.engineVersion = e.str(p, "TargetEngineVersion", "") // the green copy may run a newer version
 	switch src.Type {
 	case "AWS::RDS::DBInstance":
 		rdsInstance(e, target(src.Properties, "DBInstanceClass"))

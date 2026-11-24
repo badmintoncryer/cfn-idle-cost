@@ -260,8 +260,8 @@ jobs:
 | `AWS::EC2::Instance` | インスタンスの時間料金（Linux）、`BlockDeviceMappings`のEBSボリューム、起動時に割り当てられるパブリックIPv4 |
 | `AWS::AutoScaling::AutoScalingGroup` | インスタンスの時間料金×`DesiredCapacity`（なければ`MinSize`）、EBSボリューム、起動時に割り当てられるパブリックIPv4。起動テンプレートか起動設定から読みます。`MixedInstancesPolicy`ではオンデマンドの分（`OnDemandBaseCapacity`と、残りの`OnDemandPercentageAboveBaseCapacity`、端数は切り上げ）だけを、最初のオーバーライドのタイプで数えます。Spotは数えず、EBSとIPv4は全台分です |
 | `AWS::EC2::Volume` | 容量、gp3の3000 IOPS・125 MiB/sを超える分、io1・io2のIOPS |
-| `AWS::RDS::DBInstance` | インスタンスの時間料金（シングルAZ・マルチAZ。MySQL、PostgreSQL、MariaDBと、ライセンスモデルごとのOracleとSQL Server）、割り当てたストレージ、プロビジョンドIOPS、gp3の基準値を超えるIOPSとスループット。Auroraは、プロビジョンドのインスタンスか、Serverless v2の最小ACU（I/O-Optimizedにも対応） |
-| `AWS::RDS::DBCluster`（マルチAZ DBクラスター） | クラスターの時間料金（ライター1台と読み取り可能なスタンバイ2台）、割り当てたストレージ、プロビジョンドIOPS（gp3のIOPSとスループットにはまだ対応していません） |
+| `AWS::RDS::DBInstance` | インスタンスの時間料金（シングルAZ・マルチAZ。MySQL、PostgreSQL、MariaDBと、ライセンスモデルごとのOracleとSQL Server）、割り当てたストレージ（リードレプリカはソースのもの、`AdditionalStorageVolumes`も含む）、プロビジョンドIOPS、gp3の基準値を超えるIOPSとスループット。Auroraは、プロビジョンドのインスタンスか、Serverless v2の最小ACU（I/O-Optimizedにも対応）。`EngineVersion`（Auroraはクラスターのもの）が価格の基準日に標準サポートを過ぎていれば、RDS延長サポートの料金をvCPUごと（マルチAZのスタンバイを含む）か最小ACUごとに、1〜2年目または3年目の単価で加えます。`DatabaseInsightsMode`が`advanced`なら、Database InsightsをvCPUごとか最小ACUごとに加えます |
+| `AWS::RDS::DBCluster`（マルチAZ DBクラスター） | クラスターの時間料金（ライター1台と読み取り可能なスタンバイ2台）、割り当てたストレージ、プロビジョンドIOPS（gp3のIOPSとスループットにはまだ対応していません）、3台分のRDS延長サポート（DBインスタンスと同じ条件） |
 | `AWS::OpenSearchService::Domain`、`AWS::Elasticsearch::Domain` | データノード、専用マスターノード、UltraWarmノード、コーディネーターノード（`NodeOptions`）、EBSの容量・IOPS・スループット |
 | `AWS::ElastiCache::CacheCluster`、`ReplicationGroup` | ノードの時間料金×ノード数 |
 | `AWS::ElastiCache::ServerlessCache` | データストレージの最小量（1 GB。Valkeyは100 MB。`CacheUsageLimits`で最小量を指定していればその値）。`ECPUPerSecond`の最小値を指定していれば、そのECPUも加えます |
