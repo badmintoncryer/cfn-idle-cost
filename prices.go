@@ -1020,6 +1020,13 @@ func BuildPrices(regions, only []string, logf func(string, ...any)) (*Prices, er
 		}(j)
 	}
 	wg.Wait()
+	if firstErr == nil && (len(only) == 0 || in("SpotAdvisor", only...)) {
+		n, err := addSpotSavings(p, regions)
+		if err != nil {
+			return p, fmt.Errorf("Spot Instance Advisor: %w", err)
+		}
+		logf("%-18s %-16s %5d prices", "SpotAdvisor", "all", n)
+	}
 	return p, firstErr
 }
 
@@ -1041,6 +1048,42 @@ func fetchOfferRetry(url string, sels []selector, offerRegion string) (out map[s
 		}
 	}
 	return nil, "", fmt.Errorf("after %d tries: %w", offerTries, err)
+}
+
+// SpotAdvisorURL is the data behind the Spot Instance Advisor: per region, OS
+// and instance type, the average saving of Spot over on-demand.
+var SpotAdvisorURL = "https://spot-bid-advisor.s3.amazonaws.com/spot-advisor-data.json"
+
+// addSpotSavings adds "spot|Linux:m5.large" = 0.62 (62% off on-demand) for
+// every region (or only regions) and returns how many it added.
+func addSpotSavings(p *Prices, regions []string) (int, error) {
+	var d struct {
+		Advisor map[string]map[string]map[string]struct {
+			S float64 `json:"s"`
+		} `json:"spot_advisor"`
+	}
+	if err := getJSON(SpotAdvisorURL, &d); err != nil {
+		return 0, err
+	}
+	n := 0
+	for r, oses := range d.Advisor {
+		if !regionCode.MatchString(r) || (len(regions) > 0 && !in(r, regions...)) {
+			continue
+		}
+		for os, types := range oses {
+			if !in(os, "Linux", "Windows") {
+				continue
+			}
+			for t, v := range types {
+				if p.Regions[r] == nil {
+					p.Regions[r] = map[string]float64{}
+				}
+				p.Regions[r]["spot|"+os+":"+t] = v.S / 100
+				n++
+			}
+		}
+	}
+	return n, nil
 }
 
 func fetchOffer(url string, sels []selector, offerRegion string, out map[string]map[string]float64) (string, error) {

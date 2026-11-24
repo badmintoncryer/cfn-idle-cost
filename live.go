@@ -26,6 +26,19 @@ func LivePrices(ctx context.Context, stacks []*Stack) (*Prices, error) {
 	client := pricing.NewFromConfig(cfg)
 	p := &Prices{Regions: map[string]map[string]float64{}, AsOf: time.Now().UTC().Format("2006-01-02")}
 	p.Source = "live Price List Query API " + p.AsOf
+	var spotRegions []string // the Spot Instance Advisor's data is public and not in the Price List
+	for _, region := range sortedIDs(probe.wanted) {
+		for k := range probe.wanted[region] {
+			if strings.HasPrefix(k, "spot|") && !in(region, spotRegions...) {
+				spotRegions = append(spotRegions, region)
+			}
+		}
+	}
+	if len(spotRegions) > 0 {
+		if _, err := addSpotSavings(p, spotRegions); err != nil {
+			return nil, fmt.Errorf("--live: Spot Instance Advisor: %w", err)
+		}
+	}
 	for _, region := range sortedIDs(probe.wanted) {
 		for _, s := range selectorsFor(sortedIDs(probe.wanted[region])) {
 			offerRegion := region

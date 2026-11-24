@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"io"
 	"math"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"strings"
 	"testing"
@@ -124,5 +126,49 @@ func TestOSFlags(t *testing.T) {
 		if err := run(append([]string{path, "--region", "us-east-1"}, bad...), io.Discard); err == nil {
 			t.Errorf("%v: want an error", bad)
 		}
+	}
+}
+
+// Spot is priced at the Spot Instance Advisor's saving, with the on-demand
+// price as how much more it could cost.
+func TestSpot(t *testing.T) {
+	path := t.TempDir() + "/spot.yaml"
+	os.WriteFile(path, []byte(`Resources:
+  Box: {Type: AWS::EC2::Instance, Properties: {InstanceType: m5.large, ImageId: "{{resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64}}", InstanceMarketOptions: {MarketType: spot}}}
+  Nodes: {Type: AWS::EKS::Nodegroup, Properties: {CapacityType: SPOT, InstanceTypes: [m5.large], ScalingConfig: {DesiredSize: 2}}}
+`), 0o644)
+	stacks, err := LoadInputs([]string{path})
+	if err != nil {
+		t.Fatal(err)
+	}
+	stacks[0].Region = "us-east-1"
+	prices := &Prices{Regions: map[string]map[string]float64{"us-east-1": {
+		"ec2|m5.large": 0.1, "spot|Linux:m5.large": 0.6, "ebs|EBS:VolumeUsage.gp3": 0.08}}}
+	got := map[string]Item{}
+	for _, it := range Estimate(stacks, prices) {
+		if strings.Contains(it.Reason, "Spot") {
+			got[it.LogicalID] = it
+		}
+	}
+	for id, n := range map[string]float64{"Box": 1, "Nodes": 2} {
+		it := got[id]
+		if math.Abs(it.Monthly-n*0.04*730) > 1e-9 || it.Assumption == nil || math.Abs(it.Assumption.IfWrong-n*0.06*730) > 1e-9 {
+			t.Errorf("%s = %g %q %+v", id, it.Monthly, it.Reason, it.Assumption)
+		}
+	}
+}
+
+func TestAddSpotSavings(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		io.WriteString(w, `{"spot_advisor": {"us-east-1": {"Linux": {"m5.large": {"s": 62, "r": 1}}, "Windows": {"m5.large": {"s": 40, "r": 1}}},
+			"eu-west-1": {"Linux": {"m5.large": {"s": 70, "r": 1}}}}}`)
+	}))
+	defer srv.Close()
+	defer func(u string) { SpotAdvisorURL = u }(SpotAdvisorURL)
+	SpotAdvisorURL = srv.URL
+	p := &Prices{Regions: map[string]map[string]float64{}}
+	n, err := addSpotSavings(p, []string{"us-east-1"})
+	if err != nil || n != 2 || p.Regions["us-east-1"]["spot|Linux:m5.large"] != 0.62 || p.Regions["us-east-1"]["spot|Windows:m5.large"] != 0.4 || p.Regions["eu-west-1"] != nil {
+		t.Errorf("n=%d err=%v prices=%v", n, err, p.Regions)
 	}
 }

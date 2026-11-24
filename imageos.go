@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"math"
 	"strings"
 )
 
@@ -191,4 +192,48 @@ func (e *est) rootVolumeOf(bdm any, n, size float64, why string) {
 		Override: "VolumeSize and VolumeType of the root device (" + rootDevices[0] + " or " + rootDevices[1] + ") in BlockDeviceMappings"}
 	defer func() { e.assuming = nil }()
 	e.monthly(size*n, "GB "+t, key, "root volume from the AMI")
+}
+
+// spot bills n Spot instances of type t running os (linux or windows) at the
+// Spot Instance Advisor's average saving over on-demand in the region, marked
+// as an assumption: Spot prices move, up to the on-demand price.
+func (e *est) spot(n float64, t, os, what string) {
+	if n <= 0 {
+		return
+	}
+	key, label, adv := "ec2|", "Linux", "Linux"
+	if os == "windows" {
+		key, label, adv = "ec2win|", "Windows", "Windows"
+	}
+	od := e.price(key + t)
+	s, ok := e.prices.Get(e.st.Region, "spot|"+adv+":"+t)
+	if !ok {
+		panic(unresolved(fmt.Sprintf("the Spot Instance Advisor has no saving for %s %s in %s", label, t, e.st.Region)))
+	}
+	pct := math.Round(s * 100)
+	d := 1 - discountFor(e.r.Type)
+	e.assuming = &Assumption{
+		What:        fmt.Sprintf("Spot at %g%% off on-demand, the Spot Instance Advisor's recent average for %s; Spot prices move", pct, t),
+		IfWrong:     n * od * s * hoursPerMonth * d,
+		IfWrongCase: "Spot rises to the on-demand price, the most it can cost",
+	}
+	defer func() { e.assuming = nil }()
+	e.add(n, "", n*od*(1-s)*hoursPerMonth, fmt.Sprintf("%s Spot (%s, %g%% off on-demand)%s", t, label, pct, what))
+}
+
+// spotInstances is spot with the OS read from the image (see imageOS).
+func (e *est) spotInstances(n float64, t string, img any, what string) {
+	os, _, a := e.imageOS(img)
+	if a != nil && n > 0 { // the OS guess is a second assumption on the same line
+		e.assuming = a
+		k := len(e.items)
+		e.spot(n, t, os, what)
+		if len(e.items) > k {
+			sa := e.items[k].Assumption
+			e.items[k].Assumption = &Assumption{What: a.What + "; " + sa.What, Override: a.Override, IfWrong: sa.IfWrong, IfWrongCase: sa.IfWrongCase}
+			e.items[k].Reason = strings.Replace(e.items[k].Reason, "(Linux,", "(Linux assumed,", 1)
+		}
+		return
+	}
+	e.spot(n, t, os, what)
 }
