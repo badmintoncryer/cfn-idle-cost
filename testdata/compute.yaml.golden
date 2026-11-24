@@ -1,4 +1,4 @@
-us-east-1 · 1 stack · idle ≈ $13317/mo
+us-east-1 · 1 stack · idle ≈ $13317/mo · $38 of it on assumptions
 
 compute                        $13317/mo
   LimitlessStandby  ×32 ACU     $3738  Limitless shard group minimum capacity, ComputeRedundancy 1 (standby shards)
@@ -23,12 +23,12 @@ compute                        $13317/mo
   BlueGreen         ×1            $23  green copy: db.t4g.small postgres Single-AZ
   BlueGreen         ×20 GB gp3  $2.30  green copy: storage
   Argo              ×1            $22  ArgoCD capability (managed resources not counted)
-  Asg               ×2            $15  t3.micro on-demand (Linux), DesiredCapacity
+  Asg               ×2            $15  ≈ t3.micro on-demand (Linux assumed), DesiredCapacity
   Asg               ×40 GB gp3  $3.20  EBS gp3 storage
-  AsgAmi            ×2            $15  t3.micro on-demand (Linux), DesiredCapacity
+  AsgAmi            ×2            $15  ≈ t3.micro on-demand (Linux assumed), DesiredCapacity
   Pg                ×1            $12  db.t4g.micro postgres Single-AZ
   Pg                ×20 GB gp3  $2.30  storage
-  WarmRunning       ×1          $7.59  t3.micro on-demand (Linux), warm pool Running
+  WarmRunning       ×1          $7.59  ≈ t3.micro on-demand (Linux assumed), warm pool Running
   WarmRunning       ×20 GB gp3  $1.60  EBS gp3 storage
   WarmStopped       ×60 GB gp3  $4.80  EBS gp3 storage
   PyVersion         ×1 GB       $3.95  SnapStart cache (1024 MB)
@@ -38,6 +38,11 @@ compute                        $13317/mo
   WarmMin           ×20 GB gp3  $1.60  EBS gp3 storage
   LogAlarm          ×1          $0.10  log alarm (query scanning not counted)
   WarmAmi           ×3          $0.00  warm pool Hibernated (EBS volumes from the AMI not counted)
+
+≈ assumptions: 3 (in the total; set them to firm it up)
+  compute  Asg  Linux assumed: ImageId doesn't say the OS. Set it: --os Asg=windows (or Metadata cfn-idle-cost: {os: windows})
+  compute  AsgAmi  Linux assumed: ImageId doesn't say the OS. Set it: --os AsgAmi=windows (or Metadata cfn-idle-cost: {os: windows})
+  compute  WarmRunning  Linux assumed: ImageId doesn't say the OS. Set it: --os WarmRunning=windows (or Metadata cfn-idle-cost: {os: windows})
 
 ? could not estimate: 6
   compute  BlueGreenSub  Source does not point to a resource in this template

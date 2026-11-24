@@ -1,10 +1,13 @@
-eu-west-1 · 1 stack · idle ≈ $114/mo
+eu-west-1 · 1 stack · idle ≈ $114/mo · $100 of it on assumptions
 
 mixed                    $114/mo
-  Mixed    ×3            $100  t3.medium on-demand (Linux), On-Demand part of DesiredCapacity 6 (Spot not counted)
+  Mixed    ×3            $100  ≈ t3.medium on-demand (Linux assumed), On-Demand part of DesiredCapacity 6 (Spot not counted)
   Mixed    ×120 GB gp3    $11  EBS gp3 storage
   AllSpot  ×40 GB gp3   $3.52  EBS gp3 storage
   Anomaly  ×3 metrics   $0.30  alarm per metric
+
+≈ assumptions: 1 (in the total; set them to firm it up)
+  mixed  Mixed  Linux assumed: ImageId doesn't say the OS. Set it: --os Mixed=windows (or Metadata cfn-idle-cost: {os: windows})
 
 ? could not estimate: 1
   mixed  Weighted  MixedInstancesPolicy with WeightedCapacity is not supported yet

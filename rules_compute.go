@@ -122,7 +122,7 @@ func blueGreen(e *est, p map[string]any) {
 // an Auto Scaling group's launch template or configuration. With a
 // MixedInstancesPolicy, the type is the first override's (the On-Demand
 // priority) and dist is its InstancesDistribution, non-nil.
-func (e *est) asgLaunch(p map[string]any) (t string, bdm, assoc any, dist map[string]any) {
+func (e *est) asgLaunch(p map[string]any) (t string, bdm, assoc any, dist map[string]any, img any) {
 	if mp, ok := p["MixedInstancesPolicy"]; ok {
 		mip := asMap(mp)
 		lt := asMap(mip["LaunchTemplate"])
@@ -147,15 +147,15 @@ func (e *est) asgLaunch(p map[string]any) (t string, bdm, assoc any, dist map[st
 		if dist == nil {
 			dist = map[string]any{}
 		}
-		return t, data["BlockDeviceMappings"], firstMap(data["NetworkInterfaces"])["AssociatePublicIpAddress"], dist
+		return t, data["BlockDeviceMappings"], firstMap(data["NetworkInterfaces"])["AssociatePublicIpAddress"], dist, data["ImageId"]
 	}
 	if lt, ok := p["LaunchTemplate"]; ok {
 		data := e.launchTemplate(asMap(lt))
-		return e.mustStr(data, "InstanceType"), data["BlockDeviceMappings"], firstMap(data["NetworkInterfaces"])["AssociatePublicIpAddress"], nil
+		return e.mustStr(data, "InstanceType"), data["BlockDeviceMappings"], firstMap(data["NetworkInterfaces"])["AssociatePublicIpAddress"], nil, data["ImageId"]
 	}
 	if _, ok := p["LaunchConfigurationName"]; ok {
 		_, lc := e.ref(p, "LaunchConfigurationName")
-		return e.mustStr(lc.Properties, "InstanceType"), lc.Properties["BlockDeviceMappings"], lc.Properties["AssociatePublicIpAddress"], nil
+		return e.mustStr(lc.Properties, "InstanceType"), lc.Properties["BlockDeviceMappings"], lc.Properties["AssociatePublicIpAddress"], nil, lc.Properties["ImageId"]
 	}
 	panic(unresolved("no LaunchTemplate or LaunchConfigurationName"))
 }
@@ -174,7 +174,7 @@ func (e *est) onDemand(dist map[string]any, n float64) float64 {
 func warmPool(e *est, p map[string]any) {
 	_, asg := e.ref(p, "AutoScalingGroupName")
 	ap := asg.Properties
-	t, bdm, assoc, dist := e.asgLaunch(ap)
+	t, bdm, assoc, dist, img := e.asgLaunch(ap)
 	if dist != nil {
 		panic(unresolved("its Auto Scaling group has a MixedInstancesPolicy, which warm pools don't support"))
 	}
@@ -192,7 +192,7 @@ func warmPool(e *est, p map[string]any) {
 	}
 	state := e.str(p, "PoolState", "Stopped")
 	if state == "Running" {
-		e.hourly(n, "", "ec2|"+t, t+" on-demand (Linux), warm pool Running")
+		e.instances(n, t, img, ", warm pool Running")
 		subnets, _ := ap["VPCZoneIdentifier"].([]any)
 		if e.autoPublicIP(assoc, subnets) {
 			e.hourly(n, "IPv4", "vpc|PublicIPv4:InUseAddress", "public IPv4 assigned at launch, warm pool")

@@ -14,6 +14,7 @@ var sarifRules = []struct{ id, text, help string }{
 	{"idle-cost", "Resource that costs money while idle", "Its idle cost is in the total. Delete it, size it down, or check that it is needed in this environment."},
 	{"could-not-estimate", "Resource whose idle cost could not be estimated", "A value the template doesn't say (a Parameter, a reference to another stack) or a case cfn-idle-cost does not support yet. It is not in the total."},
 	{"not-counted", "Resource that may cost money idle and has no rule yet", "cfn-idle-cost has no rule for this type yet. It is not in the total."},
+	{"assumption", "Idle cost that rests on an assumption", "The template doesn't say a value the price depends on, such as the OS of an AMI, so cfn-idle-cost assumed one. The line is in the total; the message says how to set the real value."},
 }
 
 // WriteSARIF writes the resources whose idle cost is at least minMonthly per
@@ -66,6 +67,11 @@ func (rep Report) WriteSARIF(w io.Writer, minMonthly float64) error {
 				}
 				cents(&total)
 				add("idle-cost", "warning", fmt.Sprintf("%s (%s) idles at ≈ %s/mo in %s: %s", its[0].Path, its[0].Type, money(total), reg.Region, strings.Join(why, "; ")), its[0], total)
+			}
+		}
+		for _, g := range reg.assumptions() {
+			for _, it := range reg.assumedItems(g) {
+				add("assumption", "note", fmt.Sprintf("%s (%s): %s", it.Path, it.Type, g.text()), it, 0)
 			}
 		}
 		for _, it := range reg.Unknown {

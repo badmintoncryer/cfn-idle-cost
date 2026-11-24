@@ -73,6 +73,8 @@ nested stacks) or CloudFormation templates (JSON or YAML).
 | `--compare-regions <r1,r2,...>` | Price the same stacks in each region, as if all of them were deployed there, and print the totals side by side with the resources whose price differs most (`?` where a resource can't be estimated in that region, e.g. a type not offered there). The first region is the reference. `text` or `md`; not with `--base`, `--live` or the budget flags. |
 | `--region <r>` | Region for stacks that have none: env-agnostic CDK stacks and plain templates. Stacks with an `env` keep their own region. Without it, such stacks are an error. |
 | `--parameter [Stack:]Key=Value` | Value of a template parameter, for every stack that has it or only `Stack`. Repeat it for more. Parameters without one use their `Default`. |
+| `--os <Key>=<linux\|windows>` | The OS of the instances whose `ImageId` doesn't say it, where `Key` is an AMI ID, an SSM parameter path, a logical ID or a construct path, e.g. `--os ami-0abc12=windows`. Repeatable. See [Assumptions](#assumptions). |
+| `--assume none` | Leave the lines that rest on an assumption (marked `≈`) out of the total and list them under `? could not estimate`, for a total with no guesses. Default `defaults`: count them. |
 | `--hours <n>` | Price hour-based charges (instances, NAT Gateways, load balancers, …) for `n` hours a month instead of 730, for environments that only run part of the time: `220` is weekdays 8:00–18:00. Monthly fees and storage stay whole. |
 | `--suggest` | Show cheaper settings the template could use and what each saves. See [Cheaper settings](#cheaper-settings). Not with `--base`. |
 | `--live` | Fetch current prices from the [Price List Query API](https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/using-price-list-query-api.html) instead of the bundled snapshot. Needs AWS credentials with `pricing:GetProducts`. |
@@ -270,7 +272,7 @@ saves a month, priced from the same snapshot. The total stays the current
 cost.
 
 ```
-  Server      ×1              $74  m5.large on-demand (Linux)
+  Server      ×1              $74  ≈ m5.large on-demand (Linux assumed)
                                  → -$15/mo: m6g.large (Graviton), if the AMI and software run on arm64
   Server      ×100 GB gp2     $10  EBS gp2 storage
                                  → -$2.10/mo: gp3
@@ -305,7 +307,7 @@ and provisioned storage billed whether you use it or not.
 | `AWS::EC2::VPCEndpoint` | Interface: hourly × subnets (AZs). Gateway Load Balancer and Resource: hourly. Gateway and ServiceNetwork: free (VPC Lattice bills the services and resources in the network) |
 | `AWS::ElasticLoadBalancingV2::LoadBalancer` | ALB / NLB / GWLB hourly, plus one public IPv4 per subnet when internet-facing (none for `dualstack-without-public-ipv4`) |
 | `AWS::ElasticLoadBalancing::LoadBalancer` | Classic Load Balancer hourly |
-| `AWS::EC2::Instance` | instance hourly (Linux), EBS volumes in `BlockDeviceMappings`, the public IPv4 it gets at launch |
+| `AWS::EC2::Instance` | instance hourly (Linux, or Windows with the license included; see [Assumptions](#assumptions) for how the OS is read), EBS volumes in `BlockDeviceMappings`, the public IPv4 it gets at launch |
 | `AWS::AutoScaling::AutoScalingGroup` | instance hourly × `DesiredCapacity` (or `MinSize`), EBS volumes and public IPv4 at launch, from its launch template or launch configuration. With a `MixedInstancesPolicy`: only the On-Demand part (`OnDemandBaseCapacity`, then `OnDemandPercentageAboveBaseCapacity` of the rest, rounded up) at the first override's type; Spot is not counted, EBS and IPv4 are for all instances |
 | `AWS::EC2::Volume` | size, gp3 IOPS / throughput above 3000 / 125 MiB/s, io1 / io2 IOPS |
 | `AWS::RDS::DBInstance` | instance hourly (Single-AZ / Multi-AZ; MySQL, PostgreSQL, MariaDB, Oracle and SQL Server by license model), allocated storage, provisioned IOPS and throughput above the gp3 baseline. Aurora: provisioned instances, or Serverless v2 minimum ACU (I/O-Optimized aware) |
@@ -375,7 +377,7 @@ and provisioned storage billed whether you use it or not.
 | `AWS::EMR::Cluster`, `AWS::EMR::InstanceGroupConfig`, `AWS::EMR::InstanceFleetConfig` | EC2 hourly (Linux), EMR fee and EBS volumes of on-demand instance groups, and of instance fleets of one instance type (`TargetOnDemandCapacity` / `WeightedCapacity` instances). Clusters that auto-terminate or end with their steps: $0 idle |
 | `AWS::KinesisAnalyticsV2::Application` | KPUs (parallelism / parallelism per KPU) plus one for orchestration, and 50 GB of running storage per KPU, as if it runs (CloudFormation creates it stopped). Studio notebooks: two extra KPUs and storage for one. SQL applications are not estimated |
 | `AWS::NetworkManager::CoreNetwork` | hourly per edge location in `PolicyDocument`, priced in the stack's region |
-| `AWS::EC2::EC2Fleet`, `AWS::EC2::SpotFleet` | instance hourly (Linux) × on-demand target capacity, and the EBS volumes of its launch template, when the fleet launches one instance type. Spot capacity is not counted |
+| `AWS::EC2::EC2Fleet`, `AWS::EC2::SpotFleet` | instance hourly (Linux or Windows, as for instances) × on-demand target capacity, and the EBS volumes of its launch template, when the fleet launches one instance type. Spot capacity is not counted |
 | `AWS::Route53::HealthCheck` | monthly fee and optional features (HTTPS, string matching, fast interval, latency measurement). An endpoint that is a resource in the template is priced as an AWS endpoint, any other as non-AWS. Calculated and CloudWatch metric checks are priced as AWS endpoints. Private endpoint checks (`EndpointType: PRIVATE`) are priced at the private rates |
 | `AWS::Route53::HealthCheckSource` | private endpoint health check source hourly × Availability Zones in `SubnetConfigurationList` |
 | `AWS::Kendra::Index` | edition hourly (Developer, Enterprise, GenAI Enterprise) and additional query and storage capacity units |
@@ -560,9 +562,31 @@ and Timestream scheduled queries that run on a schedule) are listed under
 - On-demand list prices in USD, 730 hours a month (or `--hours`). Savings Plans
   and the free tier are ignored, Reserved Instances are used only with
   `--pricing reserved-1y`, and discounts only with `--discount`.
-- EC2 instances are priced as Linux with shared tenancy (the AMI is not read).
-  A root volume that comes from the AMI (no `VolumeSize` in
-  `BlockDeviceMappings`) is not counted.
+- Some prices depend on a value the template doesn't say. Those lines are
+  still in the total, marked `≈`, and the header says how much of the total
+  rests on them (`idle ≈ $339/mo · $181 of it on assumptions`). The
+  `≈ assumptions` list under the report says what was assumed, what it would
+  cost otherwise, and how to set the real value. `--assume none` leaves them
+  out of the total instead. In JSON they carry an `assumption` field, in SARIF
+  an `assumption` note, and in Markdown a folded list.
+
+  ```
+  ≈ assumptions: 1 (in the total; set them to firm it up)
+    app  Batch, Worker  Linux assumed: ImageId ami-0abc12 doesn't say the OS. +$134/mo if Windows. Set it: --os ami-0abc12=windows (or Metadata cfn-idle-cost: {os: windows})
+  ```
+- EC2 instances, Auto Scaling groups, warm pools and fleets read the OS from
+  the `ImageId`'s public SSM parameter path, which CDK writes for
+  `MachineImage.latestWindows()`, `latestAmazonLinux2023()` and the like:
+  `/aws/service/ami-windows-latest/...` is Windows with the license included,
+  and Amazon Linux, Ubuntu, Debian, Bottlerocket and the ECS and EKS optimized
+  AMIs are Linux. A SQL Server AMI is priced as Windows and a SUSE AMI as
+  Linux, marked `≈` since the SQL Server license and the SUSE subscription
+  are not counted. Any other image, such as a literal AMI ID, is priced as
+  Linux and marked `≈`. Set its OS with `--os ami-0abc12=windows`, or on the
+  resource with Metadata, which in CDK is
+  `(instance.node.defaultChild as cdk.CfnResource).addMetadata('cfn-idle-cost', { os: 'windows' })`.
+  Tenancy is shared. A root volume that comes from the AMI (no `VolumeSize`
+  in `BlockDeviceMappings`) is not counted.
 - A public IPv4 that an instance, Auto Scaling group or Fargate task gets at
   launch is counted when `AssociatePublicIpAddress` (or `AssignPublicIp`) says
   so, or else when every subnet is in the template with `MapPublicIpOnLaunch:

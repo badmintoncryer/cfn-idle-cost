@@ -28,7 +28,8 @@ var mcpTools = []mcpTool{{
 	Description: "Estimate the monthly idle cost (what it costs with zero traffic: NAT Gateways, load balancers, instances, " +
 		"databases, provisioned capacity, storage) of a synthesized AWS CDK app or CloudFormation templates, offline, " +
 		"from bundled AWS list prices. Returns JSON with one item per billed line (stack, construct path, quantity, " +
-		"monthly USD, reason) and resources it could not estimate. Run `cdk synth` first. With base, returns the change " +
+		"monthly USD, reason) and resources it could not estimate. A line with an assumption field rests on a guess " +
+		"(such as Linux for an AMI that doesn't say its OS); it is in the total, and the field says how to set the real value. Run `cdk synth` first. With base, returns the change " +
 		"from the base cdk.out instead. With suggest, items carry a cheaper setting and its monthly saving.",
 	InputSchema: map[string]any{"type": "object", "properties": map[string]any{
 		"inputs":     map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "cdk.out directories or template files (default ./cdk.out)"},
@@ -38,6 +39,7 @@ var mcpTools = []mcpTool{{
 		"hours":      map[string]any{"type": "number", "description": "hours a month hour-based charges run (default 730)"},
 		"parameters": map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "template parameter values, [Stack:]Key=Value"},
 		"discount":   map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "discounts: pct for every price, or Service=pct, e.g. 10 or RDS=20"},
+		"os":         map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "OS of instances whose ImageId doesn't say it: Key=linux or Key=windows, Key an AMI ID, SSM parameter path, logical ID or construct path"},
 	}},
 	args: func(in map[string]any) ([]string, error) {
 		a := []string{"--format", "json"}
@@ -58,6 +60,9 @@ var mcpTools = []mcpTool{{
 		}
 		for _, d := range mcpStrings(in["discount"]) {
 			a = append(a, "--discount", d)
+		}
+		for _, o := range mcpStrings(in["os"]) {
+			a = append(a, "--os", o)
 		}
 		return append(append(a, "--"), mcpStrings(in["inputs"])...), nil
 	},

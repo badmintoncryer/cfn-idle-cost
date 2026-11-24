@@ -43,6 +43,11 @@ Flags:
   --parameter [Stack:]Key=Value
                        value of a template parameter, for every stack or only Stack (repeatable);
                        parameters without one use their Default
+  --os Key=linux|windows
+                       the OS of the instances whose ImageId doesn't say it: Key is an AMI ID, an
+                       SSM parameter path, a logical ID or a construct path (repeatable)
+  --assume a           defaults (default): count lines that rest on an assumption, marked ≈;
+                       none: leave them out of the total and list them as could not estimate
   --hours n            price hour-based charges (instances, NAT Gateways, load balancers, …) for
                        n hours a month instead of 730, e.g. 220 for weekdays 8:00-18:00;
                        monthly fees and storage stay whole
@@ -114,6 +119,9 @@ func run(args []string, stdout io.Writer) error {
 	fs.Var(discountFlag{}, "discount", "")
 	var params paramFlag
 	fs.Var(&params, "parameter", "")
+	clear(osOverrides)
+	fs.Var(osFlag{}, "os", "")
+	assume := fs.String("assume", "defaults", "")
 	showVersion := fs.Bool("version", false, "")
 	// Allow flags after the inputs too (npx cfn-idle-cost cdk.out --format md).
 	var flags, inputs []string
@@ -160,6 +168,10 @@ func run(args []string, stdout io.Writer) error {
 		return usageError{"--pricing reserved-1y does not support --live yet; use the bundled snapshot"}
 	}
 	reservedPricing = *pricing == "reserved-1y"
+	if !in(*assume, "defaults", "none") {
+		return usageError{"--assume must be defaults or none"}
+	}
+	excludeAssumed = *assume == "none"
 	if *hours <= 0 || *hours > 744 {
 		return usageError{"--hours must be more than 0 and at most 744 (31 days)"}
 	}
