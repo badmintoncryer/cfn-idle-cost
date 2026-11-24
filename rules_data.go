@@ -34,6 +34,9 @@ func init() {
 	rules["AWS::Personalize::Campaign"] = func(e *est, p map[string]any) {
 		panic(unresolved(fmt.Sprintf("bills %g minimum TPS (MinProvisionedTPS) at a rate set by the recipe of its solution version", e.num(p, "MinProvisionedTPS", 1))))
 	}
+	rules["AWS::Personalize::Recommender"] = func(e *est, p map[string]any) {
+		panic(unresolved("bills every hour it is active, at a tier rate set by the users in its dataset group, which is not in the template"))
+	}
 	rules["AWS::DataPipeline::Pipeline"] = func(e *est, p map[string]any) {
 		if e.str(p, "Activate", "true") == "false" {
 			e.monthly(1, "", "datapipeline|InactivePipelines", "inactive pipeline")

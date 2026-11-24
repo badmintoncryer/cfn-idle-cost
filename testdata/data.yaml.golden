@@ -61,7 +61,7 @@ data                                      $15411/mo
   ServerlessAlwaysOn       ×0              $0.00  not started by CloudFormation; once a job starts it, the pre-initialized capacity bills until it is stopped (auto-stop is off)
   V2Service                ×0              $0.00  billed monthly after its first failure mode assessment, which is not started by CloudFormation
 
-? could not estimate: 20
+? could not estimate: 21
   data  ActivePipeline  an active pipeline bills each activity and precondition by how often it runs (1 pipeline object)
   data  BrewSchedule  runs its jobs on cron(0 1 * * ? *); node-hours per run are not known
   data  Campaign  bills 2 minimum TPS (MinProvisionedTPS) at a rate set by the recipe of its solution version
@@ -74,6 +74,7 @@ data                                      $15411/mo
   data  MaybeReservation  depends on Condition IsUnknown
   data  NoCountEndpoint  InitialInstanceCount or ManagedInstanceScaling.MinInstanceCount is not set
   data  QuickSetup  enables DevOps Guru, billed per analyzed resource-hour
+  data  Recommender  bills every hour it is active, at a tier rate set by the users in its dataset group, which is not in the template
   data  RequestSlo  request-based SLOs: the signals they generate are not documented
   data  S3Target  the tools are not listed inline; semantic search indexes each one
   data  ScheduledQuery  runs on rate(5 minutes); query TCU time per run is not known

@@ -130,6 +130,9 @@ func init() {
 			panic(unresolved(t + ": $10/month per campaign ($2 low-volume) once it is approved"))
 		}
 	}
+	rules["AWS::SMSVOICE::RcsAgent"] = func(e *est, p map[string]any) {
+		panic(unresolved("$200/month agent maintenance fee (not in the Price List) once the agent is launched; CloudFormation creates it before carrier testing"))
+	}
 	rules["AWS::Lightsail::LoadBalancer"] = func(e *est, p map[string]any) {
 		e.hourly(1, "", "lightsail|LoadBalancerUsage", "load balancer")
 	}

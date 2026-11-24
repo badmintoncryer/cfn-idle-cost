@@ -1302,6 +1302,17 @@ var notCounted = []string{
 	"AWS::DevOpsAgent::AgentSpace", "AWS::DevOpsAgent::PrivateConnection", "AWS::CustomerProfiles::Recommender",
 	"AWS::ODB::OdbNetwork", "AWS::CodeBuild::Sandbox", "AWS::SCN::Instance", "AWS::SCN::Namespace",
 	"AWS::SCN::Dataset", "AWS::SCN::DataIntegrationFlow", // priced outside the template, or the price isn't published
+	"AWS::EC2::Snapshot", "AWS::DocDBElastic::ClusterSnapshot", "AWS::RedshiftServerless::Snapshot",
+	"AWS::Timestream::InfluxDBBackup", "AWS::KinesisAnalyticsV2::Snapshot", "AWS::Omics::ReadSet",
+	"AWS::StorageGateway::Gateway",    // sized by the data
+	"AWS::AppStream::AppBlockBuilder", // created stopped, billed once started
+	"AWS::ImageBuilder::Image",        // build instance time, charged once at creation
+	"AWS::InspectorV2::Connector", "AWS::NetworkFlowMonitor::Monitor", "AWS::NetworkFlowMonitor::PerformanceMonitor",
+	"AWS::AppFabric::Ingestion", "AWS::FraudDetector::Detector", "AWS::HealthAgent::Subscription",
+	"AWS::IoTSiteWise::Gateway", "AWS::EC2::SpotInstancesRequest", // priced by resources, users, models or Spot prices outside the template
+	"AWS::EC2::TransitGatewayAttachmentNatConfiguration", "AWS::Route53GlobalResolver::CoreNetworkEndpoint",
+	"AWS::OSIS::PipelineEndpoint", "AWS::NetworkManager::ContextStore", "AWS::MediaConnect::SourceEndpoint",
+	"AWS::MediaConnect::DestinationEndpoint", "AWS::SecurityAgent::PrivateConnection", // the price isn't published
 }
 
 func init() {

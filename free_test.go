@@ -78,6 +78,13 @@ var costsIdle = []string{
 	"AWS::VpcLattice::ServiceNetworkResourceAssociation", "AWS::WAF::Rule", "AWS::WAF::WebACL",
 	"AWS::WAFRegional::RateBasedRule", "AWS::WAFRegional::Rule", "AWS::WAFRegional::WebACL",
 	"AWS::WorkSpaces::WorkspacesPool", "AWS::WorkspacesInstances::Volume", "AWS::WorkspacesInstances::WorkspaceInstance",
+	// Types added since that audit.
+	"AWS::APIPortal::Portal", "AWS::APIPortal::DiscoveryEnablement", "AWS::Route53::HealthCheckSource",
+	"AWS::NetworkMonitor::Probe", "AWS::EC2::TransitGatewayNetworkFunctionAttachment", "AWS::Personalize::Recommender",
+	"AWS::EC2::Snapshot", "AWS::KinesisAnalyticsV2::Snapshot", "AWS::NetworkFlowMonitor::PerformanceMonitor",
+	"AWS::AppFabric::Ingestion", "AWS::EC2::TransitGatewayAttachmentNatConfiguration",
+	"AWS::Route53GlobalResolver::CoreNetworkEndpoint", "AWS::OSIS::PipelineEndpoint", "AWS::NetworkManager::ContextStore",
+	"AWS::MediaConnect::SourceEndpoint", "AWS::MediaConnect::DestinationEndpoint", "AWS::SecurityAgent::PrivateConnection",
 }
 
 func TestFreeIsExplicit(t *testing.T) {

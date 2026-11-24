@@ -26,6 +26,9 @@ Resources:
   Node:
     Type: AWS::ManagedBlockchain::Node
     Properties: { NetworkId: n-123, NodeConfiguration: { InstanceType: bc.t3.small, AvailabilityZone: us-east-1a } }
+  Recommender:
+    Type: AWS::Personalize::Recommender
+    Properties: { Name: r, DatasetGroupArn: arn, RecipeArn: arn:aws:personalize:::recipe/aws-ecomm-recommended-for-you }
   Campaign:
     Type: AWS::Personalize::Campaign
     Properties: { Name: c, SolutionVersionArn: arn, MinProvisionedTPS: 2 }
