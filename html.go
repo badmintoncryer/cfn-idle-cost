@@ -108,7 +108,7 @@ func (rep Report) WriteHTML(w io.Writer) error {
 					d.Items = append(d.Items, res)
 				}
 				res.Monthly += it.Monthly
-				res.Lines = append(res.Lines, htmlLine{it.Quantity, it.Monthly, it.Reason, it.Suggestion, it.Saving})
+				res.Lines = append(res.Lines, htmlLine{it.Quantity, it.Monthly, htmlReason(it), it.Suggestion, it.Saving})
 			}
 		}
 		d.Unknown = append(d.Unknown, r.Unknown...)
@@ -347,3 +347,11 @@ renderBars(); renderHead(); renderRows();
 </body>
 </html>
 `))
+
+// htmlReason: the reason, and for an assumed line what was assumed and how to set it.
+func htmlReason(it Item) string {
+	if it.Assumption == nil {
+		return it.Reason
+	}
+	return "≈ " + it.Reason + " · " + assumptionGroup{A: *it.Assumption}.text()
+}

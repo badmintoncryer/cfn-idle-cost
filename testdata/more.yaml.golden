@@ -1,4 +1,4 @@
-eu-west-1 · 1 stack · idle ≈ $4591/mo
+eu-west-1 · 1 stack · idle ≈ $4591/mo · $33 of it on assumptions
 
 more                             $4591/mo
   Broker         ×1               $661  mq.m5.large RabbitMQ Multi-AZ
@@ -27,7 +27,7 @@ more                             $4591/mo
   Proxy          ×2 vCPU           $22  per vCPU of the target instances
   Proxy          ×2 ACU            $22  per ACU of the Serverless v2 targets (minimum)
   Attach         ×1                $36  Transit Gateway VPC attachment
-  RegionBox      ×1                $33  t3.medium on-demand (Linux)
+  RegionBox      ×1                $33  ≈ t3.medium on-demand (Linux assumed)
   SmallDb        ×1                $26  db.t2.small mysql Single-AZ
   SmallDb        ×20 GB gp3      $2.54  storage
   SmallProxy     ×2 vCPU           $22  per vCPU of the target instances
@@ -40,6 +40,9 @@ more                             $4591/mo
   Alarm          ×1 metrics      $0.10  alarm per metric
   Logs2          ×1              $0.00  shares the OCUs of Logs
   Series         ×1              $0.00  shares the OCUs of Logs
+
+≈ assumptions: 1 (in the total; set them to firm it up)
+  more  RegionBox  Linux assumed: ImageId doesn't say the OS. Set it: --os RegionBox=windows (or Metadata cfn-idle-cost: {os: windows})
 
 ? could not estimate: 1
   more  EdgeBox  Local Zone eu-west-1-lhr-1a prices are not supported yet

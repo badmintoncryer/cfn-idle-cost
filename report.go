@@ -16,9 +16,11 @@ type stackReport struct {
 }
 
 type regionReport struct {
-	Region  string        `json:"region"`
-	Stacks  int           `json:"stackCount"`
-	Monthly float64       `json:"monthly"`
+	Region  string  `json:"region"`
+	Stacks  int     `json:"stackCount"`
+	Monthly float64 `json:"monthly"`
+	// Assumed is the part of Monthly from lines that rest on an assumption.
+	Assumed float64       `json:"assumedMonthly"`
 	Billed  []stackReport `json:"stacks"`
 	Unknown []Item        `json:"couldNotEstimate"`
 	Skipped []Item        `json:"notCounted"`
@@ -79,6 +81,9 @@ func NewReport(stacks []*Stack, items []Item, prices *Prices) Report {
 			continue
 		}
 		r.Monthly += it.Monthly
+		if it.Assumption != nil {
+			r.Assumed += it.Monthly
+		}
 		i := 0
 		for i < len(r.Billed) && r.Billed[i].Name != it.Stack {
 			i++
@@ -144,7 +149,7 @@ func (rep Report) WriteText(w io.Writer) {
 		if i > 0 {
 			fmt.Fprintln(w)
 		}
-		fmt.Fprintf(w, "%s · %s · idle ≈ %s/mo\n", r.Region, count(float64(r.Stacks), "stack"), money(r.Monthly))
+		fmt.Fprintf(w, "%s · %s · idle ≈ %s/mo%s\n", r.Region, count(float64(r.Stacks), "stack"), money(r.Monthly), r.assumedNote())
 		pw, qw, mw := 0, 0, 0
 		for _, s := range r.Billed {
 			for _, it := range s.Items {
@@ -157,7 +162,7 @@ func (rep Report) WriteText(w io.Writer) {
 			tot := money(s.Monthly) // right-aligned with the item amounts
 			fmt.Fprintf(w, "\n%s%s/mo\n", pad(s.Name+" ", 6+pw+qw+mw-len(tot)), tot)
 			for _, it := range s.Items {
-				fmt.Fprintf(w, "  %s  %s  %*s  %s\n", pad(it.Path, pw), pad(it.Quantity, qw), mw, money(it.Monthly), it.Reason)
+				fmt.Fprintf(w, "  %s  %s  %*s  %s\n", pad(it.Path, pw), pad(it.Quantity, qw), mw, money(it.Monthly), approx(it)+it.Reason)
 				if it.Suggestion != "" {
 					fmt.Fprintf(w, "  %s  → -%s/mo: %s\n", pad("", pw+qw+mw+2), money(it.Saving), it.Suggestion)
 				}
@@ -165,6 +170,12 @@ func (rep Report) WriteText(w io.Writer) {
 		}
 		if n, saving := r.suggestions(); n > 0 {
 			fmt.Fprintf(w, "\n→ %s save %s/mo\n", count(float64(n), "suggestion"), money(saving))
+		}
+		if as := r.assumptions(); len(as) > 0 {
+			fmt.Fprintf(w, "\n≈ assumptions: %d (in the total; set them to firm it up)\n", len(as))
+			for _, it := range as {
+				fmt.Fprintf(w, "  %s  %s  %s\n", it.Stack, it.paths(), it.text())
+			}
 		}
 		if len(r.Unknown) > 0 {
 			fmt.Fprintf(w, "\n? could not estimate: %d\n", len(r.Unknown))
@@ -198,6 +209,74 @@ func (rep Report) WriteText(w io.Writer) {
 	fmt.Fprintf(w, "\nprices: %s · %s, %g h/mo, USD, free tier ignored\n", rep.Prices, priceBasis(), hoursPerMonth)
 }
 
+// approx marks a line that rests on an assumption.
+func approx(it Item) string {
+	if it.Assumption != nil {
+		return "≈ "
+	}
+	return ""
+}
+
+// assumedNote is the header's "· $70 of it on assumptions".
+func (r regionReport) assumedNote() string {
+	if r.Assumed < 0.005 {
+		return ""
+	}
+	return " · " + money(r.Assumed) + " of it on assumptions"
+}
+
+// assumptionGroup is one assumption and the resources of a stack that rest on it.
+type assumptionGroup struct {
+	Stack string
+	Paths []string
+	First Item // for the location in SARIF
+	A     Assumption
+}
+
+// assumptions groups the region's assumed lines by stack and assumption, so an
+// AMI shared by ten instances is one entry with one way to set it.
+func (r regionReport) assumptions() []assumptionGroup {
+	var out []assumptionGroup
+	at := map[string]int{}
+	for _, s := range r.Billed {
+		for _, it := range s.Items {
+			a := it.Assumption
+			if a == nil {
+				continue
+			}
+			k := it.Stack + "\x00" + a.What + "\x00" + a.Override
+			i, ok := at[k]
+			if !ok {
+				i = len(out)
+				at[k] = i
+				out = append(out, assumptionGroup{Stack: it.Stack, First: it, A: Assumption{What: a.What, Override: a.Override, IfWrongCase: a.IfWrongCase}})
+			}
+			g := &out[i]
+			if !in(it.Path, g.Paths...) {
+				g.Paths = append(g.Paths, it.Path)
+			}
+			g.A.IfWrong += a.IfWrong
+		}
+	}
+	return out
+}
+
+// text: what was assumed, what it would cost if wrong, how to set it.
+func (g assumptionGroup) text() string {
+	a := g.A
+	t := a.What + "."
+	if a.IfWrong >= 0.005 {
+		t += " +" + money(a.IfWrong) + "/mo if " + a.IfWrongCase + "."
+	}
+	if a.Override != "" {
+		t += " Set it: " + a.Override
+	}
+	return t
+}
+
+// paths: "Web", or "Web, Worker, Batch" for a shared assumption.
+func (g assumptionGroup) paths() string { return strings.Join(g.Paths, ", ") }
+
 // count: "1 task", "2 tasks".
 func count(n float64, noun string) string {
 	if n == 1 {
@@ -214,6 +293,7 @@ func (rep Report) WriteJSON(w io.Writer) error {
 	for i := range rep.Regions {
 		r := &rep.Regions[i]
 		cents(&r.Monthly)
+		cents(&r.Assumed)
 		for j := range r.Billed {
 			s := &r.Billed[j]
 			cents(&s.Monthly)
@@ -259,6 +339,9 @@ func mdCell(s string) string { return strings.ReplaceAll(s, "|", `\|`) }
 
 func (rep Report) WriteMarkdown(w io.Writer) {
 	fmt.Fprintf(w, "### Idle cost ≈ %s/mo\n\n", money(rep.Total()))
+	if a := rep.assumed(); a >= 0.005 {
+		fmt.Fprintf(w, "%s of it rests on assumptions (marked ≈, listed below).\n\n", money(a))
+	}
 	fmt.Fprintln(w, "| Region | Stacks | Idle cost |\n|---|---:|---:|")
 	for _, r := range rep.Regions {
 		fmt.Fprintf(w, "| %s | %d | %s/mo |\n", r.Region, r.Stacks, money(r.Monthly))
@@ -277,13 +360,14 @@ func (rep Report) WriteMarkdown(w io.Writer) {
 		fmt.Fprintln(w, "| Stack | Resource | Quantity | $/mo | |\n|---|---|---:|---:|---|")
 		for _, s := range r.Billed {
 			for _, it := range s.Items {
-				fmt.Fprintf(w, "| %s | `%s` | %s | %s | %s |\n", mdCell(s.Name), mdCell(it.Path), it.Quantity, money(it.Monthly), mdCell(it.Reason))
+				fmt.Fprintf(w, "| %s | `%s` | %s | %s | %s |\n", mdCell(s.Name), mdCell(it.Path), it.Quantity, money(it.Monthly), mdCell(approx(it)+it.Reason))
 			}
 		}
 		fmt.Fprintln(w)
 	}
 	fmt.Fprint(w, "</details>\n\n")
 	writeMarkdownSuggestions(w, rep)
+	writeMarkdownAssumptions(w, rep)
 	writeMarkdownUnknown(w, rep)
 	fmt.Fprintf(w, "<sub>cfn-idle-cost · prices: %s · %s, %g h/mo, USD, free tier ignored</sub>\n", rep.Prices, priceBasis(), hoursPerMonth)
 }
@@ -323,6 +407,29 @@ func writeMarkdownSuggestions(w io.Writer, rep Report) {
 	fmt.Fprintln(w)
 }
 
+func (rep Report) assumed() float64 {
+	a := 0.0
+	for _, r := range rep.Regions {
+		a += r.Assumed
+	}
+	return a
+}
+
+func writeMarkdownAssumptions(w io.Writer, rep Report) {
+	var as []assumptionGroup
+	for _, r := range rep.Regions {
+		as = append(as, r.assumptions()...)
+	}
+	if len(as) == 0 {
+		return
+	}
+	fmt.Fprintf(w, "<details><summary>≈ Assumptions (%d, in the total)</summary>\n\n", len(as))
+	for _, it := range as {
+		fmt.Fprintf(w, "- %s `%s`: %s\n", it.Stack, strings.Join(it.Paths, "`, `"), it.text())
+	}
+	fmt.Fprint(w, "\n</details>\n\n")
+}
+
 func writeMarkdownUnknown(w io.Writer, rep Report) {
 	var unknown, skipped, noRule []Item
 	for _, r := range rep.Regions {
@@ -348,4 +455,20 @@ func writeMarkdownUnknown(w io.Writer, rep Report) {
 		}
 		fmt.Fprintln(w)
 	}
+}
+
+// assumedItems returns one line per resource of the group, for SARIF, which
+// places each result at its resource.
+func (r regionReport) assumedItems(g assumptionGroup) []Item {
+	var out []Item
+	seen := map[string]bool{}
+	for _, s := range r.Billed {
+		for _, it := range s.Items {
+			if a := it.Assumption; a != nil && it.Stack == g.Stack && a.What == g.A.What && a.Override == g.A.Override && !seen[it.LogicalID] {
+				seen[it.LogicalID] = true
+				out = append(out, it)
+			}
+		}
+	}
+	return out
 }

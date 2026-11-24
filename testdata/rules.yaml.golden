@@ -1,4 +1,4 @@
-us-east-1 · 1 stack · idle ≈ $6155/mo
+us-east-1 · 1 stack · idle ≈ $6155/mo · $61 of it on assumptions
 
 rules                           $6155/mo
   OntapScaleOut   ×3072 MB/s    $4915  throughput capacity
@@ -13,21 +13,25 @@ rules                           $6155/mo
   Web             ×0.5 vCPU       $15  Fargate vCPU (2 tasks)
   Web             ×2 IPv4       $7.30  public IPv4 per task (2 tasks)
   Web             ×1 GB         $3.24  Fargate memory (2 tasks)
-  Fleet           ×2              $15  t3.micro on-demand (Linux), DesiredCapacity
+  Fleet           ×2              $15  ≈ t3.micro on-demand (Linux assumed), DesiredCapacity
   Fleet           ×2 IPv4       $7.30  public IPv4 assigned at launch, DesiredCapacity
   Ipv6Alb         ×1              $16  Application Load Balancer
   Prod            ×1              $15  0.5 GB cache cluster
-  PublicBox       ×1            $7.59  t3.micro on-demand (Linux)
+  PublicBox       ×1            $7.59  ≈ t3.micro on-demand (Linux assumed)
   PublicBox       ×1 IPv4       $3.65  public IPv4 assigned at launch
-  EipBox          ×1            $7.59  t3.micro on-demand (Linux)
-  ExternalBox     ×1            $7.59  t3.micro on-demand (Linux)
-  MixedFleet      ×1            $7.59  t3.micro on-demand (Linux), MinSize
-  OptOutBox       ×1            $7.59  t3.micro on-demand (Linux)
-  PrivateBox      ×1            $7.59  t3.micro on-demand (Linux)
+  EipBox          ×1            $7.59  ≈ t3.micro on-demand (Linux assumed)
+  ExternalBox     ×1            $7.59  ≈ t3.micro on-demand (Linux assumed)
+  MixedFleet      ×1            $7.59  ≈ t3.micro on-demand (Linux assumed), MinSize
+  OptOutBox       ×1            $7.59  ≈ t3.micro on-demand (Linux assumed)
+  PrivateBox      ×1            $7.59  ≈ t3.micro on-demand (Linux assumed)
   EipBoxAddress   ×1            $3.65  public IPv4 address
   Orders          ×15 RCU       $1.42  provisioned read capacity, replica in us-east-1 (1 in other regions not counted)
   Orders          ×3 rWCU       $1.42  replicated write capacity, auto scaling minimum, replica in us-east-1 (1 in other regions not counted)
   Archive         ×1 WCU        $0.59  write capacity, auto scaling minimum
   Archive         ×4 RCU        $0.47  provisioned read capacity
+
+≈ assumptions: 2 (in the total; set them to firm it up)
+  rules  Fleet  Linux assumed: ImageId doesn't say the OS. Set it: --os Fleet=windows (or Metadata cfn-idle-cost: {os: windows})
+  rules  PublicBox, EipBox, ExternalBox, MixedFleet, OptOutBox, PrivateBox  Linux assumed: ImageId ami-1 doesn't say the OS. Set it: --os ami-1=windows (or Metadata cfn-idle-cost: {os: windows})
 
 prices: test prices · on-demand list prices, 730 h/mo, USD, free tier ignored

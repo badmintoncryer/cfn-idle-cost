@@ -93,7 +93,7 @@
             }
           ],
           "message": {
-            "text": "Server (AWS::EC2::Instance) idles at ≈ $13/mo in ap-northeast-1: $9.93 t3.micro on-demand (Linux) (default of ServerType) (×1); $2.88 EBS gp3 storage (default of ServerType) (×30 GB gp3)"
+            "text": "Server (AWS::EC2::Instance) idles at ≈ $13/mo in ap-northeast-1: $9.93 t3.micro on-demand (Linux assumed) (default of ServerType) (×1); $2.88 EBS gp3 storage (default of ServerType) (×30 GB gp3)"
           },
           "partialFingerprints": {
             "resource/v1": "ap-northeast-1/App/Server"
@@ -173,6 +173,64 @@
             {
               "logicalLocations": [
                 {
+                  "fullyQualifiedName": "App/Server",
+                  "kind": "resource",
+                  "name": "Server"
+                }
+              ],
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "testdata/cdk.out/App.template.json"
+                },
+                "region": {
+                  "startLine": 14
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Server (AWS::EC2::Instance): Linux assumed: ImageId doesn't say the OS. Set it: --os Server=windows (or Metadata cfn-idle-cost: {os: windows})"
+          },
+          "partialFingerprints": {
+            "resource/v1": "ap-northeast-1/App/Server"
+          },
+          "ruleId": "assumption"
+        },
+        {
+          "level": "note",
+          "locations": [
+            {
+              "logicalLocations": [
+                {
+                  "fullyQualifiedName": "App/Spare",
+                  "kind": "resource",
+                  "name": "Spare"
+                }
+              ],
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "testdata/cdk.out/App.template.json"
+                },
+                "region": {
+                  "startLine": 23
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Spare (AWS::EC2::Instance): Linux assumed: ImageId doesn't say the OS. Set it: --os Spare=windows (or Metadata cfn-idle-cost: {os: windows})"
+          },
+          "partialFingerprints": {
+            "resource/v1": "ap-northeast-1/App/Spare"
+          },
+          "ruleId": "assumption"
+        },
+        {
+          "level": "note",
+          "locations": [
+            {
+              "logicalLocations": [
+                {
                   "fullyQualifiedName": "App/Worker",
                   "kind": "resource",
                   "name": "Worker"
@@ -227,6 +285,15 @@
               "id": "not-counted",
               "shortDescription": {
                 "text": "Resource that may cost money idle and has no rule yet"
+              }
+            },
+            {
+              "help": {
+                "text": "The template doesn't say a value the price depends on, such as the OS of an AMI, so cfn-idle-cost assumed one. The line is in the total; the message says how to set the real value."
+              },
+              "id": "assumption",
+              "shortDescription": {
+                "text": "Idle cost that rests on an assumption"
               }
             }
           ],

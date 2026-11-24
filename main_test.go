@@ -533,7 +533,7 @@ func TestReservedPricing(t *testing.T) {
 	defer func() { reservedPricing = false }()
 	var b bytes.Buffer
 	NewReport(stacks, Estimate(stacks, testPrices), testPrices).WriteText(&b)
-	for _, want := range []string{"$4.75  t3.micro 1-yr RI (Linux)", "1-yr no-upfront Reserved Instance rates"} {
+	for _, want := range []string{"$4.75  ≈ t3.micro 1-yr RI (Linux assumed)", "1-yr no-upfront Reserved Instance rates"} {
 		if !strings.Contains(b.String(), want) {
 			t.Errorf("no %q in\n%s", want, b.String())
 		}
@@ -559,10 +559,10 @@ func TestHours(t *testing.T) {
 		got[it.LogicalID+" "+it.Reason] += it.Monthly
 	}
 	for k, want := range map[string]float64{
-		"Nat NAT Gateway":                   0.062 * 365,
-		"Server t3.micro on-demand (Linux)": 0.0136 * 365,
-		"Data EBS gp3 storage":              100 * 0.096,
-		"Key customer managed key":          1,
+		"Nat NAT Gateway": 0.062 * 365,
+		"Server t3.micro on-demand (Linux assumed)": 0.0136 * 365,
+		"Data EBS gp3 storage":                      100 * 0.096,
+		"Key customer managed key":                  1,
 	} {
 		if math.Abs(got[k]-want) > 1e-9 {
 			t.Errorf("%s = %g, want %g", k, got[k], want)

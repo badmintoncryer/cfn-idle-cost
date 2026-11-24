@@ -1,5 +1,7 @@
 ### Idle cost ≈ $1120/mo
 
+$134 of it rests on assumptions (marked ≈, listed below).
+
 | Region | Stacks | Idle cost |
 |---|---:|---:|
 | eu-north-1 | 1 | $1120/mo |
@@ -15,11 +17,11 @@
 | suggest | `Db` | ×20 GB gp3 | $2.42 | storage |
 | suggest | `DbSamePrice` | ×1 | $117 | db.m6g.large postgres Single-AZ |
 | suggest | `DbSamePrice` | ×100 GB gp2 | $12 | storage |
-| suggest | `Server` | ×1 | $74 | m5.large on-demand (Linux) |
+| suggest | `Server` | ×1 | $74 | ≈ m5.large on-demand (Linux assumed) |
 | suggest | `Server` | ×100 GB gp2 | $10 | EBS gp2 storage |
 | suggest | `Service` | ×2 vCPU | $62 | Fargate vCPU (2 tasks) |
 | suggest | `Service` | ×4 GB | $14 | Fargate memory (2 tasks) |
-| suggest | `ArmServer` | ×1 | $60 | m6g.large on-demand (Linux) |
+| suggest | `ArmServer` | ×1 | $60 | ≈ m6g.large on-demand (Linux assumed) |
 | suggest | `ArmServer` | ×100 GB gp3 | $8.40 | EBS gp3 storage |
 | suggest | `NatA` | ×1 | $34 | NAT Gateway |
 | suggest | `NatB` | ×1 | $34 | NAT Gateway |
@@ -38,11 +40,18 @@
 - suggest `DbMultiAZ`: -$1.40/mo, gp3 (now storage)
 - suggest `Big`: -$22/mo, gp3 with 6000 IOPS and 250 MiB/s, gp2's baseline (now EBS gp2 storage)
 - suggest `Db`: -$13/mo, db.m6g.large (Graviton) (now db.m5.large postgres Single-AZ)
-- suggest `Server`: -$15/mo, m6g.large (Graviton), if the AMI and software run on arm64 (now m5.large on-demand (Linux))
+- suggest `Server`: -$15/mo, m6g.large (Graviton), if the AMI and software run on arm64 (now m5.large on-demand (Linux assumed))
 - suggest `Server`: -$2.10/mo, gp3 (now EBS gp2 storage)
 - suggest `Service`: -$15/mo, ARM64 vCPU and memory (Graviton, RuntimePlatform CpuArchitecture), if the image is built for arm64 (now Fargate vCPU (2 tasks))
 - suggest `NatB`: -$37/mo, one NAT Gateway for the VPC instead of 2 (CDK natGateways: 1); egress then depends on one AZ (now NAT Gateway)
 - suggest `Cache`: -$1.46/mo, cache.t4g.micro (Graviton) (now cache.t3.micro Redis)
 - suggest `Endpoint`: -$8.03/mo, one subnet instead of 2, for development stacks: clients in the other AZs then cross AZs and lose the endpoint if its AZ fails (now interface endpoint)
+
+<details><summary>≈ Assumptions (2, in the total)</summary>
+
+- suggest `Server`: Linux assumed: ImageId doesn't say the OS. Set it: --os Server=windows (or Metadata cfn-idle-cost: {os: windows})
+- suggest `ArmServer`: Linux assumed: ImageId doesn't say the OS. Set it: --os ArmServer=windows (or Metadata cfn-idle-cost: {os: windows})
+
+</details>
 
 <sub>cfn-idle-cost · prices: test prices · on-demand list prices, 730 h/mo, USD, free tier ignored</sub>

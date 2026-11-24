@@ -34,7 +34,24 @@ type Item struct {
 	// Suggestion is a cheaper setting for this line, and Saving what it saves a month (--suggest).
 	Suggestion string  `json:"suggestion,omitempty"`
 	Saving     float64 `json:"saving,omitempty"`
+	// Assumption is what the line takes for granted that the template doesn't say.
+	// The line is in the total, marked ≈, with how to set it right.
+	Assumption *Assumption `json:"assumption,omitempty"`
 }
+
+// Assumption is a guess an estimate line rests on.
+type Assumption struct {
+	What     string `json:"what"`               // "Linux: ImageId ami-0abc12 doesn't say the OS"
+	Override string `json:"override,omitempty"` // how to replace the guess with the real value
+	// IfWrong is how much more a month the line would cost if the other case
+	// (IfWrongCase, "Windows") were true.
+	IfWrong     float64 `json:"ifWrongMonthly,omitempty"`
+	IfWrongCase string  `json:"ifWrongCase,omitempty"`
+}
+
+// excludeAssumed leaves the lines that rest on an assumption out of the total
+// and lists them as could not estimate (--assume none).
+var excludeAssumed bool
 
 // unresolved aborts the estimate of one resource; the message says why.
 type unresolved string
@@ -47,6 +64,8 @@ type est struct {
 	id     string
 	items  []Item
 	notes  []string // parameters whose defaults were used
+	// assuming marks the lines added while it is set (see Assumption).
+	assuming *Assumption
 	// engineVersion replaces the EngineVersion a DB instance is billed for (a
 	// Blue/Green deployment's TargetEngineVersion).
 	engineVersion string
@@ -118,12 +137,16 @@ func estimateResource(all []*Stack, st *Stack, prices *Prices, id string) (items
 	for _, it := range e.items {
 		b := base
 		b.Quantity, b.Monthly, b.Reason = it.Quantity, it.Monthly, it.Reason
-		b.Suggestion, b.Saving = it.Suggestion, it.Saving
+		b.Suggestion, b.Saving, b.Assumption = it.Suggestion, it.Saving, it.Assumption
 		if d := discountFor(e.r.Type); d > 0 {
 			b.Monthly, b.Saving = b.Monthly*(1-d), b.Saving*(1-d)
 		}
 		if len(e.notes) > 0 {
 			b.Reason += " (default of " + strings.Join(e.notes, ", ") + ")"
+		}
+		if b.Assumption != nil && excludeAssumed && b.Monthly > 0 {
+			b.Unknown, b.Quantity, b.Monthly, b.Suggestion, b.Saving = true, "", 0, "", 0
+			b.Reason = "--assume none: " + b.Assumption.What
 		}
 		items = append(items, b)
 	}
@@ -451,7 +474,7 @@ func (e *est) add(qty float64, unit string, monthly float64, reason string) {
 	if unit != "" {
 		q += " " + unit
 	}
-	e.items = append(e.items, Item{Quantity: q, Monthly: monthly, Reason: reason})
+	e.items = append(e.items, Item{Quantity: q, Monthly: monthly, Reason: reason, Assumption: e.assuming})
 }
 
 // ---- rules
@@ -521,10 +544,14 @@ func init() {
 			t := e.str(p, "InstanceType", "")
 			bdm := p["BlockDeviceMappings"]
 			nics := p["NetworkInterfaces"]
+			img := p["ImageId"]
 			if lt, ok := p["LaunchTemplate"]; ok {
 				data := e.launchTemplate(asMap(lt))
 				if t == "" {
 					t = e.str(data, "InstanceType", "")
+				}
+				if img == nil {
+					img = data["ImageId"]
 				}
 				if bdm == nil {
 					bdm = data["BlockDeviceMappings"]
@@ -540,8 +567,9 @@ func init() {
 				panic(unresolved("dedicated tenancy is not supported yet"))
 			}
 			e.notLocalZone(p)
-			e.hourly(1, "", "ec2|"+t, t+" on-demand (Linux)")
-			e.suggestGraviton(t, 1, ec2Key, armCaveat)
+			if e.instances(1, t, img, "") {
+				e.suggestGraviton(t, 1, ec2Key, armCaveat)
+			}
 			e.blockDevices(bdm, 1)
 			nic := firstMap(nics)
 			subnet := p["SubnetId"]
@@ -553,7 +581,7 @@ func init() {
 			}
 		},
 		"AWS::AutoScaling::AutoScalingGroup": func(e *est, p map[string]any) {
-			t, bdm, assoc, dist := e.asgLaunch(p)
+			t, bdm, assoc, dist, img := e.asgLaunch(p)
 			n, why := e.num(p, "DesiredCapacity", -1), "DesiredCapacity"
 			if n < 0 {
 				n, why = e.mustNum(p, "MinSize"), "MinSize"
@@ -562,8 +590,9 @@ func init() {
 			if dist != nil { // the Spot instances' EBS volumes and IPv4 addresses are still billed
 				od, odWhy = e.onDemand(dist, n), fmt.Sprintf("On-Demand part of %s %g (Spot not counted)", why, n)
 			}
-			e.hourly(od, "", "ec2|"+t, fmt.Sprintf("%s on-demand (Linux), %s", t, odWhy))
-			e.suggestGraviton(t, od, ec2Key, armCaveat)
+			if e.instances(od, t, img, ", "+odWhy) {
+				e.suggestGraviton(t, od, ec2Key, armCaveat)
+			}
 			e.blockDevices(bdm, n)
 			subnets, _ := p["VPCZoneIdentifier"].([]any)
 			if e.autoPublicIP(assoc, subnets) {
@@ -2237,7 +2266,7 @@ func init() {
 			var ls []fleetLaunch
 			for _, s := range specs {
 				s := asMap(s)
-				ls = append(ls, fleetLaunch{e.mustStr(s, "InstanceType"), e.num(s, "WeightedCapacity", 1), s["BlockDeviceMappings"]})
+				ls = append(ls, fleetLaunch{e.mustStr(s, "InstanceType"), e.num(s, "WeightedCapacity", 1), s["BlockDeviceMappings"], s["ImageId"]})
 			}
 			e.fleet(od, spot, ls)
 			return
@@ -2307,6 +2336,7 @@ type fleetLaunch struct {
 	typ    string
 	weight float64 // capacity units per instance
 	bdm    any
+	img    any // ImageId
 }
 
 // fleetLaunches reads the instance types of LaunchTemplateConfigs: each
@@ -2322,7 +2352,7 @@ func (e *est) fleetLaunches(v any) []fleetLaunch {
 		data := e.launchTemplate(asMap(c["LaunchTemplateSpecification"]))
 		ovs, _ := c["Overrides"].([]any)
 		if len(ovs) == 0 {
-			out = append(out, fleetLaunch{e.mustStr(data, "InstanceType"), 1, data["BlockDeviceMappings"]})
+			out = append(out, fleetLaunch{e.mustStr(data, "InstanceType"), 1, data["BlockDeviceMappings"], data["ImageId"]})
 		}
 		for _, o := range ovs {
 			o := asMap(o)
@@ -2333,7 +2363,7 @@ func (e *est) fleetLaunches(v any) []fleetLaunch {
 			if t == "" {
 				t = e.mustStr(data, "InstanceType")
 			}
-			out = append(out, fleetLaunch{t, e.num(o, "WeightedCapacity", 1), data["BlockDeviceMappings"]})
+			out = append(out, fleetLaunch{t, e.num(o, "WeightedCapacity", 1), data["BlockDeviceMappings"], data["ImageId"]})
 		}
 	}
 	return out
@@ -2362,7 +2392,7 @@ func (e *est) fleet(od, spot float64, launches []fleetLaunch) {
 	if spot > 0 {
 		why += fmt.Sprintf(" (%g Spot not counted)", spot)
 	}
-	e.hourly(n, "", "ec2|"+l.typ, l.typ+" on-demand (Linux), "+why)
+	e.instances(n, l.typ, l.img, ", "+why)
 	e.blockDevices(l.bdm, n)
 }
 
