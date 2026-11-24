@@ -268,13 +268,13 @@ jobs:
 | `AWS::ElastiCache::CacheCluster`、`ReplicationGroup` | ノードの時間料金×ノード数 |
 | `AWS::ElastiCache::ServerlessCache` | データストレージの最小量（1 GB。Valkeyは100 MB。`CacheUsageLimits`で最小量を指定していればその値） |
 | `AWS::DynamoDB::Table` | プロビジョニングしたRCU・WCU（GSIを含みます。StandardとStandard-IAに対応） |
-| `AWS::DynamoDB::GlobalTable` | スタックと同じリージョンにあるレプリカの、プロビジョニングしたRCUとAuto Scalingの最小WCU（GSIを含みます。レプリカが2つ以上なら、書き込みにはレプリケートされたWCUの料金を使います）。ほかのリージョンのレプリカは、数を行に書くだけで、料金には含めません |
+| `AWS::DynamoDB::GlobalTable` | すべてのレプリカの、プロビジョニングしたRCUとAuto Scalingの最小WCU（GSIを含みます。レプリカが2つ以上なら、書き込みにはレプリケートされたWCUの料金を使います）。各レプリカはそれぞれのリージョンの料金で見積もります。[前提](#前提)を参照してください |
 | `AWS::Kinesis::Stream` | プロビジョンドのシャード時間（24時間を超える延長保持を含む）、またはオンデマンドのストリーム時間 |
 | `AWS::ECS::Service`（Fargate） | vCPU、メモリ、20 GBを超えるエフェメラルストレージ、パブリックIPv4（`AssignPublicIp: ENABLED`のとき）×`DesiredCount`（x86とARMのLinux、Windows。WindowsはvCPUごとのOSライセンス料金も含みます）。キャパシティプロバイダ戦略を使うときは、FARGATEに割り当たるタスクだけを数えます。`Base`を先に割り当て、残りを`Weight`の比で分けます。ECSは端数の扱いを公開していないので、切り上げます。Fargate Spotのタスクは数えません。ほかのプロバイダのタスクは、そのAuto Scalingグループの側で数えます |
 | `AWS::EFS::FileSystem` | プロビジョンドスループット |
 | `AWS::FSx::FileSystem` | Windows、Lustre、OpenZFS、ONTAPのストレージ容量とスループット容量。容量1 GBあたり3 IOPSを超えるSSD IOPS（ONTAPの容量プールは使った分だけかかるので含みません） |
 | `AWS::KMS::Key`、`AWS::KMS::ReplicaKey` | キー1つにつき$1 |
-| `AWS::SecretsManager::Secret` | シークレットとレプリカごとの料金 |
+| `AWS::SecretsManager::Secret` | シークレットごとの料金と、レプリカごとにそのリージョンの料金 |
 | `AWS::Route53::HostedZone` | ホストゾーンごとの料金 |
 | `AWS::EKS::Cluster` | クラスターの時間料金。`Version`が価格の基準日（同梱のスナップショットの日付、`--live`なら当日）に標準サポートを過ぎていれば、延長サポートの料金も加えます |
 | `AWS::EKS::Nodegroup` | インスタンスの時間料金×`DesiredSize`（なければ`MinSize`）。オンデマンドで、インスタンスタイプが1つの場合。WindowsのAMIタイプは、ライセンス込みのWindowsの料金で見積もる。ノードのボリュームは`DiskSize`（既定20 GB、Windowsは50 GB）をgp3として数え、EKSがボリュームタイプを公開していないので`≈`を付ける。起動テンプレートを使うときは、その`BlockDeviceMappings`とAMIのルートボリューム（20 GB、`≈`）を数える |
@@ -470,6 +470,7 @@ jobs:
     app  Batch, Worker  Linux assumed: ImageId ami-0abc12 doesn't say the OS. +$134/mo if Windows. Set it: --os ami-0abc12=windows (or Metadata cfn-idle-cost: {os: windows})
   ```
 - EC2インスタンス、Auto Scalingグループ、ウォームプール、フリートのOSは、`ImageId`の公開SSMパラメータのパスから読みます。CDKの`MachineImage.latestWindows()`や`latestAmazonLinux2023()`などはこのパスを書き出します。`/aws/service/ami-windows-latest/...`はライセンス込みのWindows、Amazon Linux、Ubuntu、Debian、Bottlerocket、ECS・EKS最適化AMIはLinuxです。SQL ServerのAMIはWindows、SUSEのAMIはLinuxの料金で見積もり、SQL ServerのライセンスとSUSEのサブスクリプションは数えないので`≈`を付けます。リテラルのAMI IDなどほかのイメージはLinuxとみなして`≈`を付けます。OSは`--os ami-0abc12=windows`か、リソースのMetadataで指定できます。CDKでは`(instance.node.defaultChild as cdk.CfnResource).addMetadata('cfn-idle-cost', { os: 'windows' })`です。テナンシーは共有です。`InstanceMarketOptions`（または起動テンプレートのもの）が`spot`のインスタンスはSpotとして数えます。
+- グローバルテーブルのレプリカのように、スタックとは別のリージョンで課金される行は、そのリージョンの料金で見積もり、行にリージョンを書きます（`replica in eu-west-1`）。金額はスタックのリージョンの合計に含め、ヘッダーにほかのリージョンで課金される額を出します（`· $2.68 billed in eu-west-1`）。JSONでは行に`billedIn`が付きます。そのリージョンの料金がないときは、その行だけを`? could not estimate`に載せます。
 - Spotのインスタンス（`MixedInstancesPolicy`のAuto Scalingグループ、EC2フリート、Spotフリート、インスタンスタイプが1つのEKSのSpotノードグループ、Spotインスタンス）は、[Spot Instance Advisor](https://aws.amazon.com/ec2/spot/instance-advisor/)がタイプ・リージョン・OSごとに示す平均の割引率をオンデマンド料金から引いて見積もります。割引率はスナップショットに含めていて、`--live`では取り直します。Spotの価格は変わるので、これらの行には`≈`を付け、前提の一覧にオンデマンド料金（Spotの上限）ならいくら増えるかを出します。
 - サイズがAMIから決まるルートボリューム（`/dev/xvda`か`/dev/sda1`のマッピングに`VolumeSize`がないもの）は、一般的なAMIのサイズ（8 GB、Windowsは30 GB）で数えます。マッピングに`VolumeType`がなければgp3とし、`≈`を付けます。ルートデバイスの`VolumeSize`を書けば確定します。
 - インスタンス、Auto Scalingグループ、Fargateのタスクに起動時に割り当てられるパブリックIPv4は、`AssociatePublicIpAddress`（Fargateは`AssignPublicIp`）で割り当てると指定しているときに数えます。指定がなければ、すべてのサブネットが同じテンプレートにあり、`MapPublicIpOnLaunch`がtrueのときに数えます。サブネットが別のスタックなどにあって決まらないときは、IPの行を出さず、リソースのほかの費用だけを見積もります。同じテンプレートでElastic IPを関連付けたインスタンスは、IPを二重に数えません。

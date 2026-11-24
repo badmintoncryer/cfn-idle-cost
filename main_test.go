@@ -33,6 +33,7 @@ var testPrices = &Prices{Source: "test prices", AsOf: "2026-10-16", Regions: map
 		"kinesis|Storage-ShardHour":         0.0195,
 	},
 	"eu-west-1": {
+		"ddb|ReadCapacityUnit-Hrs": 0.000147, "ddb|ReplWriteCapacityUnit-Hrs": 0.000735,
 		"spot|Linux:t3.medium":    0.65,
 		"rdsproxy|RDS:ProxyUsage": 0.015, "rdsproxy|RDS:Proxy-ASv2-Usage": 0.015, "rds|InstanceUsage:db.r6g.large|16": 0.276, "rds|InstanceUsage:db.t2.small|2": 0.036, "rds|RDS:GP3-Storage|2": 0.127,
 		"rds|Aurora:ServerlessV2Usage|16": 0.13, "aoss|IndexingOCU": 0.24, "aoss|SearchOCU": 0.24,

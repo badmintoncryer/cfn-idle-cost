@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -34,6 +35,9 @@ type Item struct {
 	// Suggestion is a cheaper setting for this line, and Saving what it saves a month (--suggest).
 	Suggestion string  `json:"suggestion,omitempty"`
 	Saving     float64 `json:"saving,omitempty"`
+	// BilledIn is the region the line is billed in when it is not the stack's,
+	// such as a global table's replica in another region.
+	BilledIn string `json:"billedIn,omitempty"`
 	// Assumption is what the line takes for granted that the template doesn't say.
 	// The line is in the total, marked ≈, with how to set it right.
 	Assumption *Assumption `json:"assumption,omitempty"`
@@ -66,6 +70,40 @@ type est struct {
 	notes  []string // parameters whose defaults were used
 	// assuming marks the lines added while it is set (see Assumption).
 	assuming *Assumption
+	// region prices the lines added while it is set in that region instead
+	// of the stack's (see inRegion).
+	region string
+}
+
+// reg is the region the lines are priced in.
+func (e *est) reg() string {
+	if e.region != "" {
+		return e.region
+	}
+	return e.st.Region
+}
+
+// inRegion runs f with its lines priced and billed in region r. When they
+// can't be estimated there, one could-not-estimate line says so and the rest
+// of the resource is still estimated.
+func (e *est) inRegion(r string, f func()) {
+	old, n := e.region, len(e.items)
+	e.region = r
+	defer func() {
+		e.region = old
+		if v := recover(); v != nil {
+			msg, ok := v.(unresolved)
+			if !ok {
+				panic(v)
+			}
+			why := string(msg)
+			if !strings.Contains(why, r) {
+				why = "in " + r + ": " + why
+			}
+			e.items = append(e.items[:n], Item{Unknown: true, Reason: why})
+		}
+	}()
+	f()
 }
 
 // Estimate returns the billed items of every stack, plus the resources it could
@@ -133,8 +171,8 @@ func estimateResource(all []*Stack, st *Stack, prices *Prices, id string) (items
 	rule(e, e.props(e.r))
 	for _, it := range e.items {
 		b := base
-		b.Quantity, b.Monthly, b.Reason = it.Quantity, it.Monthly, it.Reason
-		b.Suggestion, b.Saving, b.Assumption = it.Suggestion, it.Saving, it.Assumption
+		b.Quantity, b.Monthly, b.Reason, b.Unknown = it.Quantity, it.Monthly, it.Reason, it.Unknown
+		b.Suggestion, b.Saving, b.Assumption, b.BilledIn = it.Suggestion, it.Saving, it.Assumption, it.BilledIn
 		if d := discountFor(e.r.Type); d > 0 {
 			b.Monthly, b.Saving = b.Monthly*(1-d), b.Saving*(1-d)
 		}
@@ -416,10 +454,10 @@ func (e *est) ref(m map[string]any, key string) (string, Resource) {
 }
 
 func (e *est) price(key string) float64 {
-	v, ok := e.prices.Get(e.st.Region, key)
+	v, ok := e.prices.Get(e.reg(), key)
 	if !ok {
 		_, detail, _ := strings.Cut(key, "|")
-		panic(unresolved(fmt.Sprintf("no price for %s in %s", detail, e.st.Region)))
+		panic(unresolved(fmt.Sprintf("no price for %s in %s", detail, e.reg())))
 	}
 	return v
 }
@@ -432,7 +470,7 @@ func (e *est) hourly(qty float64, unit, key, reason string) {
 	}
 	p := e.price(key)
 	if reservedPricing {
-		if ri, ok := e.prices.Get(e.st.Region, key+riSuffix); ok {
+		if ri, ok := e.prices.Get(e.reg(), key+riSuffix); ok {
 			p = ri
 			if strings.Contains(reason, "on-demand") {
 				reason = strings.Replace(reason, "on-demand", "1-yr RI", 1)
@@ -471,7 +509,11 @@ func (e *est) add(qty float64, unit string, monthly float64, reason string) {
 	if unit != "" {
 		q += " " + unit
 	}
-	e.items = append(e.items, Item{Quantity: q, Monthly: monthly, Reason: reason, Assumption: e.assuming})
+	it := Item{Quantity: q, Monthly: monthly, Reason: reason, Assumption: e.assuming}
+	if e.reg() != e.st.Region {
+		it.BilledIn = e.reg()
+	}
+	e.items = append(e.items, it)
 }
 
 // ---- rules
@@ -690,11 +732,13 @@ func init() {
 			e.monthly(1, "", "kms|KMS-Keys", "customer managed key (replica)")
 		},
 		"AWS::SecretsManager::Secret": func(e *est, p map[string]any) {
-			n, why := 1+float64(max(0, e.length(p, "ReplicaRegions"))), "secret"
-			if n > 1 { // each replica is billed as a secret
-				why = "secret and its replicas"
+			e.monthly(1, "", "secrets|AWSSecretsManager-Secrets", "secret")
+			if e.length(p, "ReplicaRegions") > 0 { // each replica is billed as a secret, in its region
+				for _, r := range p["ReplicaRegions"].([]any) {
+					region := e.mustStr(asMap(r), "Region")
+					e.inRegion(region, func() { e.monthly(1, "", "secrets|AWSSecretsManager-Secrets", "replica in "+region) })
+				}
 			}
-			e.monthly(n, "", "secrets|AWSSecretsManager-Secrets", why)
 		},
 		"AWS::Route53::HostedZone": func(e *est, p map[string]any) {
 			e.monthly(1, "", "r53|HostedZone", "hosted zone")
@@ -1150,23 +1194,19 @@ func (e *est) userIOPS(c map[string]any, size float64, key string) {
 	}
 }
 
-// globalTable bills the provisioned capacity of the replica in the stack's
-// region. Writes can only be set as an auto scaling range, so the minimum is
-// used; with two or more replicas they are billed as replicated writes.
-// ponytail: other regions' replicas are only counted in the reason; pricing
-// them needs a region per Item.
+// globalTable bills the provisioned capacity of every replica, each in its
+// own region. Writes can only be set as an auto scaling range, so the minimum
+// is used; with two or more replicas they are billed as replicated writes.
 func globalTable(e *est, p map[string]any) {
 	if e.str(p, "BillingMode", "PROVISIONED") != "PROVISIONED" {
 		return
 	}
 	replicas, _ := p["Replicas"].([]any)
-	var here map[string]any
+	found := false
 	for _, r := range replicas {
-		if e.mustStr(asMap(r), "Region") == e.st.Region {
-			here = asMap(r)
-		}
+		found = found || e.mustStr(asMap(r), "Region") == e.st.Region
 	}
-	if here == nil {
+	if !found {
 		panic(unresolved("no replica in " + e.st.Region))
 	}
 	minWrite := func(m map[string]any) float64 {
@@ -1187,26 +1227,40 @@ func globalTable(e *est, p map[string]any) {
 		}
 		return e.mustNum(as, "MinCapacity")
 	}
-	r, w := read(here), minWrite(p)
-	replicaGSIs, _ := here["GlobalSecondaryIndexes"].([]any)
-	for _, g := range replicaGSIs {
-		r += read(asMap(g))
-	}
+	w := minWrite(p)
 	gsis, _ := p["GlobalSecondaryIndexes"].([]any)
 	for _, g := range gsis {
 		w += minWrite(asMap(g))
 	}
-	ia := ""
-	if e.str(here, "TableClass", "STANDARD") == "STANDARD_INFREQUENT_ACCESS" {
-		ia = "IA-"
-	}
-	wkey, wunit, what, sfx := "WriteCapacityUnit-Hrs", "WCU", "write capacity", ""
+	wkey, wunit, what := "WriteCapacityUnit-Hrs", "WCU", "write capacity"
 	if len(replicas) > 1 {
 		wkey, wunit, what = "ReplWriteCapacityUnit-Hrs", "rWCU", "replicated write capacity"
-		sfx = fmt.Sprintf(", replica in %s (%d in other regions not counted)", e.st.Region, len(replicas)-1)
 	}
-	e.hourly(r, "RCU", "ddb|"+ia+"ReadCapacityUnit-Hrs", "provisioned read capacity"+sfx)
-	e.hourly(w, wunit, "ddb|"+ia+wkey, what+", auto scaling minimum"+sfx)
+	// The stack's region first, then the others in template order.
+	sort.SliceStable(replicas, func(i, j int) bool {
+		return e.str(asMap(replicas[i]), "Region", "") == e.st.Region && e.str(asMap(replicas[j]), "Region", "") != e.st.Region
+	})
+	for _, rv := range replicas {
+		here := asMap(rv)
+		region := e.mustStr(here, "Region")
+		r := read(here)
+		replicaGSIs, _ := here["GlobalSecondaryIndexes"].([]any)
+		for _, g := range replicaGSIs {
+			r += read(asMap(g))
+		}
+		ia := ""
+		if e.str(here, "TableClass", "STANDARD") == "STANDARD_INFREQUENT_ACCESS" {
+			ia = "IA-"
+		}
+		sfx := ""
+		if len(replicas) > 1 {
+			sfx = ", replica in " + region
+		}
+		e.inRegion(region, func() {
+			e.hourly(r, "RCU", "ddb|"+ia+"ReadCapacityUnit-Hrs", "provisioned read capacity"+sfx)
+			e.hourly(w, wunit, "ddb|"+ia+wkey, what+", auto scaling minimum"+sfx)
+		})
+	}
 }
 
 func ecsService(e *est, p map[string]any) {

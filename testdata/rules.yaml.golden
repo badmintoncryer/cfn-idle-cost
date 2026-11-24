@@ -1,6 +1,6 @@
-us-east-1 · 1 stack · idle ≈ $6160/mo · $66 of it on assumptions
+us-east-1 · 1 stack · idle ≈ $6162/mo · $66 of it on assumptions · $2.68 billed in eu-west-1
 
-rules                           $6160/mo
+rules                           $6162/mo
   OntapScaleOut   ×3072 MB/s    $4915  throughput capacity
   OntapScaleOut   ×2048 GB SSD   $256  SSD storage (capacity pool is pay-per-use)
   OntapScaleOut   ×3856 IOPS      $66  SSD IOPS above 3 per GB
@@ -31,9 +31,11 @@ rules                           $6160/mo
   OptOutBox       ×8 GB gp3     $0.64  ≈ root volume from the AMI
   PrivateBox      ×1            $7.59  ≈ t3.micro on-demand (Linux assumed)
   PrivateBox      ×8 GB gp3     $0.64  ≈ root volume from the AMI
+  Orders          ×3 rWCU       $1.61  replicated write capacity, auto scaling minimum, replica in eu-west-1
+  Orders          ×15 RCU       $1.42  provisioned read capacity, replica in us-east-1
+  Orders          ×3 rWCU       $1.42  replicated write capacity, auto scaling minimum, replica in us-east-1
+  Orders          ×10 RCU       $1.07  provisioned read capacity, replica in eu-west-1
   EipBoxAddress   ×1            $3.65  public IPv4 address
-  Orders          ×15 RCU       $1.42  provisioned read capacity, replica in us-east-1 (1 in other regions not counted)
-  Orders          ×3 rWCU       $1.42  replicated write capacity, auto scaling minimum, replica in us-east-1 (1 in other regions not counted)
   Archive         ×1 WCU        $0.59  write capacity, auto scaling minimum
   Archive         ×4 RCU        $0.47  provisioned read capacity
 
