@@ -589,10 +589,10 @@ var selectors = []selector{
 			}
 			return ""
 		}},
-	// Internet Monitor has no productFamily.
 	// Network Synthetic Monitor, per monitored subnet-hour.
 	{name: "cwnm", service: "AmazonCloudWatch", families: []string{"CloudWatch Network Monitor"},
 		key: func(a map[string]string, u string) string { return keep(u, "CWNMHybrid-Paid") }},
+	// Internet Monitor has no productFamily.
 	{name: "im", service: "AmazonCloudWatch",
 		key: func(a map[string]string, u string) string { return keep(u, "CW:InternetMonitor-MonitoredResource") }},
 	{name: "influx", service: "AmazonTimestream", families: []string{"Database Instance", "Influx Optimized Storage"},
