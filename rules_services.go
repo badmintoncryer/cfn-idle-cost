@@ -256,7 +256,7 @@ func smsPhoneNumber(e *est, p map[string]any) {
 	if usd == 0 {
 		panic(unresolved("no list price for a " + t + " number in " + c))
 	}
-	e.add(1, "", usd, fmt.Sprintf("%s %s number lease ($%g list price, not in the Price List)", c, t, usd))
+	e.listPrice(1, "", usd, fmt.Sprintf("%s %s number lease ($%g list price, not in the Price List)", c, t, usd))
 }
 
 // lightsailBundle bills the monthly bundle a Lightsail BundleId names.

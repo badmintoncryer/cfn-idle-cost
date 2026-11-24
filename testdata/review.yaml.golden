@@ -1,27 +1,32 @@
-us-east-1 · 1 stack · idle ≈ $781/mo · $8.00 of it on assumptions · $0.40 billed in ap-northeast-1
+us-east-1 · 1 stack · idle ≈ $786/mo · $8.00 of it on assumptions · $0.40 billed in ap-northeast-1
 
-review                       $781/mo
-  WinNodes     ×2            $274  m5.large on-demand (Windows, license included), DesiredSize
-  WinNodes     ×100 GB gp3  $8.00  ≈ node volume (DiskSize 50 GB)
-  Search       ×1            $122  r6g.large.search data nodes
-  Search       ×500 GB gp3    $61  EBS storage
-  Search       ×50 MiB/s    $3.20  gp3 throughput above 250 MiB/s
-  Uneven       ×2 vCPU        $59  Fargate vCPU (2 of 3 tasks on FARGATE, rounded up; FARGATE_SPOT not counted here)
-  Uneven       ×4 GB          $13  Fargate memory (2 of 3 tasks on FARGATE, rounded up; FARGATE_SPOT not counted here)
-  DocsWriter   ×1 DCU         $66  serverless minimum capacity
-  Stream       ×2 shards      $29  extended retention (over 24 hours)
-  Stream       ×2 shards      $22  provisioned shards
-  FargateOnly  ×1 vCPU        $30  Fargate vCPU (1 task)
-  FargateOnly  ×2 GB        $6.49  Fargate memory (1 task)
-  SpotFirst    ×1 vCPU        $30  Fargate vCPU (1 of 4 tasks on FARGATE; FARGATE_SPOT not counted here)
-  SpotFirst    ×2 GB        $6.49  Fargate memory (1 of 4 tasks on FARGATE; FARGATE_SPOT not counted here)
-  SpotLast     ×1 vCPU        $30  Fargate vCPU (1 of 4 tasks on FARGATE; FARGATE_SPOT not counted here)
-  SpotLast     ×2 GB        $6.49  Fargate memory (1 of 4 tasks on FARGATE; FARGATE_SPOT not counted here)
-  Db           ×1             $12  db.t4g.micro postgres Single-AZ
-  Db           ×20 GB gp3   $2.30  storage
-  Secret       ×1           $0.40  secret
-  Secret       ×1           $0.40  replica in ap-northeast-1
-  AllSpot      ×1           $0.00  no tasks on FARGATE (2 tasks; FARGATE_SPOT not counted here)
+review                          $786/mo
+  WinNodes        ×2            $274  m5.large on-demand (Windows, license included), DesiredSize
+  WinNodes        ×100 GB gp3  $8.00  ≈ node volume (DiskSize 50 GB)
+  Search          ×1            $122  r6g.large.search data nodes
+  Search          ×500 GB gp3    $61  EBS storage
+  Search          ×50 MiB/s    $3.20  gp3 throughput above 250 MiB/s
+  Uneven          ×2 vCPU        $59  Fargate vCPU (2 of 3 tasks on FARGATE, rounded up; FARGATE_SPOT not counted here)
+  Uneven          ×4 GB          $13  Fargate memory (2 of 3 tasks on FARGATE, rounded up; FARGATE_SPOT not counted here)
+  DocsWriter      ×1 DCU         $66  serverless minimum capacity
+  Stream          ×2 shards      $29  extended retention (over 24 hours)
+  Stream          ×2 shards      $22  provisioned shards
+  FargateOnly     ×1 vCPU        $30  Fargate vCPU (1 task)
+  FargateOnly     ×2 GB        $6.49  Fargate memory (1 task)
+  SpotFirst       ×1 vCPU        $30  Fargate vCPU (1 of 4 tasks on FARGATE; FARGATE_SPOT not counted here)
+  SpotFirst       ×2 GB        $6.49  Fargate memory (1 of 4 tasks on FARGATE; FARGATE_SPOT not counted here)
+  SpotLast        ×1 vCPU        $30  Fargate vCPU (1 of 4 tasks on FARGATE; FARGATE_SPOT not counted here)
+  SpotLast        ×2 GB        $6.49  Fargate memory (1 of 4 tasks on FARGATE; FARGATE_SPOT not counted here)
+  Db              ×1             $12  db.t4g.micro postgres Single-AZ
+  Db              ×20 GB gp3   $2.30  storage
+  Dashboard       ×1           $3.00  dashboard ($3 list price, not in the Price List)
+  FastRotatedKey  ×1           $1.00  customer managed key
+                                    ↗ $3.00/mo after 180 days: automatic key rotation
+  RotatedKey      ×1           $1.00  customer managed key
+                                    ↗ $3.00/mo after 2 years: automatic key rotation
+  Secret          ×1           $0.40  secret
+  Secret          ×1           $0.40  replica in ap-northeast-1
+  AllSpot         ×1           $0.00  no tasks on FARGATE (2 tasks; FARGATE_SPOT not counted here)
 
 ≈ assumptions: 1 (in the total; set them to firm it up)
   review  WinNodes  gp3 node volumes (EKS doesn't document the type of DiskSize volumes). Set it: use a launch template whose BlockDeviceMappings set VolumeType

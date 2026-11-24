@@ -47,3 +47,7 @@ Resources:
   DocsWriter: { Type: AWS::DocDB::DBInstance, Properties: { DBClusterIdentifier: !Ref Docs, DBInstanceClass: db.serverless } }
   # Listed instead of left out.
   Desk: { Type: AWS::WorkSpaces::Workspace, Properties: { BundleId: wsb-1, DirectoryId: d-1, UserName: u } }
+  # Automatic rotation: today's $1, and $3 after two rotations.
+  RotatedKey: { Type: AWS::KMS::Key, Properties: { EnableKeyRotation: true } }
+  FastRotatedKey: { Type: AWS::KMS::Key, Properties: { EnableKeyRotation: true, RotationPeriodInDays: 90 } }
+  Dashboard: { Type: AWS::CloudWatch::Dashboard, Properties: { DashboardBody: "{}" } }

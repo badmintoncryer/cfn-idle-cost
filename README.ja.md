@@ -74,7 +74,7 @@ npx cfn-idle-cost [flags] [cdk.out | template ...]
 | `--pricing reserved-1y` | EC2、RDS、ElastiCache、OpenSearch Service、Redshift、MemoryDBのインスタンスを、1年・前払いなし・スタンダードのリザーブドインスタンスの料金で見積もります。コミットした場合のアイドルコストの目安です。その行には`1-yr RI`と付き、ほかはオンデマンドのままです。同梱のスナップショットでのみ使えます（`--live`とは併用不可）。既定は`on-demand`。 |
 | `--discount <pct>` | すべての価格から`pct`%を引きます。EDPなどの個別の割引向けです（例: `--discount 10`）。どの割引を引いたかはフッターに出ます。 |
 | `--discount <Service>=<pct>` | 1つのCloudFormationサービスのリソース（`RDS`なら`AWS::RDS::*`）だけから`pct`%を引きます（例: `--discount EC2=30`）。繰り返し指定でき、そのサービスでは全体の割引より優先します。提案の削減額も同じように割り引きます。 |
-| `--version` | バージョンを表示します。 |
+| `--version` | バージョンと、同梱の価格の日付と、手で管理している表（サポートのカレンダー、Price Listにない公開価格）を最後に確認した日を表示します。 |
 
 終了コードは、成功が`0`、エラーが`1`、使い方の誤り（リージョンのないスタックを含みます）が`2`、`--max`か`--max-increase`の超過が`3`です。見積もれなかったリソースがあっても、成功なら`0`を返します。予算のフラグを付けたときに見積もれなかったリソースがあると、実際のアイドルコストはもっと高いかもしれないという警告を出します。`--max`はこの場合も失敗にしません。一方、`--max-increase`は、見積もれないリソースが追加されたときや、見積もれていたリソースが見積もれなくなったときに失敗します。増加額を確かめられないためです。`? no rule`のリソースは警告の件数に含めますが、予算のチェックを失敗させることはありません。
 
@@ -273,7 +273,7 @@ jobs:
 | `AWS::ECS::Service`（Fargate） | vCPU、メモリ、20 GBを超えるエフェメラルストレージ、パブリックIPv4（`AssignPublicIp: ENABLED`のとき）×`DesiredCount`（x86とARMのLinux、Windows。WindowsはvCPUごとのOSライセンス料金も含みます）。キャパシティプロバイダ戦略を使うときは、FARGATEに割り当たるタスクだけを数えます。`Base`を先に割り当て、残りを`Weight`の比で分けます。ECSは端数の扱いを公開していないので、切り上げます。Fargate Spotのタスクは数えません。ほかのプロバイダのタスクは、そのAuto Scalingグループの側で数えます |
 | `AWS::EFS::FileSystem` | プロビジョンドスループット |
 | `AWS::FSx::FileSystem` | Windows、Lustre、OpenZFS、ONTAPのストレージ容量とスループット容量。容量1 GBあたり3 IOPSを超えるSSD IOPS（ONTAPの容量プールは使った分だけかかるので含みません） |
-| `AWS::KMS::Key`、`AWS::KMS::ReplicaKey` | キー1つにつき$1 |
+| `AWS::KMS::Key`、`AWS::KMS::ReplicaKey` | キー1つにつき$1。`EnableKeyRotation`のときは、最初の2回のローテーションのあと（既定では2年後）に月$3になることを`↗`の行で示す。合計には今の$1を使う |
 | `AWS::SecretsManager::Secret` | シークレットごとの料金と、レプリカごとにそのリージョンの料金 |
 | `AWS::Route53::HostedZone` | ホストゾーンごとの料金 |
 | `AWS::EKS::Cluster` | クラスターの時間料金。`Version`が価格の基準日（同梱のスナップショットの日付、`--live`なら当日）に標準サポートを過ぎていれば、延長サポートの料金も加えます |
@@ -471,6 +471,7 @@ jobs:
   ```
 - EC2インスタンス、Auto Scalingグループ、ウォームプール、フリートのOSは、`ImageId`の公開SSMパラメータのパスから読みます。CDKの`MachineImage.latestWindows()`や`latestAmazonLinux2023()`などはこのパスを書き出します。`/aws/service/ami-windows-latest/...`はライセンス込みのWindows、Amazon Linux、Ubuntu、Debian、Bottlerocket、ECS・EKS最適化AMIはLinuxです。SQL ServerのAMIはWindows、SUSEのAMIはLinuxの料金で見積もり、SQL ServerのライセンスとSUSEのサブスクリプションは数えないので`≈`を付けます。リテラルのAMI IDなどほかのイメージはLinuxとみなして`≈`を付けます。OSは`--os ami-0abc12=windows`か、リソースのMetadataで指定できます。CDKでは`(instance.node.defaultChild as cdk.CfnResource).addMetadata('cfn-idle-cost', { os: 'windows' })`です。テナンシーは共有です。`InstanceMarketOptions`（または起動テンプレートのもの）が`spot`のインスタンスはSpotとして数えます。
 - グローバルテーブルのレプリカのように、スタックとは別のリージョンで課金される行は、そのリージョンの料金で見積もり、行にリージョンを書きます（`replica in eu-west-1`）。金額はスタックのリージョンの合計に含め、ヘッダーにほかのリージョンで課金される額を出します（`· $2.68 billed in eu-west-1`）。JSONでは行に`billedIn`が付きます。そのリージョンの料金がないときは、その行だけを`? could not estimate`に載せます。
+- いくつかの料金はPrice Listになく、AWSの料金ページから手で管理しています。CloudWatchのダッシュボード、us-east-1のFSx File Cache、End User Messagingの番号のリース料です。これらの行には`list price, not in the Price List`と書き、JSONでは`"priceSource": "list-price"`が付きます。EKSのバージョンのサポートカレンダーも手で管理しています。`--version`で、それぞれを最後に確認した日がわかります。価格の日付がカレンダーの最後の日付を過ぎているときは、標準エラーに警告を出します。
 - Spotのインスタンス（`MixedInstancesPolicy`のAuto Scalingグループ、EC2フリート、Spotフリート、インスタンスタイプが1つのEKSのSpotノードグループ、Spotインスタンス）は、[Spot Instance Advisor](https://aws.amazon.com/ec2/spot/instance-advisor/)がタイプ・リージョン・OSごとに示す平均の割引率をオンデマンド料金から引いて見積もります。割引率はスナップショットに含めていて、`--live`では取り直します。Spotの価格は変わるので、これらの行には`≈`を付け、前提の一覧にオンデマンド料金（Spotの上限）ならいくら増えるかを出します。
 - サイズがAMIから決まるルートボリューム（`/dev/xvda`か`/dev/sda1`のマッピングに`VolumeSize`がないもの）は、一般的なAMIのサイズ（8 GB、Windowsは30 GB）で数えます。マッピングに`VolumeType`がなければgp3とし、`≈`を付けます。ルートデバイスの`VolumeSize`を書けば確定します。
 - インスタンス、Auto Scalingグループ、Fargateのタスクに起動時に割り当てられるパブリックIPv4は、`AssociatePublicIpAddress`（Fargateは`AssignPublicIp`）で割り当てると指定しているときに数えます。指定がなければ、すべてのサブネットが同じテンプレートにあり、`MapPublicIpOnLaunch`がtrueのときに数えます。サブネットが別のスタックなどにあって決まらないときは、IPの行を出さず、リソースのほかの費用だけを見積もります。同じテンプレートでElastic IPを関連付けたインスタンスは、IPを二重に数えません。

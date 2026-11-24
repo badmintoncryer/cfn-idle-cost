@@ -27,7 +27,7 @@ func init() {
 			panic(unresolved("File Cache prices are not in the Price List; only us-east-1's is known"))
 		}
 		size := e.mustNum(p, "StorageCapacity")
-		e.add(size, "GB", size*1.33, "cache storage ($1.33/GB-month list price, not in the Price List)")
+		e.listPrice(size, "GB", size*1.33, "cache storage ($1.33/GB-month list price, not in the Price List)")
 	}
 	rules["AWS::Transfer::WebApp"] = func(e *est, p map[string]any) {
 		e.hourly(e.num(asMap(p["WebAppUnits"]), "Provisioned", 1), "units", "transfer|WebAppHours", "web app units")

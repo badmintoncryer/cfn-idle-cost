@@ -81,7 +81,7 @@ nested stacks) or CloudFormation templates (JSON or YAML).
 | `--pricing reserved-1y` | Price EC2, RDS, ElastiCache, OpenSearch Service, Redshift and MemoryDB instances at the 1-year, no-upfront, standard Reserved Instance rate, to see the idle cost you would commit to. Those lines say `1-yr RI`; everything else stays on-demand. Uses the bundled snapshot only (not with `--live`). Default `on-demand`. |
 | `--discount <pct>` | Take `pct` percent off every price, for an Enterprise Discount Program or other private pricing, e.g. `--discount 10`. The footer says which discounts were taken. |
 | `--discount <Service>=<pct>` | Take `pct` percent off the resources of one CloudFormation service instead (`RDS` for `AWS::RDS::*`), e.g. `--discount EC2=30`. Repeatable, and overrides the overall one for that service. Suggested savings are discounted the same way. |
-| `--version` | Print the version. |
+| `--version` | Print the version, the date of the bundled prices, and when each hand-kept table (support calendars, list prices not in the Price List) was last checked. |
 
 Exit codes: `0` success (even when some resources could not be estimated), `1`
 error, `2` usage error (including a stack without a region), `3` over `--max`
@@ -321,7 +321,7 @@ and provisioned storage billed whether you use it or not.
 | `AWS::ECS::Service` (Fargate) | vCPU, memory, ephemeral storage above 20 GB and public IPv4 (`AssignPublicIp: ENABLED`) × `DesiredCount` (x86 and ARM Linux, and Windows with its OS license per vCPU). With a capacity provider strategy, only the FARGATE share is priced: `Base` first, then the rest by `Weight`, rounded up since ECS doesn't document how it rounds. Fargate Spot tasks are not counted, and tasks on other providers are counted through their Auto Scaling groups |
 | `AWS::EFS::FileSystem` | provisioned throughput |
 | `AWS::FSx::FileSystem` | storage and throughput capacity for Windows, Lustre, OpenZFS and ONTAP, SSD IOPS above the included 3 per GB (the ONTAP capacity pool is pay-per-use) |
-| `AWS::KMS::Key`, `AWS::KMS::ReplicaKey` | $1 per key |
+| `AWS::KMS::Key`, `AWS::KMS::ReplicaKey` | $1 per key. With `EnableKeyRotation`, a `↗` line under it says the key costs $3/mo after its first two rotations (2 years by default); the total uses today's $1 |
 | `AWS::SecretsManager::Secret` | per secret, and per replica in its own region |
 | `AWS::Route53::HostedZone` | per hosted zone |
 | `AWS::EKS::Cluster` | cluster hourly, plus the extended support fee when `Version` is past the end of standard support on the date of the prices (the snapshot date, or today with `--live`) |
@@ -593,6 +593,13 @@ and Timestream scheduled queries that run on a schedule) are listed under
   billed elsewhere (`· $2.68 billed in eu-west-1`). In JSON the line has
   `billedIn`. When that region has no price, only that line is listed under
   `? could not estimate`.
+- A few prices are not in the Price List and are kept by hand from AWS
+  pricing pages: CloudWatch dashboards, FSx File Cache in us-east-1, and End
+  User Messaging number leases. Their lines say `list price, not in the
+  Price List`, and in JSON they have `"priceSource": "list-price"`. The EKS
+  version support calendar is also kept by hand. `--version` shows when each
+  was last checked. When the prices' date is past the last date such a
+  calendar knows, a warning says so on stderr.
 - Spot instances (Auto Scaling groups with a `MixedInstancesPolicy`, EC2
   Fleets, Spot Fleets, EKS Spot node groups of one instance type, Spot
   instances) are priced at the on-demand price minus the average saving the
