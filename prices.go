@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
 
 // OfferBase serves the public, unauthenticated AWS Bulk Price List files.
@@ -967,8 +968,7 @@ func BuildPrices(regions, only []string, logf func(string, ...any)) (*Prices, er
 			defer wg.Done()
 			sem <- struct{}{}
 			defer func() { <-sem }()
-			out := map[string]map[string]float64{}
-			pub, err := fetchOffer(j.url, byService[j.service], j.region, out)
+			out, pub, err := fetchOfferRetry(j.url, byService[j.service], j.region)
 			mu.Lock()
 			defer mu.Unlock()
 			if err != nil {
@@ -1000,6 +1000,26 @@ func BuildPrices(regions, only []string, logf func(string, ...any)) (*Prices, er
 	}
 	wg.Wait()
 	return p, firstErr
+}
+
+// offerTries is how many times BuildPrices downloads an offer before it gives
+// up, waiting retryDelay × try² before each retry.
+var offerTries, retryDelay = 4, 5 * time.Second
+
+// fetchOfferRetry is fetchOffer, tried again when a download fails: the EC2
+// offers are about 450 MB per region, and one cut off used to fail the weekly
+// refresh.
+func fetchOfferRetry(url string, sels []selector, offerRegion string) (out map[string]map[string]float64, pub string, err error) {
+	for try := 1; try <= offerTries; try++ {
+		if try > 1 {
+			time.Sleep(time.Duration(try*try) * retryDelay)
+		}
+		out = map[string]map[string]float64{}
+		if pub, err = fetchOffer(url, sels, offerRegion, out); err == nil {
+			return out, pub, nil
+		}
+	}
+	return nil, "", fmt.Errorf("after %d tries: %w", offerTries, err)
 }
 
 func fetchOffer(url string, sels []selector, offerRegion string, out map[string]map[string]float64) (string, error) {
