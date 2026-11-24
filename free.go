@@ -705,6 +705,33 @@ var free = []string{
 	"AWS::WorkspacesInstances::VolumeAssociation",
 	"AWS::XRay::Group", "AWS::XRay::ResourcePolicy", "AWS::XRay::SamplingRule", "AWS::XRay::TransactionSearchConfig",
 	"Alexa::ASK::Skill",
+	// Types added since the audit that cost nothing idle: configuration, sharing and
+	// access types, one-off jobs and exports, ONTAP replication settings, Lambda
+	// runtimes, and CloudWatch Omni, Kinesis queues, OpenSearch memory spaces and
+	// SageMaker inference routers, which bill only by data, queries or requests.
+	// An API Portal portal and discovery are counted; their other types are free.
+	"AWS::APIPortal::DiscoveryConfiguration", "AWS::APIPortal::ManagedApi",
+	"AWS::APIPortal::OrganizationDiscoveryConfiguration", "AWS::APIPortal::PortalPublication", "AWS::APIPortal::Product",
+	"AWS::APIPortal::ProductApiPage", "AWS::APIPortal::ProductDisplayOrder",
+	"AWS::APIPortal::ProductManagedApiAssociation", "AWS::APIPortal::ProductPage", "AWS::APIPortal::ProductSharingPolicy",
+	"AWS::AgentRegistry::Publisher", "AWS::AppFabric::AppBundle", "AWS::Athena::SystemTables",
+	"AWS::Backup::BackupAccessPoint", "AWS::Bedrock::DataAutomationLibraryIngestionJob",
+	"AWS::CloudWatch::AccessGrant", "AWS::CloudWatch::AccessProfile", "AWS::CloudWatch::Alert", "AWS::CloudWatch::Domain",
+	"AWS::CloudWatch::DomainAccessGrantForOrganization", "AWS::CloudWatch::DomainForOrganization",
+	"AWS::CloudWatch::MetricDataQueryDefinition", "AWS::CloudWatch::OmniDashboard", "AWS::CloudWatch::Space",
+	"AWS::Cognito::CIMDPolicy", "AWS::Cognito::UserPoolClientSessionConfigurationAttachment",
+	"AWS::Cognito::UserPoolSessionConfigurationAttachment", "AWS::DirectConnect::ResiliencyGroup",
+	"AWS::EC2::DeclarativePoliciesReport", "AWS::EC2::ExportImageTask", "AWS::EC2::FcaPolicy",
+	"AWS::EC2::FcaPolicyAssociation", "AWS::EC2::IPv6Pool", "AWS::EC2::LocalGateway",
+	"AWS::FSx::ClusterPeer", "AWS::FSx::SnapmirrorPolicy", "AWS::FSx::SnapmirrorRelationship", "AWS::FSx::SnapshotPolicy",
+	"AWS::FSx::StorageVirtualMachinePeer", "AWS::IoT::OTAUpdate", "AWS::Kinesis::Queue",
+	"AWS::Lambda::Runtime", "AWS::Lambda::RuntimeAlias", "AWS::Lambda::RuntimeVersion",
+	"AWS::MGN::Application", "AWS::MGN::ReplicationConfigurationTemplate", "AWS::MGN::Wave",
+	"AWS::MediaLive::InputDevice", "AWS::NetworkManager::Connection", "AWS::NetworkManager::ContextStoreAssociation",
+	"AWS::OpenSearchMemory::Space", "AWS::OpenSearchService::ReplicationPeer", "AWS::Route53::RecordSetProtection",
+	"AWS::SSM::DefaultHostManagementConfiguration", "AWS::SageMaker::EndpointPolicy", "AWS::SageMaker::Extension",
+	"AWS::SageMaker::InferenceRouter", "AWS::WellArchitected::AgentOrganizationalProfile",
+	"AWS::WellArchitected::AgentProfilePolicy", "AWS::WorkSpaces::WorkspaceImage",
 	// The service ended (SageMaker Edge Manager, Panorama, OpsWorks Stacks, SimSpaceWeaver), or the
 	// type has no writable properties, so a template can't buy the reservation.
 	"AWS::SageMaker::Device", "AWS::SageMaker::DeviceFleet", "AWS::SageMaker::TrainingPlan",
