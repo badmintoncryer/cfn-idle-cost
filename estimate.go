@@ -1278,7 +1278,7 @@ var notCounted = []string{
 	"AWS::CloudWatch::OTelEnrichment", "AWS::GuardDuty::Detector", "AWS::SecurityHub::Hub", "AWS::SecurityHub::HubV2",
 	"AWS::Config::ConfigurationRecorder", "AWS::Logs::Integration", // priced by the rest of the account
 	"AWS::ECS::Gateway", // ECS adds ALBs as services attach; the count isn't in the template
-	"AWS::EC2::ApplicationStatusCheck", "AWS::NetworkMonitor::Monitor", "AWS::NetworkFlowMonitor::Scope",
+	"AWS::EC2::ApplicationStatusCheck", "AWS::NetworkFlowMonitor::Scope",
 	"AWS::NetworkSecurityManager::Deployment",        // billed per resource or probe outside the template
 	"AWS::EC2::NetworkPerformanceMetricSubscription", // a CloudWatch metric charge whose rate AWS doesn't state
 	"AWS::Macie::Session", "AWS::Macie::Member", "AWS::DevOpsGuru::ResourceCollection", "AWS::AuditManager::Assessment",
@@ -2178,7 +2178,14 @@ func healthCheck(e *est, p map[string]any) {
 		return
 	}
 	sfx, where := "-Non-AWS", "non-AWS endpoint (not in this template)"
+	private := e.str(c, "EndpointType", "PUBLIC") == "PRIVATE"
+	if private { // the source's hourly fee is counted on the HealthCheckSource
+		sfx, where = "-Private-AWS", "private endpoint (health check source counted on its own)"
+	}
 	for _, k := range []string{"IPAddress", "FullyQualifiedDomainName"} {
+		if private {
+			break
+		}
 		m := asMap(c[k])
 		ref, _ := m["Ref"].(string)
 		if _, ok := e.st.Resources[ref]; ok || m["Fn::GetAtt"] != nil {
@@ -2198,7 +2205,11 @@ func healthCheck(e *est, p map[string]any) {
 	if e.flag(c, "MeasureLatency") {
 		opts = append(opts, "latency measurement")
 	}
-	e.monthly(1, "", "r53hc|Health-Check"+sfx, t+" health check, "+where)
+	basic := "r53hc|Health-Check" + sfx
+	if private {
+		basic = "r53hc|Health-Check-Basic" + sfx
+	}
+	e.monthly(1, "", basic, t+" health check, "+where)
 	e.monthly(float64(len(opts)), "features", "r53hc|Health-Check-Option"+sfx, "optional features: "+strings.Join(opts, ", "))
 }
 

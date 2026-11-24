@@ -17,7 +17,8 @@ var servicesPrices = &Prices{Source: "test prices", AsOf: "2026-10-20", Regions:
 		"paycrypto|ActiveKeys": 1, "b2bi|PartnershipMonths": 8, "billingconductor|Proforma-Accounts": 8.25,
 		"lightsail|LoadBalancerUsage": 0.024193548, "lightsail|DiskUsage": 0.1, "lightsail|UnusedStaticIP": 0.005,
 		"lightsail|ContainerSvcUsage:Micro-0.25CPU-1GB": 0.01344086, "lightsail|Storage-BundleUsage:100GB": 3,
-		"lightsail|CDN-BundleUsage:50GB": 2.5,
+		"lightsail|CDN-BundleUsage:50GB": 2.5, "apiportal|APIGateway-APIPortal-DocumentationPortal-Months": 125,
+		"apiportal|APIGateway-APIPortal-DiscoveryMinimum-Months": 40,
 	},
 }}
 

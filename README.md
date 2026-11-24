@@ -331,6 +331,7 @@ and provisioned storage billed whether you use it or not.
 | `AWS::Lambda::CapacityProvider` | Lambda Managed Instances: EC2 hourly (Linux) plus the management fee × the instances the functions that use it need at least. See [Assumptions](#assumptions). Needs `AllowedInstanceTypes` with one type |
 | `AWS::CloudWatch::Dashboard` | $3 per dashboard (the list price; dashboards are not in the Price List) |
 | `AWS::EC2::TransitGatewayAttachment`, `TransitGatewayVpcAttachment`, `TransitGatewayPeeringAttachment`, `TransitGatewayConnect` | attachment hourly |
+| `AWS::EC2::TransitGatewayNetworkFunctionAttachment` | Gateway Load Balancer network functions: the attachment hourly at the standard attachment rate, plus a Gateway Load Balancer endpoint hourly × `AvailabilityZones`. AWS Network Firewall attachments are billed to the firewall owner and are not estimated |
 | `AWS::EC2::VPNConnection` | connection hourly (the lower site rate on a VPN concentrator), plus the Transit Gateway VPN attachment |
 | `AWS::EC2::ClientVpnTargetNetworkAssociation` | association hourly |
 | `AWS::Route53Resolver::ResolverEndpoint` | hourly × IP addresses |
@@ -349,6 +350,8 @@ and provisioned storage billed whether you use it or not.
 | `AWS::SageMaker::Endpoint` | instance hourly × `InitialInstanceCount` per production variant, or × `ManagedInstanceScaling.MinInstanceCount` when it is not set (endpoints that host inference components). Serverless variants: $0 idle |
 | `AWS::CodePipeline::Pipeline` | per active V1 pipeline (V2 pipelines bill per minute: $0 idle) |
 | `AWS::ApiGateway::Stage` | cache cluster hourly by `CacheClusterSize` when `CacheClusterEnabled` |
+| `AWS::APIPortal::Portal` | monthly fee per documentation portal (APIs beyond the included 400 not counted) |
+| `AWS::APIPortal::DiscoveryEnablement` | API discovery monthly minimum, once per stack; $0 when the template also has a documentation portal, which waives it (discovered APIs beyond 400 not counted) |
 | `AWS::DirectoryService::MicrosoftAD` | 2 domain controllers hourly (Standard or Enterprise). Controllers added later are not in the template |
 | `AWS::DirectoryService::SimpleAD` | directory hourly (Small or Large) |
 | `AWS::ACMPCA::CertificateAuthority` | monthly per CA (general-purpose or short-lived certificate mode) |
@@ -373,7 +376,8 @@ and provisioned storage billed whether you use it or not.
 | `AWS::KinesisAnalyticsV2::Application` | KPUs (parallelism / parallelism per KPU) plus one for orchestration, and 50 GB of running storage per KPU, as if it runs (CloudFormation creates it stopped). Studio notebooks: two extra KPUs and storage for one. SQL applications are not estimated |
 | `AWS::NetworkManager::CoreNetwork` | hourly per edge location in `PolicyDocument`, priced in the stack's region |
 | `AWS::EC2::EC2Fleet`, `AWS::EC2::SpotFleet` | instance hourly (Linux) × on-demand target capacity, and the EBS volumes of its launch template, when the fleet launches one instance type. Spot capacity is not counted |
-| `AWS::Route53::HealthCheck` | monthly fee and optional features (HTTPS, string matching, fast interval, latency measurement). An endpoint that is a resource in the template is priced as an AWS endpoint, any other as non-AWS. Calculated and CloudWatch metric checks are priced as AWS endpoints |
+| `AWS::Route53::HealthCheck` | monthly fee and optional features (HTTPS, string matching, fast interval, latency measurement). An endpoint that is a resource in the template is priced as an AWS endpoint, any other as non-AWS. Calculated and CloudWatch metric checks are priced as AWS endpoints. Private endpoint checks (`EndpointType: PRIVATE`) are priced at the private rates |
+| `AWS::Route53::HealthCheckSource` | private endpoint health check source hourly × Availability Zones in `SubnetConfigurationList` |
 | `AWS::Kendra::Index` | edition hourly (Developer, Enterprise, GenAI Enterprise) and additional query and storage capacity units |
 | `AWS::EC2::VerifiedAccessEndpoint` | hourly per endpoint, at the HTTP or the non-HTTP (TCP, RDS, CIDR) application price |
 | `AWS::CloudWatch::InsightRule` | monthly fee per enabled Contributor Insights rule (matched log events not counted) |
@@ -435,6 +439,7 @@ and provisioned storage billed whether you use it or not.
 | `AWS::SES::DedicatedIpPool` | Dedicated IPs (managed) monthly fee for `ScalingMode: MANAGED`, once per stack (billed per account) |
 | `AWS::SES::Tenant` | monthly fee per tenant |
 | `AWS::InternetMonitor::Monitor` | hourly × `Resources` (inactive monitors: $0; city-networks not counted) |
+| `AWS::NetworkMonitor::Probe` | Network Synthetic Monitor hourly fee per monitored subnet: probes with the same `SourceArn` and monitor are billed once. `AWS::NetworkMonitor::Monitor`: $0 |
 | `AWS::ApplicationInsights::Application` | $0 idle, unless it sets up monitoring (`AutoConfigurationEnabled`, components): its alarms and metrics are not estimated |
 | `AWS::ARCRegionSwitch::Plan` | monthly fee per Region switch plan |
 | `AWS::RefactorSpaces::Environment` | environment hourly, plus a Transit Gateway attachment per VPC of its applications and services in the same template (`NetworkFabricType: TRANSIT_GATEWAY`) |
@@ -508,7 +513,7 @@ Inspector CIS and code repository scans, CodeGuru Reviewer, AppFabric, IoT
 TwinMaker entities), Bedrock imported models, CloudFront distribution tenants, Route 53
 Resolver on Outposts, ECS gateways (ECS adds load balancers as services
 attach), and monitoring billed per resource or probe outside the template (EC2
-application status checks, Network Synthetic Monitor, Network Flow Monitor
+application status checks, Network Flow Monitor
 scopes, Network Security Manager deployments, network performance metric
 subscriptions), Elastic Disaster Recovery plan executions, SageMaker Partner
 AI Apps, Oracle Database@AWS, WorkSpaces Pools, Launch Wizard deployments,

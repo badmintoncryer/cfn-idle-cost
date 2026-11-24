@@ -18,10 +18,13 @@ var connectivityPrices = &Prices{Source: "test prices", AsOf: "2026-10-20", Regi
 		"waf|WebACL": 5, "waf|Rule": 1, "fms|Policy": 100, "nsm|Usage-Trigger-Policy": 0.35, "ses|IngressPoint-Subscription": 50,
 		"ses|DIP-Managed-Acc-Sub-Hours": 15, "ses|Tenant-Count": 0.005, "im|CW:InternetMonitor-MonitoredResource": 0.01,
 		"refactor|EnvironmentHours": 0.028, "tgw|TransitGatewayVPC": 0.05, "elb|Load Balancer-Network": 0.0225,
+		"r53hc|PEHC:HealthCheckSource-Hourly": 0.125, "cwnm|CWNMHybrid-Paid": 0.1, "vpc|VpcEndpoint-GWLBE-Hours": 0.01,
+		"apiportal|APIGateway-APIPortal-DiscoveryMinimum-Months": 40,
 	},
 	"global": {
 		"r53|HostedZone": 0.5, "gr|GlobalResolver-BaseRegionsWithFiltering": 2.5, "gr|GlobalResolver-AdditionalRegionsWithFiltering": 1.5,
-		"arc|Global-AmazonARCRegionSwitchPlan": 70,
+		"arc|Global-AmazonARCRegionSwitchPlan": 70, "r53hc|Health-Check-Basic-Private-AWS": 0.5,
+		"r53hc|Health-Check-Option-Private-AWS": 1,
 	},
 }}
 
@@ -29,7 +32,8 @@ var connectivityPrices = &Prices{Source: "test prices", AsOf: "2026-10-20", Regi
 // reservation fleets, Direct Connect, Interconnect, Cloud WAN, VPC Lattice,
 // endpoints, Route 53 Profiles and Global Resolver, Cloud Map namespaces, WAF
 // Classic, Firewall Manager, Network Security Manager, SES, Internet Monitor,
-// Application Insights, Region switch and Refactor Spaces.
+// Application Insights, Region switch, Refactor Spaces, private endpoint health
+// checks, Network Synthetic Monitor and Transit Gateway network functions.
 func TestConnectivityRules(t *testing.T) {
 	stacks, err := LoadInputs([]string{"testdata/connectivity.yaml"})
 	if err != nil {

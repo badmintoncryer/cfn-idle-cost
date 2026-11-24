@@ -368,6 +368,10 @@ var selectors = []selector{
 	// cacheMemorySizeGb is the CacheClusterSize value (1.6), not the usagetype's (1.55GB).
 	{name: "apigw", service: "AmazonApiGateway", families: []string{"Amazon API Gateway Cache"},
 		key: func(a map[string]string, u string) string { return "cache:" + a["cacheMemorySizeGb"] }},
+	{name: "apiportal", service: "AmazonApiGateway", families: []string{"Amazon API Gateway API Portal"},
+		key: func(a map[string]string, u string) string {
+			return keep(u, "APIGateway-APIPortal-DocumentationPortal-Months", "APIGateway-APIPortal-DiscoveryMinimum-Months")
+		}},
 	{name: "ds", service: "AWSDirectoryService", families: []string{"AWS Directory Service"},
 		key: func(a map[string]string, u string) string {
 			return keep(u, "MicrosoftAD-DC-Usage", "Std-MicrosoftAD-DC-Usage", "Small-SimpleAD-Usage", "Large-SimpleAD-Usage")
@@ -451,7 +455,8 @@ var selectors = []selector{
 		}},
 	{name: "r53hc", service: "AmazonRoute53", global: true, families: []string{"DNS Health Check"},
 		key: func(a map[string]string, u string) string {
-			return keep(u, "Health-Check-AWS", "Health-Check-Non-AWS", "Health-Check-Option-AWS", "Health-Check-Option-Non-AWS")
+			return keep(u, "Health-Check-AWS", "Health-Check-Non-AWS", "Health-Check-Option-AWS", "Health-Check-Option-Non-AWS",
+				"Health-Check-Basic-Private-AWS", "Health-Check-Option-Private-AWS", "PEHC:HealthCheckSource-Hourly")
 		}},
 	// KendraEnterpriseEdition ($7/h) is the retired price; Kendra-Enterprise-Edition is the current one.
 	{name: "kendra", service: "AmazonKendra",
@@ -584,6 +589,9 @@ var selectors = []selector{
 			}
 			return ""
 		}},
+	// Network Synthetic Monitor, per monitored subnet-hour.
+	{name: "cwnm", service: "AmazonCloudWatch", families: []string{"CloudWatch Network Monitor"},
+		key: func(a map[string]string, u string) string { return keep(u, "CWNMHybrid-Paid") }},
 	// Internet Monitor has no productFamily.
 	{name: "im", service: "AmazonCloudWatch",
 		key: func(a map[string]string, u string) string { return keep(u, "CW:InternetMonitor-MonitoredResource") }},

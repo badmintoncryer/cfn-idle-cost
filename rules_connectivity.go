@@ -113,6 +113,14 @@ func init() {
 		}
 	}
 	rules["AWS::Route53GlobalResolver::GlobalResolver"] = globalResolver
+	rules["AWS::Route53::HealthCheckSource"] = func(e *est, p map[string]any) {
+		n := e.length(asMap(p["HealthCheckSourceConfig"]), "SubnetConfigurationList")
+		if n < 0 {
+			panic(unresolved("HealthCheckSourceConfig.SubnetConfigurationList is not set"))
+		}
+		e.hourly(float64(n), "AZs", "r53hc|PEHC:HealthCheckSource-Hourly", "private endpoint health check source per Availability Zone")
+	}
+	rules["AWS::EC2::TransitGatewayNetworkFunctionAttachment"] = tgwNetworkFunction
 	namespace := func(e *est, p map[string]any) {
 		e.monthly(1, "", "r53|HostedZone", "hosted zone of the namespace")
 	}
@@ -157,6 +165,24 @@ func init() {
 			return
 		}
 		e.hourly(float64(max(0, e.length(p, "Resources"))), "resources", "im|CW:InternetMonitor-MonitoredResource", "monitored resources")
+	}
+	// Network Synthetic Monitor bills each monitored subnet per hour; up to four
+	// probes from one subnet in a monitor share the fee, so they are counted once.
+	rules["AWS::NetworkMonitor::Monitor"] = func(e *est, p map[string]any) {
+		e.add(1, "", 0, "monitor fee $0; its probes' subnets are counted on each Probe")
+	}
+	rules["AWS::NetworkMonitor::Probe"] = func(e *est, p map[string]any) {
+		if p["SourceArn"] == nil {
+			panic(unresolved("SourceArn is not set"))
+		}
+		mon, src := fmt.Sprint(p["MonitorName"]), fmt.Sprint(p["SourceArn"])
+		if e.first(func(q map[string]any) bool {
+			return fmt.Sprint(q["MonitorName"]) == mon && fmt.Sprint(q["SourceArn"]) == src
+		}) {
+			e.hourly(1, "subnet", "cwnm|CWNMHybrid-Paid", "monitored subnet (probes from the same subnet and monitor share it)")
+			return
+		}
+		e.add(1, "", 0, "same subnet and monitor as another probe; billed once")
 	}
 	rules["AWS::ApplicationInsights::Application"] = func(e *est, p map[string]any) {
 		if e.flag(p, "AutoConfigurationEnabled") || e.length(p, "ComponentMonitoringSettings") > 0 || e.length(p, "CustomComponents") > 0 {
@@ -284,4 +310,24 @@ func refactorEnvironment(e *est, p map[string]any) {
 		}
 	}
 	e.hourly(float64(len(vpcs)), "VPCs", "tgw|TransitGatewayVPC", "Transit Gateway attachment per VPC in this template")
+}
+
+// tgwNetworkFunction bills a network function attachment. With a Gateway Load
+// Balancer endpoint service, the attachment owner pays the standard attachment
+// hour and a Gateway Load Balancer endpoint in each Availability Zone; with
+// AWS Network Firewall, the firewall owner is billed, through the firewall.
+func tgwNetworkFunction(e *est, p map[string]any) {
+	svc := e.mustStr(p, "ServiceName")
+	if !strings.Contains(svc, "vpce-svc-") {
+		panic(unresolved("ServiceName " + svc + " is not a Gateway Load Balancer endpoint service; AWS Network Firewall attachments are billed to the firewall owner"))
+	}
+	n := e.length(p, "AvailabilityZones")
+	if n < 0 {
+		n = e.length(p, "AvailabilityZoneIds")
+	}
+	if n < 0 {
+		panic(unresolved("AvailabilityZones is not set"))
+	}
+	e.hourly(1, "", "tgw|TransitGatewayVPC", "Transit Gateway attachment (standard attachment rate)")
+	e.hourly(float64(n), "AZs", "vpc|VpcEndpoint-GWLBE-Hours", "Gateway Load Balancer endpoint per Availability Zone")
 }
