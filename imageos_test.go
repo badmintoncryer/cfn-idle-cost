@@ -98,6 +98,7 @@ func TestImageOS(t *testing.T) {
 
 // --os sets the OS by AMI or by resource; --assume none leaves assumed lines out.
 func TestOSFlags(t *testing.T) {
+	defer func() { excludeAssumed = false; clear(osOverrides) }()
 	path := t.TempDir() + "/os.yaml"
 	os.WriteFile(path, []byte(osTemplate), 0o644)
 	var b bytes.Buffer
